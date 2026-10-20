@@ -6,12 +6,14 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Checkbox, Input, Select } from "@/components/ui/fields";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
 import { FilterBar } from "@/components/ui/search-form";
 import { Table, TableWrap } from "@/components/ui/table";
 import { requireContext } from "@/lib/auth";
 import { imageUrl, primaryImages } from "@/lib/item-images";
 import { can } from "@/lib/permissions";
-import { listCategories, listItems, listLocations } from "@/lib/queries";
+import { pageParam } from "@/lib/paging";
+import { listCategories, listLocations, pageItems } from "@/lib/queries";
 import { formatDate, formatMoney, formatNumber, isLowStock, plural } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Артикули" };
@@ -29,8 +31,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   const low = first(sp.low) === "1";
   const imported = Number(first(sp.imported)) || 0;
 
-  const [rows, categories, locations] = await Promise.all([
-    listItems(ctx.db, { q, categoryId, status, low, locationId }),
+  const [{ rows, total, page, pageSize }, categories, locations] = await Promise.all([
+    pageItems(ctx.db, { q, categoryId, status, low, locationId }, pageParam(sp)),
     listCategories(ctx.db),
     listLocations(ctx.db),
   ]);
@@ -174,9 +176,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
           </Table>
         )}
       </TableWrap>
-      <p className="mt-3 text-xs text-muted">
-        {rows.length} {plural(rows.length, "артикул", "артикула")}
-      </p>
+      <Pagination basePath="/items" searchParams={sp} page={page} pageSize={pageSize} total={total} noun={plural(total, "артикул", "артикула")} />
     </>
   );
 }

@@ -4,23 +4,36 @@ import { Plus, Truck } from "lucide-react";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input, Select } from "@/components/ui/fields";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { FilterBar } from "@/components/ui/search-form";
 import { Table, TableWrap } from "@/components/ui/table";
-import { SHIPMENT_STATUSES, type ShipmentStatus } from "@/db/tenant-schema";
+import { SHIPMENT_STATUSES, type ShipmentDirection, type ShipmentStatus } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { listShipments } from "@/lib/queries";
+import { pageParam, param, type SearchParams } from "@/lib/paging";
+import { pageShipments } from "@/lib/queries";
 import { cn, formatDate, label, todayIso } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Пратки" };
 
 const TABS: Array<{ value: ShipmentStatus | "all"; label: string }> = [{ value: "all", label: "Всички" }, ...SHIPMENT_STATUSES.map((s) => ({ value: s, label: label(s) }))];
 
-export default async function ShipmentsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function ShipmentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext();
   const sp = await searchParams;
-  const status = (TABS.some((t) => t.value === sp.status) ? sp.status : "all") as ShipmentStatus | "all";
-  const rows = await listShipments(ctx.db, status);
+  const status = (TABS.some((t) => t.value === param(sp, "status")) ? param(sp, "status") : "all") as ShipmentStatus | "all";
+  const direction = (["inbound", "outbound"].includes(param(sp, "direction")) ? param(sp, "direction") : "all") as ShipmentDirection | "all";
+  const q = param(sp, "q");
+  const { rows, total, page, pageSize } = await pageShipments(ctx.db, { status, direction, q }, pageParam(sp));
+  const tabHref = (value: string) => {
+    const qs = new URLSearchParams();
+    if (value !== "all") qs.set("status", value);
+    if (direction !== "all") qs.set("direction", direction);
+    if (q) qs.set("q", q);
+    return `/shipments${qs.size ? `?${qs}` : ""}`;
+  };
   const today = todayIso();
 
   return (
@@ -42,13 +55,25 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         {TABS.map((t) => (
           <Link
             key={t.value}
-            href={t.value === "all" ? "/shipments" : `/shipments?status=${t.value}`}
+            href={tabHref(t.value)}
             className={cn("rounded-lg px-3 py-1.5 text-sm font-medium transition-colors", status === t.value ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}
           >
             {t.label}
           </Link>
         ))}
       </div>
+
+      <FilterBar action="/shipments" resetHref={q || direction !== "all" ? tabHref(status).replace(/[?&](direction|q)=[^&]*/g, "") || "/shipments" : undefined}>
+        {status !== "all" && <input type="hidden" name="status" value={status} />}
+        <div className="min-w-56 flex-1">
+          <Input name="q" placeholder="Референция, партньор, куриер, товарителница…" defaultValue={q} />
+        </div>
+        <Select name="direction" defaultValue={direction} className="w-auto">
+          <option value="all">Входящи и изходящи</option>
+          <option value="inbound">Входящи</option>
+          <option value="outbound">Изходящи</option>
+        </Select>
+      </FilterBar>
 
       <TableWrap>
         {rows.length === 0 ? (
@@ -104,6 +129,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
           </Table>
         )}
       </TableWrap>
+      <Pagination basePath="/shipments" searchParams={sp} page={page} pageSize={pageSize} total={total} noun="пратки" />
     </>
   );
 }

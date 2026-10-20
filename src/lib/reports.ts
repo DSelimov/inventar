@@ -140,9 +140,14 @@ export async function buildReports(db: Db, s: AppSettings) {
     limit: 50,
   });
 
+  const [{ expiringTotal }] = await db
+    .select({ expiringTotal: n(sql<number>`count(*)`) })
+    .from(lots)
+    .where(and(gt(lots.quantity, 0), lte(lots.expiryDate, format(addDays(now, 90), "yyyy-MM-dd"))));
+
   const [{ catCount }] = await db.select({ catCount: n(sql<number>`count(*)`) }).from(categories);
 
-  return { settings: s, windowStart, totals, turnover, topMovers, deadStock, ageing, reorder, series, currentValue, expiring, coverDays, avgLead, catCount, itemCount: activeItems.length };
+  return { settings: s, windowStart, totals, turnover, topMovers, deadStock, ageing, reorder, series, currentValue, expiring, expiringTotal, coverDays, avgLead, catCount, itemCount: activeItems.length };
 }
 
 export type ReorderRow = Reports["reorder"][number];

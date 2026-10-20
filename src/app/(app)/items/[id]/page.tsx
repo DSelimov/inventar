@@ -220,7 +220,15 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           )}
 
           <Card>
-            <CardHeader title="Складова история" description="Най-новите движения са най-отгоре." />
+            <CardHeader
+              title="Складова история"
+              description="Последните 50 движения, най-новите отгоре."
+              actions={
+                <Link href={`/movements?item=${id}`} className="text-xs font-medium text-accent hover:underline">
+                  Всички движения
+                </Link>
+              }
+            />
             {item.movements.length === 0 ? (
               <CardBody className="text-sm text-muted">Все още няма движения.</CardBody>
             ) : (

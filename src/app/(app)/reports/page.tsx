@@ -146,6 +146,7 @@ export default async function ReportsPage() {
               </tbody>
             </Table>
           )}
+          <ShownOf shown={Math.min(15, r.reorder.length)} total={r.reorder.length} href="/items?low=1" linkLabel="Артикули под минимума" />
         </Card>
 
         <Card>
@@ -212,6 +213,7 @@ export default async function ReportsPage() {
               </tbody>
             </Table>
           )}
+          <ShownOf shown={Math.min(15, r.deadStock.length)} total={r.deadStock.length} />
         </Card>
 
         <Card>
@@ -267,9 +269,28 @@ export default async function ReportsPage() {
                 ))}
               </tbody>
             </Table>
+            <ShownOf shown={r.expiring.length} total={r.expiringTotal} href="/calendar" linkLabel="Календар със сроковете" />
           </Card>
         )}
       </div>
     </>
+  );
+}
+
+/** Отчетите показват първите редове; при повече — бележка и линк към пълния списък. */
+function ShownOf({ shown, total, href, linkLabel }: { shown: number; total: number; href?: string; linkLabel?: string }) {
+  if (total <= shown) return null;
+  return (
+    <div className="border-t border-line px-5 py-2.5 text-xs text-muted">
+      Показани {shown} от {total}.
+      {href && (
+        <>
+          {" "}
+          <Link href={href} className="font-medium text-accent hover:underline">
+            {linkLabel} →
+          </Link>
+        </>
+      )}
+    </div>
   );
 }

@@ -4,23 +4,28 @@ import { ClipboardList, Plus } from "lucide-react";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/fields";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { FilterBar } from "@/components/ui/search-form";
 import { Table, TableWrap } from "@/components/ui/table";
 import { ORDER_STATUSES, type OrderStatus, type OrderType } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { listOrders } from "@/lib/queries";
+import { pageParam, param, type SearchParams } from "@/lib/paging";
+import { pageOrders } from "@/lib/queries";
 import { cn, formatDate, formatMoney, label } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Поръчки" };
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ type?: string; status?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext();
   const sp = await searchParams;
-  const type = (["purchase", "sales"].includes(sp.type ?? "") ? sp.type : "all") as OrderType | "all";
-  const status = ((ORDER_STATUSES as readonly string[]).includes(sp.status ?? "") ? sp.status : "all") as OrderStatus | "all";
-  const rows = await listOrders(ctx.db, { type, status });
-  const href = (t: string, s: string) => `/orders?type=${t}&status=${s}`;
+  const q = param(sp, "q");
+  const type = (["purchase", "sales"].includes(param(sp, "type")) ? param(sp, "type") : "all") as OrderType | "all";
+  const status = ((ORDER_STATUSES as readonly string[]).includes(param(sp, "status")) ? param(sp, "status") : "all") as OrderStatus | "all";
+  const { rows, total, page, pageSize } = await pageOrders(ctx.db, { type, status, q }, pageParam(sp));
+  const href = (t: string, s: string) => `/orders?type=${t}&status=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   return (
     <>
@@ -57,6 +62,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           ))}
         </div>
       </div>
+
+      <FilterBar action="/orders" resetHref={q ? href(type, status).replace(/&q=[^&]*/, "") : undefined}>
+        <input type="hidden" name="type" value={type} />
+        <input type="hidden" name="status" value={status} />
+        <div className="min-w-56 flex-1">
+          <Input name="q" placeholder="Търсене по номер или партньор…" defaultValue={q} />
+        </div>
+      </FilterBar>
 
       <TableWrap>
         {rows.length === 0 ? (
@@ -106,6 +119,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </Table>
         )}
       </TableWrap>
+      <Pagination basePath="/orders" searchParams={sp} page={page} pageSize={pageSize} total={total} noun="поръчки" />
     </>
   );
 }

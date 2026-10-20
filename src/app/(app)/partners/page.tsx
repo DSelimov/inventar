@@ -4,21 +4,32 @@ import { Plus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/fields";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { FilterBar } from "@/components/ui/search-form";
 import { Table, TableWrap } from "@/components/ui/table";
 import type { PartnerType } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { listPartners } from "@/lib/queries";
+import { pageParam, param, type SearchParams } from "@/lib/paging";
+import { pagePartners } from "@/lib/queries";
 import { cn, label } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Партньори" };
 
-export default async function PartnersPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+export default async function PartnersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext();
   const sp = await searchParams;
-  const type = (["supplier", "customer"].includes(sp.type ?? "") ? sp.type : "all") as PartnerType | "all";
-  const rows = await listPartners(ctx.db, type);
+  const type = (["supplier", "customer"].includes(param(sp, "type")) ? param(sp, "type") : "all") as PartnerType | "all";
+  const q = param(sp, "q");
+  const { rows, total, page, pageSize } = await pagePartners(ctx.db, { type, q }, pageParam(sp));
+  const tabHref = (v: string) => {
+    const qs = new URLSearchParams();
+    if (v !== "all") qs.set("type", v);
+    if (q) qs.set("q", q);
+    return `/partners${qs.size ? `?${qs}` : ""}`;
+  };
 
   return (
     <>
@@ -39,11 +50,17 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
           ["supplier", "Доставчици"],
           ["customer", "Клиенти"],
         ].map(([v, l]) => (
-          <Link key={v} href={v === "all" ? "/partners" : `/partners?type=${v}`} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", type === v ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}>
+          <Link key={v} href={tabHref(v)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", type === v ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}>
             {l}
           </Link>
         ))}
       </div>
+      <FilterBar action="/partners" resetHref={q ? (type === "all" ? "/partners" : `/partners?type=${type}`) : undefined}>
+        {type !== "all" && <input type="hidden" name="type" value={type} />}
+        <div className="min-w-56 flex-1">
+          <Input name="q" placeholder="Име, имейл, телефон, ЕИК…" defaultValue={q} />
+        </div>
+      </FilterBar>
       <TableWrap>
         {rows.length === 0 ? (
           <EmptyState icon={Users} title="Няма партньори" description="Добавете доставчици и клиенти, за да ги избирате в поръчки и пратки." />
@@ -78,6 +95,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
           </Table>
         )}
       </TableWrap>
+      <Pagination basePath="/partners" searchParams={sp} page={page} pageSize={pageSize} total={total} noun="партньори" />
     </>
   );
 }
