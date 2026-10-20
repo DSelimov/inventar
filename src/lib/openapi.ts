@@ -333,6 +333,16 @@ const bearer = [{ bearerAuth: [] }];
 const errorResponses = (extra: Record<string, string> = {}) => ({
   "401": { description: "Липсва или е невалиден API ключ.", content: { "application/json": { schema: ref("Error") } } },
   "403": { description: "Ключът няма нужното право (read/write).", content: { "application/json": { schema: ref("Error") } } },
+  "429": {
+    description: "Превишен лимит от заявки за ключа. Изчакайте Retry-After секунди.",
+    headers: {
+      "Retry-After": { description: "Секунди до нов опит", schema: { type: "integer" } },
+      "X-RateLimit-Limit": { description: "Заявки в минута", schema: { type: "integer" } },
+      "X-RateLimit-Remaining": { description: "Оставащи заявки в текущата минута", schema: { type: "integer" } },
+      "X-RateLimit-Reset": { description: "Край на текущата минута (Unix секунди)", schema: { type: "integer" } },
+    },
+    content: { "application/json": { schema: ref("Error") } },
+  },
   ...Object.fromEntries(Object.entries(extra).map(([code, description]) => [code, { description, content: { "application/json": { schema: ref("Error") } } }])),
 });
 const ok = (schema: Schema, description = "Успех") => ({ "200": { description, content: { "application/json": { schema } } } });
@@ -366,7 +376,9 @@ export function buildOpenApi(serverUrl: string) {
         "**Автентикация.** Създайте API ключ от *Настройки › API* и го изпращайте в заглавието `Authorization: Bearer inv_…`.",
         "Ключът е обвързан с една организация: виждате и променяте само нейните данни. Ключ с право *четене* може да ползва само GET; за POST/PATCH е нужно право *запис*.",
         "",
-        "**Грешки.** Винаги `{ \"error\": \"…\" }` с HTTP код 400 (невалидна заявка), 401 (ключ), 403 (права), 404 (не е намерено), 409 (конфликт, напр. дублиран код), 422 (невалидни полета).",
+        "**Грешки.** Винаги `{ \"error\": \"…\" }` с HTTP код 400 (невалидна заявка), 401 (ключ), 403 (права), 404 (не е намерено), 409 (конфликт, напр. дублиран код), 422 (невалидни полета), 429 (лимит), 500 (вътрешна грешка; детайлите са само в лога на сървъра).",
+        "",
+        "**Лимит.** До 600 заявки в минута за един API ключ. Всеки отговор съдържа `X-RateLimit-Limit`, `X-RateLimit-Remaining` и `X-RateLimit-Reset` (Unix време в секунди). При превишаване: HTTP 429 с `Retry-After` (секунди).",
         "",
         "**Дати.** Полетата с дата са `ГГГГ-ММ-ДД`; моментите във времето са ISO 8601 в UTC.",
         "",

@@ -81,6 +81,14 @@ export const passwordResets = mysqlTable(
   (t) => [index("password_resets_user").on(t.userId)],
 );
 
+/** Броячи за ограничаване на опити (вход, забравена парола): фиксиран прозорец по ключ. */
+export const rateLimits = mysqlTable("rate_limits", {
+  /** напр. login:email:ivan@firma.bg, login:ip:1.2.3.4 */
+  key: varchar("key", { length: 191 }).primaryKey(),
+  hits: int("hits").notNull().default(0),
+  windowStart: datetime("window_start", { fsp: 3 }).notNull(),
+});
+
 /** Предварително създадени бази (режим manual, напр. споделен хостинг). */
 export const databasePool = mysqlTable("database_pool", {
   id: int("id").autoincrement().primaryKey(),

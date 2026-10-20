@@ -11,19 +11,32 @@ import { UserError } from "@/lib/errors";
 import { str } from "@/lib/forms";
 import { passwordResetMail, sendMail } from "@/lib/mail";
 import { createPasswordLink, findPasswordLink, recentResetExists } from "@/lib/password-tokens";
+import { clear, clientIp, hit, minutes, retryAfter } from "@/lib/rate-limit";
 import { currentTenant, isValidSubdomain, rootUrl, tenantUrl } from "@/lib/tenant";
+
+/** Вход: до 5 грешни опита за имейл и 20 за IP адрес на 15 минути. */
+const loginLimits = (email: string, ip: string) => ({
+  email: { key: `login:email:${email}`, max: 5, windowMs: 15 * 60_000 },
+  ip: { key: `login:ip:${ip}`, max: 20, windowMs: 15 * 60_000 },
+});
 
 export async function login(_prev: string | undefined, fd: FormData): Promise<string | undefined> {
   const email = str(fd, "email").toLowerCase();
   const password = str(fd, "password");
+  const limits = loginLimits(email, await clientIp());
+  const wait = Math.max(await retryAfter(limits.email), await retryAfter(limits.ip));
+  if (wait > 0) return `Твърде много неуспешни опити за вход. Опитайте отново след ${minutes(wait)} мин. или използвайте „Забравена парола“.`;
+
   const [user] = await controlDb.select().from(users).where(eq(users.email, email)).limit(1);
-  if (!user || !verifyPassword(password, user.passwordHash)) return "Грешен имейл или парола.";
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    await Promise.all([hit(limits.email), hit(limits.ip)]);
+    return "Грешен имейл или парола.";
+  }
+  await clear(limits.email.key);
 
   const tenant = await currentTenant();
   if (tenant) {
-    const [m] = await controlDb.select().from(memberships).where(eq(memberships.userId, user.id));
-    const member = (await controlDb.select().from(memberships).where(eq(memberships.userId, user.id))).find((x) => x.organizationId === tenant.id);
-    void m;
+    const [member] = await controlDb.select().from(memberships).where(and(eq(memberships.userId, user.id), eq(memberships.organizationId, tenant.id))).limit(1);
     if (!member) return `Нямате достъп до организация „${tenant.name}“. Помолете администратора ѝ да ви добави.`;
     await createSession(user.id, tenant.id);
     redirect("/");
@@ -93,6 +106,10 @@ export async function createOrganization(_prev: string | undefined, fd: FormData
 export async function requestPasswordReset(_prev: string | undefined, fd: FormData): Promise<string | undefined> {
   const email = str(fd, "email").toLowerCase();
   if (!email) return "Въведете имейл.";
+  const ipLimit = { key: `reset:ip:${await clientIp()}`, max: 10, windowMs: 60 * 60_000 };
+  const wait = await retryAfter(ipLimit);
+  if (wait > 0) return `Твърде много заявки. Опитайте отново след ${minutes(wait)} мин.`;
+  await hit(ipLimit);
   const tenant = await currentTenant();
   const [user] = await controlDb.select().from(users).where(eq(users.email, email)).limit(1);
   if (user && !(await recentResetExists(user.id))) {

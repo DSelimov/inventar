@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Checkbox, Field, Input } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { changeOwnPassword } from "@/lib/actions/members";
+import { LogOut } from "lucide-react";
+import { ConfirmButton } from "@/components/ui/confirm-button";
+import { changeOwnPassword, logoutEverywhere } from "@/lib/actions/members";
 import { saveOrganization, saveReportParameters } from "@/lib/actions/settings";
-import { requireContext } from "@/lib/auth";
+import { countSessions, requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getSettings } from "@/lib/settings";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
@@ -14,7 +16,7 @@ export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const s = await getSettings(ctx.db);
+  const [s, sessionCount] = await Promise.all([getSettings(ctx.db), countSessions(ctx.user.id)]);
   const manage = can(ctx.role, "manage");
 
   return (
@@ -71,10 +73,25 @@ export default async function SettingsPage() {
         <CardHeader title="Вашият профил" description={`${ctx.user.name} · ${ctx.user.email}`} />
         <CardBody>
           <Form action={changeOwnPassword} className="flex flex-wrap items-end gap-3">
-            <Field label="Нова парола" className="min-w-60 flex-1">
+            <Field label="Текуща парола" className="min-w-52 flex-1">
+              <Input name="currentPassword" type="password" required autoComplete="current-password" />
+            </Field>
+            <Field label="Нова парола" className="min-w-52 flex-1">
               <Input name="password" type="password" minLength={8} required autoComplete="new-password" />
             </Field>
             <SubmitButton variant="secondary">Смени паролата</SubmitButton>
+          </Form>
+          <p className="mt-2 text-xs text-muted">След смяна на паролата всички други устройства излизат от акаунта.</p>
+        </CardBody>
+        <CardBody className="flex flex-wrap items-center justify-between gap-3 border-t border-line text-sm">
+          <span className="text-muted">
+            Активни сесии: <strong className="text-text">{sessionCount}</strong> (браузъри и устройства, в които сте влезли)
+          </span>
+          <Form action={logoutEverywhere}>
+            <ConfirmButton variant="secondary" size="sm" message="Да изляза ли от всички устройства, включително това?">
+              <LogOut className="h-4 w-4" />
+              Изход от всички устройства
+            </ConfirmButton>
           </Form>
         </CardBody>
       </Card>

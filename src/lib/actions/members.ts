@@ -2,15 +2,16 @@
 
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { controlDb } from "@/db/control";
 import { memberships, ROLES, users, type Role, type User } from "@/db/control-schema";
 import { audit } from "@/lib/audit";
-import { hashPassword, requireContext, type Context } from "@/lib/auth";
+import { destroyAllSessions, destroyOtherSessions, hashPassword, requireContext, verifyPassword, type Context } from "@/lib/auth";
 import { oneOf, required, str } from "@/lib/forms";
 import { accessGrantedMail, invitationMail, sendMail, type Mail } from "@/lib/mail";
 import { createPasswordLink, isPendingInvite, PENDING_PASSWORD } from "@/lib/password-tokens";
 import { can } from "@/lib/permissions";
-import { tenantUrl } from "@/lib/tenant";
+import { rootUrl, tenantUrl } from "@/lib/tenant";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 
@@ -110,9 +111,17 @@ export const removeMember = act(async (membershipId: number) => {
 
 export const changeOwnPassword = act(async (fd: FormData) => {
   const ctx = await requireContext("read");
+  if (!verifyPassword(str(fd, "currentPassword"), ctx.user.passwordHash)) throw new UserError("Текущата парола е грешна.");
   const password = str(fd, "password");
   if (password.length < 8) throw new UserError("Паролата трябва да е поне 8 знака.");
   await controlDb.update(users).set({ passwordHash: hashPassword(password) }).where(eq(users.id, ctx.user.id));
+  await destroyOtherSessions(ctx.user.id);
   revalidatePath("/settings");
-  return "Паролата е сменена.";
+  return "Паролата е сменена. Излязохте от всички други устройства.";
+});
+
+export const logoutEverywhere = act(async () => {
+  const ctx = await requireContext("read");
+  await destroyAllSessions(ctx.user.id);
+  redirect(rootUrl("/login"));
 });

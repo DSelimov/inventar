@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, ne } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -45,6 +45,29 @@ export async function destroySession() {
   const token = jar.get(COOKIE)?.value;
   if (token) await controlDb.delete(sessions).where(eq(sessions.id, sha256(token)));
   jar.set(COOKIE, "", { maxAge: 0, path: "/", domain: cookieDomain() });
+}
+
+/** Id на текущата сесия (sha256 на cookie-то) или null. */
+export async function currentSessionId() {
+  const token = (await cookies()).get(COOKIE)?.value;
+  return token ? sha256(token) : null;
+}
+
+/** Прекратява всички други сесии на потребителя (след смяна на парола). */
+export async function destroyOtherSessions(userId: number) {
+  const current = await currentSessionId();
+  await controlDb.delete(sessions).where(current ? and(eq(sessions.userId, userId), ne(sessions.id, current)) : eq(sessions.userId, userId));
+}
+
+/** „Изход от всички устройства“: всички сесии, включително текущата. */
+export async function destroyAllSessions(userId: number) {
+  await controlDb.delete(sessions).where(eq(sessions.userId, userId));
+  (await cookies()).set(COOKIE, "", { maxAge: 0, path: "/", domain: cookieDomain() });
+}
+
+export async function countSessions(userId: number) {
+  const rows = await controlDb.select({ id: sessions.id }).from(sessions).where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, new Date())));
+  return rows.length;
 }
 
 // ------------------------------------------------------------------- session

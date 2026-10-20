@@ -1,9 +1,9 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { Db } from "@/db/tenant";
-import { SHIPMENT_DIRECTIONS, SHIPMENT_STATUSES, shipmentLines, shipments, type ShipmentStatus } from "@/db/tenant-schema";
+import { lots, SHIPMENT_DIRECTIONS, SHIPMENT_STATUSES, shipmentLines, shipments, type ShipmentStatus } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { oneOf, optional, optionalInt, required, str } from "@/lib/forms";
@@ -41,6 +41,15 @@ function readLines(fd: FormData): LineInput[] {
   return lines;
 }
 
+/** Избраната партида трябва да е на същия артикул (иначе пратката би показвала чужда партида). */
+async function assertLotsBelong(db: Db, lines: LineInput[]) {
+  const withLot = lines.filter((l) => l.lotId);
+  if (!withLot.length) return;
+  const rows = await db.select({ id: lots.id, itemId: lots.itemId }).from(lots).where(inArray(lots.id, withLot.map((l) => l.lotId!)));
+  const owner = new Map(rows.map((r) => [r.id, r.itemId]));
+  if (withLot.some((l) => owner.get(l.lotId!) !== l.itemId)) throw new UserError("Избраната партида не е на този артикул.");
+}
+
 async function readShipment(db: Db, fd: FormData) {
   return {
     reference: required(str(fd, "reference"), "Референция"),
@@ -62,6 +71,7 @@ export const createShipment = act(async (fd: FormData) => {
   const lines = readLines(fd);
   if (!lines.length) throw new UserError("Добавете поне един ред към пратката.");
   if (!data.locationId) throw new UserError("Изберете локация.");
+  await assertLotsBelong(ctx.db, lines);
   const id = await ctx.db.transaction(async (tx) => {
     const [row] = await tx.insert(shipments).values({ ...data, createdBy: ctx.user.id }).$returningId();
     await tx.insert(shipmentLines).values(lines.map((l) => ({ ...l, shipmentId: row.id })));
@@ -81,6 +91,7 @@ export const updateShipment = act(async (id: number, fd: FormData) => {
   const lines = readLines(fd);
   const editable = existing.status === "pending" || existing.status === "in_transit";
   if (editable && !lines.length) throw new UserError("Добавете поне един ред към пратката.");
+  if (editable) await assertLotsBelong(ctx.db, lines);
   await ctx.db.transaction(async (tx) => {
     await tx.update(shipments).set(editable ? data : { notes: data.notes, carrier: data.carrier, trackingNumber: data.trackingNumber }).where(eq(shipments.id, id));
     if (editable) {
