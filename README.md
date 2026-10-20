@@ -42,6 +42,10 @@ pnpm dev                      # портал: http://localhost:3000 · клие�
 Демо вход след `db:seed`: **admin@demo.bg / demo1234** (собственик на demo и vtora) и
 **sklad@demo.bg / demo1234** (служител в demo). Браузърите резолват `*.localhost` към 127.0.0.1 без настройки.
 
+**Имейл.** Забравена парола и покани за нови потребители се изпращат по SMTP (`SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` в `.env`). Без `SMTP_HOST` писмата (с линковете) се печатат в конзолата
+на сървъра — удобно за разработка.
+
 Други скриптове: `pnpm db:generate` (нови миграции след промяна на схема), `pnpm db:pool:add`,
 `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm db:studio`.
 

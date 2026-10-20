@@ -1,13 +1,15 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { controlDb } from "@/db/control";
-import { memberships, organizations, users } from "@/db/control-schema";
+import { memberships, organizations, passwordResets, sessions, users } from "@/db/control-schema";
 import { getTenantDb, provisionTenant, tenantDbName } from "@/db/tenant";
 import { locations } from "@/db/tenant-schema";
 import { createSession, destroySession, getSession, hashPassword, suggestSubdomain, verifyPassword } from "@/lib/auth";
 import { str } from "@/lib/forms";
+import { passwordResetMail, sendMail } from "@/lib/mail";
+import { createPasswordLink, findPasswordLink, recentResetExists } from "@/lib/password-tokens";
 import { currentTenant, isValidSubdomain, rootUrl, tenantUrl } from "@/lib/tenant";
 
 export async function login(_prev: string | undefined, fd: FormData): Promise<string | undefined> {
@@ -80,6 +82,48 @@ export async function createOrganization(_prev: string | undefined, fd: FormData
     return e instanceof Error ? e.message : "Грешка при създаване на организацията.";
   }
   redirect(tenantUrl(org.subdomain));
+}
+
+/** Забравена парола: изпраща линк, ако има такъв акаунт. Отговорът е еднакъв и без акаунт. */
+export async function requestPasswordReset(_prev: string | undefined, fd: FormData): Promise<string | undefined> {
+  const email = str(fd, "email").toLowerCase();
+  if (!email) return "Въведете имейл.";
+  const tenant = await currentTenant();
+  const [user] = await controlDb.select().from(users).where(eq(users.email, email)).limit(1);
+  if (user && !(await recentResetExists(user.id))) {
+    const member = tenant && (await controlDb.select().from(memberships).where(and(eq(memberships.userId, user.id), eq(memberships.organizationId, tenant.id))).limit(1)).length > 0;
+    const org = member ? tenant : null;
+    const url = await createPasswordLink(user, "reset", org);
+    try {
+      await sendMail(passwordResetMail({ to: user.email, name: user.name, url, orgName: org?.name }));
+    } catch (e) {
+      console.error("[mail] password reset", e);
+      return "Писмото не можа да бъде изпратено. Опитайте отново по-късно.";
+    }
+  }
+  redirect("/forgot-password?sent=1");
+}
+
+/** Нова парола по линк (забравена парола или покана). Прекратява всички сесии на потребителя. */
+export async function resetPassword(_prev: string | undefined, fd: FormData): Promise<string | undefined> {
+  const password = str(fd, "password");
+  if (password.length < 8) return "Паролата трябва да е поне 8 знака.";
+  if (password !== str(fd, "confirm")) return "Паролите не съвпадат.";
+  const found = await findPasswordLink(str(fd, "token"));
+  if (!found) return "Линкът е невалиден или е изтекъл. Заявете нов.";
+  const { link, user, organization } = found;
+
+  // Еднократен: маркира се като използван само ако още не е бил (паралелни заявки).
+  const [res] = await controlDb.update(passwordResets).set({ usedAt: new Date() }).where(and(eq(passwordResets.id, link.id), isNull(passwordResets.usedAt)));
+  if (res.affectedRows !== 1) return "Линкът вече е използван.";
+  await controlDb.update(users).set({ passwordHash: hashPassword(password) }).where(eq(users.id, user.id));
+  await controlDb.delete(sessions).where(eq(sessions.userId, user.id));
+  await controlDb.delete(passwordResets).where(and(eq(passwordResets.userId, user.id), isNull(passwordResets.usedAt)));
+
+  const tenant = await currentTenant();
+  const org = tenant && organization?.id === tenant.id ? tenant : null;
+  await createSession(user.id, org?.id ?? null);
+  redirect(org ? "/" : "/portal");
 }
 
 export async function logout() {

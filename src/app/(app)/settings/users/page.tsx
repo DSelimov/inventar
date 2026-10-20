@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { UserPlus, X } from "lucide-react";
+import { Send, UserPlus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -8,10 +8,12 @@ import { Field, Input, Select } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Table } from "@/components/ui/table";
 import { ROLES } from "@/db/control-schema";
-import { addMember, changeRole, removeMember } from "@/lib/actions/members";
+import { addMember, changeRole, removeMember, resendInvite } from "@/lib/actions/members";
 import { requireContext } from "@/lib/auth";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/permissions";
 import { listMembers } from "@/lib/members";
+import { mailConfigured } from "@/lib/mail";
+import { isPendingInvite } from "@/lib/password-tokens";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Потребители" };
@@ -38,7 +40,10 @@ export default async function UsersPage() {
             {members.map((m) => (
               <tr key={m.id}>
                 <td>
-                  <div className="font-medium">{m.user.name}</div>
+                  <div className="flex items-center gap-2 font-medium">
+                    {m.user.name}
+                    {isPendingInvite(m.user) && <Badge tone="warning">Поканен</Badge>}
+                  </div>
                   <div className="text-xs text-muted">{m.user.email}</div>
                 </td>
                 <td>
@@ -61,6 +66,14 @@ export default async function UsersPage() {
                 </td>
                 <td className="text-muted">{formatDate(m.createdAt)}</td>
                 <td className="text-right">
+                  <div className="flex justify-end gap-1">
+                  {isPendingInvite(m.user) && (
+                    <form action={resendInvite.bind(null, m.id)}>
+                      <SubmitButton variant="ghost" size="sm" title="Изпрати поканата отново" aria-label="Изпрати поканата отново">
+                        <Send className="h-4 w-4" />
+                      </SubmitButton>
+                    </form>
+                  )}
                   {m.userId !== ctx.user.id && m.role !== "owner" && (
                     <form action={removeMember.bind(null, m.id)}>
                       <ConfirmButton variant="ghost" size="sm" message={`Да премахна ли ${m.user.name} от организацията?`} aria-label="Премахни">
@@ -68,6 +81,7 @@ export default async function UsersPage() {
                       </ConfirmButton>
                     </form>
                   )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -77,7 +91,7 @@ export default async function UsersPage() {
 
       <div className="space-y-6">
         <Card>
-          <CardHeader title="Добави потребител" description="Ако имейлът вече има акаунт, той просто получава достъп." />
+          <CardHeader title="Добави потребител" description="Новите потребители получават покана по имейл с линк за парола. Ако имейлът вече има акаунт, той просто получава достъп." />
           <CardBody>
             <form action={addMember} className="space-y-3">
               <Field label="Име">
@@ -86,7 +100,7 @@ export default async function UsersPage() {
               <Field label="Имейл">
                 <Input name="email" type="email" required />
               </Field>
-              <Field label="Начална парола" hint="Само за нови акаунти, мин. 8 знака.">
+              <Field label="Начална парола (по избор)" hint={mailConfigured() ? "Оставете празно, за да изпратим покана. Иначе мин. 8 знака — съобщете я лично." : "SMTP не е настроен: поканата се записва само в лога на сървъра. Може да зададете парола (мин. 8 знака)."}>
                 <Input name="password" type="password" minLength={8} autoComplete="new-password" />
               </Field>
               <Field label="Роля">

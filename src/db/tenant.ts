@@ -4,7 +4,7 @@ import { migrate } from "drizzle-orm/mysql2/migrator";
 import mysql from "mysql2/promise";
 import path from "node:path";
 import { decrypt, encrypt } from "@/lib/crypto";
-import { controlDb } from "./control";
+import { controlDb, utcSessions } from "./control";
 import { databasePool, organizations, type Organization } from "./control-schema";
 import * as schema from "./tenant-schema";
 
@@ -39,6 +39,7 @@ const MAX_POOLS = 50;
 
 function open(conn: Conn, limit = 5): Entry {
   const pool = mysql.createPool({ ...conn, connectionLimit: limit, timezone: "Z", charset: "utf8mb4_0900_ai_ci", supportBigNumbers: true });
+  utcSessions(pool);
   return { pool, db: drizzle(pool, { schema, mode: "default" }), lastUsed: Date.now() };
 }
 

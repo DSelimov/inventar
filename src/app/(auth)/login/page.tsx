@@ -22,7 +22,13 @@ export default async function LoginPage() {
           { name: "email", label: "Имейл", type: "email", autoComplete: "email" },
           { name: "password", label: "Парола", type: "password", autoComplete: "current-password" },
         ]}
-      />
+      >
+        <div className="-mt-2 text-right text-sm">
+          <Link href="/forgot-password" className="text-accent hover:underline">
+            Забравена парола?
+          </Link>
+        </div>
+      </AuthForm>
       <p className="mt-6 text-center text-sm text-muted">
         Нямате акаунт?{" "}
         <Link href={tenant ? rootUrl("/register") : "/register"} className="font-medium text-accent hover:underline">

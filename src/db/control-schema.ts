@@ -4,7 +4,7 @@
  * отделна база (tenant-schema.ts).
  */
 import { relations, sql } from "drizzle-orm";
-import { boolean, datetime, int, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, datetime, index, int, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const ROLES = ["owner", "admin", "manager", "staff", "viewer"] as const;
 export type Role = (typeof ROLES)[number];
@@ -62,6 +62,25 @@ export const sessions = mysqlTable("sessions", {
   createdAt: createdAt(),
 });
 
+export const PASSWORD_TOKEN_PURPOSES = ["reset", "invite"] as const;
+
+/** Еднократни линкове за нова парола (reset, 1 час) и покани (invite, 7 дни). */
+export const passwordResets = mysqlTable(
+  "password_resets",
+  {
+    /** sha256 на токена от линка */
+    id: varchar("id", { length: 64 }).primaryKey(),
+    userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    purpose: mysqlEnum("purpose", PASSWORD_TOKEN_PURPOSES).notNull().default("reset"),
+    /** Организацията, от чийто поддомейн е заявката/поканата — за връщане там след смяната. */
+    organizationId: int("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+    expiresAt: datetime("expires_at", { fsp: 3 }).notNull(),
+    usedAt: datetime("used_at", { fsp: 3 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("password_resets_user").on(t.userId)],
+);
+
 /** Предварително създадени бази (режим manual, напр. споделен хостинг). */
 export const databasePool = mysqlTable("database_pool", {
   id: int("id").autoincrement().primaryKey(),
@@ -84,3 +103,4 @@ export const membershipsRelations = relations(memberships, ({ one }) => ({
 export type Organization = typeof organizations.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
+export type PasswordReset = typeof passwordResets.$inferSelect;

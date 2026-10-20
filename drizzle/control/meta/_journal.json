@@ -8,6 +8,13 @@
       "when": 1792495392070,
       "tag": "0000_modern_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1792495617202,
+      "tag": "0001_password_resets",
+      "breakpoints": true
     }
   ]
 }
