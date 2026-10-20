@@ -45,4 +45,13 @@ export const statusTone: Record<string, Tone> = {
   event: "accent",
   reminder: "warning",
   deadline: "danger",
+  expiry: "danger",
+  draft: "neutral",
+  confirmed: "info",
+  partial: "warning",
+  completed: "success",
+  transfer_in: "info",
+  transfer_out: "info",
+  purchase: "info",
+  sales: "accent",
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Category, FieldDefinition, Item } from "@/db/schema";
+import type { Category, FieldDefinition, Item, Location } from "@/db/schema";
 import { Checkbox, Field, FormActions, Input, Select, Textarea } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ButtonLink } from "@/components/ui/button";
@@ -10,19 +10,26 @@ type CategoryWithFields = Category & { fields: FieldDefinition[] };
 
 export function ItemForm({
   categories,
+  locations,
   item,
   values = {},
   action,
   cancelHref,
+  defaultBarcode,
 }: {
   categories: CategoryWithFields[];
+  locations: Location[];
   item?: Item;
   values?: Record<number, string>;
   action: (fd: FormData) => Promise<void>;
   cancelHref: string;
+  defaultBarcode?: string;
 }) {
   const [categoryId, setCategoryId] = useState<string>(item?.categoryId ? String(item.categoryId) : "");
+  const [tracking, setTracking] = useState<string>(item?.tracking ?? "none");
+  const [quantity, setQuantity] = useState<string>("0");
   const category = categories.find((c) => String(c.id) === categoryId);
+  const trackingLocked = Boolean(item && item.quantity > 0);
 
   return (
     <form action={action} className="space-y-6">
@@ -32,8 +39,16 @@ export function ItemForm({
           <Field label="Име" className="sm:col-span-2">
             <Input name="name" required defaultValue={item?.name} placeholder="напр. Безжична мишка" autoFocus />
           </Field>
+          {item?.parentId && (
+            <Field label="Вариант" hint="Напр. размер / цвят.">
+              <Input name="variantLabel" defaultValue={item.variantLabel ?? ""} />
+            </Field>
+          )}
           <Field label="Код (SKU)" hint="Оставете празно за автоматично генериране.">
             <Input name="sku" defaultValue={item?.sku} placeholder="MISHKA-001" className="font-mono" />
+          </Field>
+          <Field label="Баркод" hint="EAN / QR; използва се при сканиране.">
+            <Input name="barcode" defaultValue={item?.barcode ?? defaultBarcode ?? ""} className="font-mono" inputMode="numeric" />
           </Field>
           <Field label="Категория">
             <Select name="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
@@ -45,6 +60,14 @@ export function ItemForm({
               ))}
             </Select>
           </Field>
+          <Field label="Проследяване" hint={trackingLocked ? "Може да се смени само при нулева наличност." : "Партиди: срок на годност; серийни номера: всяка единица поотделно."}>
+            <Select name="tracking" value={tracking} onChange={(e) => setTracking(e.target.value)} disabled={trackingLocked}>
+              <option value="none">Без проследяване</option>
+              <option value="lot">Партиди (с евентуален срок на годност)</option>
+              <option value="serial">Серийни номера</option>
+            </Select>
+            {trackingLocked && <input type="hidden" name="tracking" value={item!.tracking} />}
+          </Field>
           <Field label="Описание" className="sm:col-span-2">
             <Textarea name="description" defaultValue={item?.description ?? ""} placeholder="Незадължителни бележки за артикула" />
           </Field>
@@ -55,9 +78,30 @@ export function ItemForm({
         <h2 className="mb-4 text-sm font-semibold">Наличност и цени</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {!item && (
-            <Field label="Начално количество">
-              <Input name="quantity" type="number" min={0} step={1} defaultValue={0} />
-            </Field>
+            <>
+              <Field label="Начално количество">
+                <Input name="quantity" type="number" min={0} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              </Field>
+              <Field label="Локация за началното количество">
+                <Select name="locationId" defaultValue={locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? ""}>
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              {tracking !== "none" && Number(quantity) > 0 && (
+                <>
+                  <Field label={tracking === "serial" ? "Серийни номера" : "Партида №"} hint={tracking === "serial" ? "Разделени със запетая, колкото е количеството." : "Номер на партидата."}>
+                    <Input name="lotNumber" required className="font-mono" />
+                  </Field>
+                  <Field label="Срок на годност">
+                    <Input name="expiryDate" type="date" />
+                  </Field>
+                </>
+              )}
+            </>
           )}
           <Field label="Минимално количество" hint="Сигнал при достигане на това ниво. 0 изключва.">
             <Input name="minQuantity" type="number" min={0} step={1} defaultValue={item?.minQuantity ?? 0} />
@@ -70,9 +114,6 @@ export function ItemForm({
           </Field>
           <Field label="Продажна цена" hint="На каква цена продавате (по избор).">
             <Input name="unitPrice" type="number" min={0} step="0.01" defaultValue={item?.unitPrice ?? 0} />
-          </Field>
-          <Field label="Локация">
-            <Input name="location" defaultValue={item?.location ?? ""} placeholder="Склад А · Рафт 3" />
           </Field>
           {item && (
             <Field label="Статус">

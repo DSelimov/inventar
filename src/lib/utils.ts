@@ -23,18 +23,15 @@ export function formatNumber(value: number) {
   return new Intl.NumberFormat("bg-BG").format(value);
 }
 
-/** Форматира ISO дата или SQLite timestamp за показване. */
-export function formatDate(value: string | null | undefined, pattern = "d MMM yyyy") {
+/** Форматира Date, ISO дата (ГГГГ-ММ-ДД) или timestamp за показване. */
+export function formatDate(value: Date | string | null | undefined, pattern = "d MMM yyyy") {
   if (!value) return "—";
-  const d =
-    value.includes("T") || value.includes(" ")
-      ? new Date(value.replace(" ", "T") + (value.endsWith("Z") ? "" : "Z"))
-      : parseISO(value);
-  if (Number.isNaN(d.getTime())) return value;
+  const d = value instanceof Date ? value : /^\d{4}-\d{2}-\d{2}$/.test(value) ? parseISO(value) : new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
   return format(d, pattern, { locale: bg });
 }
 
-export function formatDateTime(value: string | null | undefined) {
+export function formatDateTime(value: Date | string | null | undefined) {
   return formatDate(value, "d MMM yyyy, HH:mm");
 }
 
@@ -83,6 +80,20 @@ export const STATUS_LABELS: Record<string, string> = {
   in: "Приход",
   out: "Разход",
   adjust: "Корекция",
+  transfer_in: "Трансфер (вход)",
+  transfer_out: "Трансфер (изход)",
+  none: "Без проследяване",
+  lot: "Партиди",
+  serial: "Серийни номера",
+  supplier: "Доставчик",
+  customer: "Клиент",
+  both: "Доставчик и клиент",
+  purchase: "Поръчка за доставка",
+  sales: "Клиентска поръчка",
+  draft: "Чернова",
+  confirmed: "Потвърдена",
+  partial: "Частично изпълнена",
+  completed: "Изпълнена",
   event: "Събитие",
   reminder: "Напомняне",
   deadline: "Краен срок",
@@ -100,4 +111,8 @@ export function label(value: string) {
 /** Склонение: 1 артикул, 2 артикула. */
 export function plural(n: number, one: string, many: string) {
   return n === 1 ? one : many;
+}
+
+export function daysBetween(a: Date, b: Date) {
+  return Math.floor((b.getTime() - a.getTime()) / 86_400_000);
 }

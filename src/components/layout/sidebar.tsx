@@ -2,19 +2,53 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Boxes, CalendarDays, LayoutDashboard, Layers, Package, Settings, Tags, Truck } from "lucide-react";
+import {
+  BarChart3,
+  Boxes,
+  Building2,
+  CalendarDays,
+  ClipboardList,
+  LayoutDashboard,
+  Layers,
+  LogOut,
+  Package,
+  ScanLine,
+  Settings,
+  Tags,
+  Truck,
+  Users,
+} from "lucide-react";
+import type { Role } from "@/db/schema";
+import { logout, switchOrg } from "@/lib/actions/auth";
+import { ROLE_LABELS } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Табло", icon: LayoutDashboard },
   { href: "/items", label: "Артикули", icon: Package },
   { href: "/categories", label: "Категории", icon: Tags },
+  { href: "/orders", label: "Поръчки", icon: ClipboardList },
   { href: "/shipments", label: "Пратки", icon: Truck },
+  { href: "/partners", label: "Партньори", icon: Users },
   { href: "/collections", label: "Колекции", icon: Layers },
   { href: "/calendar", label: "Календар", icon: CalendarDays },
+  { href: "/reports", label: "Отчети", icon: BarChart3 },
+  { href: "/scan", label: "Сканиране", icon: ScanLine },
 ];
 
-export function Sidebar({ companyName }: { companyName: string }) {
+export function Sidebar({
+  companyName,
+  userName,
+  role,
+  currentOrgId,
+  organizations,
+}: {
+  companyName: string;
+  userName: string;
+  role: Role;
+  currentOrgId: number;
+  organizations: Array<{ id: number; name: string }>;
+}) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const linkClass = (href: string) =>
@@ -29,13 +63,28 @@ export function Sidebar({ companyName }: { companyName: string }) {
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-white">
           <Boxes className="h-5 w-5" />
         </div>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold leading-tight">{companyName}</div>
+        <div className="min-w-0 flex-1">
+          {organizations.length > 1 ? (
+            <select
+              aria-label="Организация"
+              className="w-full truncate bg-transparent text-sm font-semibold leading-tight focus:outline-none"
+              value={currentOrgId}
+              onChange={(e) => void switchOrg(Number(e.target.value))}
+            >
+              {organizations.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="truncate text-sm font-semibold leading-tight">{companyName}</div>
+          )}
           <div className="text-xs text-muted">Инвентар</div>
         </div>
       </div>
 
-      <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:pb-0">
+      <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:overflow-y-auto md:pb-0">
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} className={linkClass(href)}>
             <Icon className="h-4 w-4" />
@@ -46,6 +95,10 @@ export function Sidebar({ companyName }: { companyName: string }) {
           <Settings className="h-4 w-4" />
           Настройки
         </Link>
+        <button type="button" onClick={() => void logout()} className={cn(linkClass("/__logout"), "md:hidden")}>
+          <LogOut className="h-4 w-4" />
+          Изход
+        </button>
       </nav>
 
       <div className="hidden border-t border-line p-3 md:block">
@@ -53,6 +106,21 @@ export function Sidebar({ companyName }: { companyName: string }) {
           <Settings className="h-4 w-4" />
           Настройки
         </Link>
+        <div className="mt-2 flex items-center gap-2.5 px-3 py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-muted">
+            {userName.slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">{userName}</div>
+            <div className="flex items-center gap-1 text-xs text-muted">
+              <Building2 className="h-3 w-3" />
+              {ROLE_LABELS[role]}
+            </div>
+          </div>
+          <button type="button" onClick={() => void logout()} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-text" aria-label="Изход" title="Изход">
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </aside>
   );

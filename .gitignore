@@ -41,10 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 # database
-/data/*.db
-/data/*.db-journal
-/data/*.db-wal
-/data/*.db-shm
 /drizzle
 
 # ide

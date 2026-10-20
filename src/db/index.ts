@@ -1,13 +1,15 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-const url = process.env.DATABASE_URL ?? "file:./data/inventory.db";
+const connectionString = process.env.DATABASE_URL ?? "postgres://inventory:inventory@localhost:5440/inventory";
 
-const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
+// Reuse the pool across hot reloads in development.
+const globalForDb = globalThis as unknown as { __pool?: Pool };
+const pool = globalForDb.__pool ?? new Pool({ connectionString, max: 10 });
+if (process.env.NODE_ENV !== "production") globalForDb.__pool = pool;
 
-// Enforce FK cascades on SQLite (off by default per connection).
-void client.execute("PRAGMA foreign_keys = ON");
-
-export const db = drizzle(client, { schema });
+export const db = drizzle(pool, { schema });
 export type Db = typeof db;
+/** Either the root db or a transaction handle. */
+export type DbOrTx = Pick<Db, "select" | "insert" | "update" | "delete" | "query" | "execute">;

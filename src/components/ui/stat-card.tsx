@@ -27,7 +27,7 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
-          <div className="mt-2 truncate text-2xl font-semibold tabular-nums tracking-tight">{value}</div>
+          <div className="mt-2 break-words text-xl font-semibold tabular-nums tracking-tight xl:text-[1.35rem]">{value}</div>
           {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
         </div>
         <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", toneClass)}>
