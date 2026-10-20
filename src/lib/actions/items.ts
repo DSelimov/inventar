@@ -7,6 +7,7 @@ import type { Db } from "@/db/tenant";
 import { fieldDefinitions, itemFieldValues, items, ITEM_STATUSES, TRACKING_MODES, type MovementType } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { deleteItemFiles } from "@/lib/item-images";
 import { int, num, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { getDefaultLocation } from "@/lib/queries";
 import { applyMovement, transferStock } from "@/lib/stock";
@@ -112,6 +113,7 @@ export async function deleteItem(id: number) {
   const existing = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
   if (!existing) throw new Error("Артикулът не е намерен.");
   await ctx.db.delete(items).where(eq(items.id, id));
+  await deleteItemFiles(ctx.org, id);
   await audit(ctx, "delete", "item", id, { name: existing.name, sku: existing.sku });
   revalidateItems();
   redirect("/items");

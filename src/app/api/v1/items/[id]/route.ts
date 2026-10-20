@@ -1,6 +1,7 @@
 import { eq, gt } from "drizzle-orm";
 import { items, lots } from "@/db/tenant-schema";
 import { ApiError, handler, json, paramId, readJson } from "@/lib/api";
+import { apiImage, listItemImages } from "@/lib/item-images";
 import { emit } from "@/lib/webhooks";
 
 type Params = { params: Promise<{ id: string }> };
@@ -12,7 +13,8 @@ export const GET = handler("read", async (_req, ctx, { params }: Params) => {
     with: { category: true, stockLevels: { with: { location: true } }, lots: { where: gt(lots.quantity, 0), with: { location: true } }, fieldValues: { with: { field: true } }, variants: true },
   });
   if (!row) throw new ApiError(404, "Артикулът не е намерен.");
-  return json({ data: row });
+  const images = (await listItemImages(ctx.db, id)).map(apiImage);
+  return json({ data: { ...row, images } });
 });
 
 const EDITABLE = ["name", "barcode", "description", "categoryId", "unit", "unitCost", "unitPrice", "minQuantity", "status", "sku"] as const;

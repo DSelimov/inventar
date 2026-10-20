@@ -100,6 +100,24 @@ export const items = mysqlTable(
   (t) => [uniqueIndex("items_sku").on(t.sku), index("items_barcode").on(t.barcode), index("items_parent").on(t.parentId)],
 );
 
+/** Снимки на артикул. Файловете са в хранилището (src/lib/storage.ts) под storageKey + "-full.webp" / "-thumb.webp". */
+export const itemImages = mysqlTable(
+  "item_images",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    storageKey: varchar("storage_key", { length: 255 }).notNull(),
+    width: int("width").notNull(),
+    height: int("height").notNull(),
+    /** Общ размер на двата файла в байтове. */
+    sizeBytes: int("size_bytes").notNull(),
+    /** Най-малкият е главната снимка. */
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("item_images_item").on(t.itemId, t.sortOrder)],
+);
+
 export const itemFieldValues = mysqlTable(
   "item_field_values",
   {
@@ -325,12 +343,16 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   parent: one(items, { fields: [items.parentId], references: [items.id], relationName: "variants" }),
   variants: many(items, { relationName: "variants" }),
   fieldValues: many(itemFieldValues),
+  images: many(itemImages),
   stockLevels: many(stockLevels),
   lots: many(lots),
   movements: many(stockMovements),
   collectionItems: many(collectionItems),
   shipmentLines: many(shipmentLines),
   orderLines: many(orderLines),
+}));
+export const itemImagesRelations = relations(itemImages, ({ one }) => ({
+  item: one(items, { fields: [itemImages.itemId], references: [items.id] }),
 }));
 export const itemFieldValuesRelations = relations(itemFieldValues, ({ one }) => ({
   item: one(items, { fields: [itemFieldValues.itemId], references: [items.id] }),
@@ -400,3 +422,4 @@ export type Collection = typeof collections.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
+export type ItemImage = typeof itemImages.$inferSelect;

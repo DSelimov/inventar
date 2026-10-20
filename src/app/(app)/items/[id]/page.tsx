@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftRight, GitBranch, Layers, Pencil, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ItemGallery } from "@/components/items/item-gallery";
 import { Badge, ColorBadge, statusTone } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { Table } from "@/components/ui/table";
 import { adjustStock, createVariant, deleteItem, transfer } from "@/lib/actions/items";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
 import { getItem, listLocations } from "@/lib/queries";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
 
@@ -25,8 +27,9 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [item, locations] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db)]);
+  const [item, locations, ownImages] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id)]);
   if (!item) notFound();
+  const images = ownImages.length || !item.parentId ? ownImages : await listItemImages(ctx.db, item.parentId);
 
   const currency = ctx.org.currency;
   const writable = can(ctx.role, "write");
@@ -287,6 +290,21 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="space-y-6">
+          {(images.length > 0 || writable) && (
+            <Card>
+              <CardBody>
+                <ItemGallery
+                  itemId={id}
+                  title={title}
+                  editable={writable}
+                  maxImages={MAX_IMAGES_PER_ITEM}
+                  inheritedFrom={ownImages.length === 0 && images.length > 0 ? item.parent?.name : undefined}
+                  images={images.map((img) => ({ id: img.id, width: img.width, height: img.height, full: imageUrl(img), thumb: imageUrl(img, "thumb") }))}
+                />
+              </CardBody>
+            </Card>
+          )}
+
           {writable && (
             <Card>
               <CardHeader title="Корекция на наличност" description={tracked ? "При приход въведете партида; при разход изберете партида." : "Приход, разход или точно преброено количество."} />

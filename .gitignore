@@ -44,3 +44,6 @@ next-env.d.ts
 
 # ide
 /.idea
+
+# uploaded files (STORAGE_DIR)
+/storage

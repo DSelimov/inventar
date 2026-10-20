@@ -15,8 +15,16 @@ type Operation = {
   description?: string;
   operationId?: string;
   parameters?: Array<{ name: string; in: string; required?: boolean; description?: string; schema?: Schema }>;
-  requestBody?: { content: { "application/json": { schema: Schema; example?: unknown } } };
-  responses: Record<string, { description: string; content?: { "application/json": { schema: Schema } } }>;
+  requestBody?: { content: Content };
+  responses: Record<string, { description: string; content?: Content }>;
+};
+/** Ключ = media type (application/json, multipart/form-data, image/webp…). */
+type Content = Record<string, { schema: Schema; example?: unknown }>;
+
+/** Първият media type на тялото/отговора. */
+const media = (content?: Content) => {
+  const [type, value] = Object.entries(content ?? {})[0] ?? [];
+  return type ? { type, ...value } : undefined;
 };
 
 const METHOD_TONE: Record<string, Tone> = { get: "info", post: "success", patch: "warning", delete: "danger" };
@@ -45,13 +53,17 @@ export default async function ApiDocsPage() {
   const tags = spec.tags.filter((t) => byTag.has(t.name));
 
   const curlFor = (method: string, path: string, op: Operation) => {
-    const url = `${server}${path.replace(/\{id\}/g, "1")}`;
+    const url = `${server}${path.replace(/\{\w+\}/g, "1")}`;
     const qs = (op.parameters ?? []).filter((p) => p.in === "query").slice(0, 1).map((p) => `${p.name}=…`);
-    const ex = op.requestBody?.content["application/json"].example;
+    const req = media(op.requestBody?.content);
+    const multipart = req?.type === "multipart/form-data";
+    const ex = req?.example;
+    const binary = media(op.responses["200"]?.content)?.type.startsWith("image/");
+    const extra = multipart ? [`  -F "file=@snimka.jpg"`] : ex ? [`  -H "Content-Type: application/json" \\`, `  -d '${JSON.stringify(ex)}'`] : binary ? [`  -o snimka.webp`] : [];
     return [
-      `curl ${method !== "get" ? `-X ${method.toUpperCase()} ` : ""}"${url}${qs.length ? `?${qs.join("&")}` : ""}" \\`,
-      `  -H "Authorization: Bearer inv_…"${ex ? " \\" : ""}`,
-      ...(ex ? [`  -H "Content-Type: application/json" \\`, `  -d '${JSON.stringify(ex)}'`] : []),
+      `curl ${method !== "get" && !multipart ? `-X ${method.toUpperCase()} ` : ""}"${url}${qs.length ? `?${qs.join("&")}` : ""}" \\`,
+      `  -H "Authorization: Bearer inv_…"${extra.length ? " \\" : ""}`,
+      ...extra,
     ].join("\n");
   };
 
@@ -193,7 +205,7 @@ export default async function ApiDocsPage() {
               <p className="text-sm text-muted">{t.description}</p>
             </div>
             {byTag.get(t.name)!.map(({ method, path, op }) => {
-              const req = op.requestBody?.content["application/json"];
+              const req = media(op.requestBody?.content);
               return (
                 <div key={method + path} id={op.operationId} className="scroll-mt-24 rounded-2xl border border-line bg-surface shadow-sm">
                   <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4">
@@ -243,7 +255,9 @@ export default async function ApiDocsPage() {
                       )}
                       {req && (
                         <div>
-                          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Тяло на заявката · {typeLabel(req.schema, schemas)}</h4>
+                          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                            Тяло на заявката · {req.type === "application/json" ? typeLabel(req.schema, schemas) : req.type}
+                          </h4>
                           <SchemaTable schema={req.schema} schemas={schemas} />
                         </div>
                       )}
@@ -255,7 +269,7 @@ export default async function ApiDocsPage() {
                               <Badge tone={code.startsWith("2") ? "success" : "neutral"}>{code}</Badge>
                               <span className="text-muted">
                                 {r.description}
-                                {r.content && code.startsWith("2") && <span className="ml-1">→ {typeLabel(r.content["application/json"].schema, schemas)}</span>}
+                                {r.content && code.startsWith("2") && <span className="ml-1">→ {media(r.content)!.type === "application/json" ? typeLabel(media(r.content)!.schema, schemas) : media(r.content)!.type}</span>}
                               </span>
                             </li>
                           ))}
@@ -268,12 +282,12 @@ export default async function ApiDocsPage() {
                         <Code lang="bash">{curlFor(method, path, op)}</Code>
                       </div>
                       {Object.entries(op.responses)
-                        .filter(([code, r]) => code.startsWith("2") && r.content)
+                        .filter(([code, r]) => code.startsWith("2") && media(r.content)?.type === "application/json")
                         .slice(0, 1)
                         .map(([code, r]) => (
                           <div key={code}>
                             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Отговор {code}</h4>
-                            <SchemaTable schema={r.content!["application/json"].schema} schemas={schemas} compact />
+                            <SchemaTable schema={media(r.content)!.schema} schemas={schemas} compact />
                           </div>
                         ))}
                     </div>

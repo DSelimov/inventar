@@ -133,10 +133,25 @@ const schemas: Record<string, Schema> = {
     ["id", "sku", "name", "tracking", "quantity", "minQuantity", "unit", "unitCost", "unitPrice", "status"],
   ),
 
+  ItemImage: obj(
+    {
+      id: int("Идентификатор", { example: 7 }),
+      itemId: int("Артикул", { example: 1 }),
+      width: int("Ширина на пълния размер (до 1600px)", { example: 1600 }),
+      height: int("Височина на пълния размер", { example: 1200 }),
+      sortOrder: int("Подредба; първата снимка е главната"),
+      createdAt: datetime("Качена"),
+      url: str("Пълен размер (image/webp); изисква API ключ", { example: "/api/v1/items/1/images/7" }),
+      thumbnailUrl: str("Миниатюра 400×400 (image/webp); изисква API ключ", { example: "/api/v1/items/1/images/7?size=thumb" }),
+    },
+    ["id", "itemId", "width", "height", "sortOrder", "url", "thumbnailUrl"],
+  ),
+
   ItemDetail: {
     allOf: [
       ref("Item"),
       obj({
+        images: arr(ref("ItemImage"), "Снимки; първата е главната."),
         lots: arr(ref("Lot"), "Партиди/серийни номера с наличност > 0."),
         fieldValues: arr(ref("ItemFieldValue"), "Стойности на персонализираните полета."),
         variants: arr(ref("Item"), "Варианти (дъщерни артикули)."),
@@ -395,7 +410,7 @@ export function buildOpenApi(serverUrl: string) {
       "/api/v1/items/{id}": {
         get: {
           tags: ["Артикули"],
-          summary: "Артикул с партиди, полета и варианти",
+          summary: "Артикул със снимки, партиди, полета и варианти",
           operationId: "getItem",
           parameters: [idParam("артикула")],
           responses: { ...ok(data(ref("ItemDetail"))), ...errorResponses({ "404": "Артикулът не е намерен." }) },
@@ -408,6 +423,44 @@ export function buildOpenApi(serverUrl: string) {
           parameters: [idParam("артикула")],
           requestBody: body(ref("ItemUpdate"), { unitPrice: 27.9, minQuantity: 8 }),
           responses: { ...ok(data(ref("Item"))), ...errorResponses({ "404": "Артикулът не е намерен.", "422": "Няма полета за промяна." }) },
+        },
+      },
+      "/api/v1/items/{id}/images": {
+        get: {
+          tags: ["Артикули"],
+          summary: "Снимки на артикул",
+          operationId: "listItemImages",
+          parameters: [idParam("артикула")],
+          responses: { ...ok(data(arr(ref("ItemImage")))), ...errorResponses() },
+        },
+        post: {
+          tags: ["Артикули"],
+          summary: "Качва снимки",
+          description: `multipart/form-data с едно или повече полета \`file\` (JPG, PNG, WebP, GIF, AVIF; до 10 MB на файл, до 12 снимки на артикул). Снимките се завъртат по EXIF, метаданните (вкл. GPS) се премахват и се записват като WebP до 1600px плюс миниатюра 400×400. Пример: \`curl -H "Authorization: Bearer inv_…" -F file=@snimka.jpg …/api/v1/items/1/images\``,
+          operationId: "uploadItemImages",
+          parameters: [idParam("артикула")],
+          requestBody: {
+            required: true,
+            content: { "multipart/form-data": { schema: obj({ file: arr({ type: "string", format: "binary" }, "Един или повече файла.") }, ["file"]) } },
+          },
+          responses: { ...created(data(arr(ref("ItemImage"))), "Всички снимки на артикула след качването"), ...errorResponses({ "404": "Артикулът не е намерен.", "422": "Невалиден файл, твърде голям или над лимита от снимки." }) },
+        },
+      },
+      "/api/v1/items/{id}/images/{imageId}": {
+        get: {
+          tags: ["Артикули"],
+          summary: "Изображение (файл)",
+          description: "Връща самото изображение като image/webp.",
+          operationId: "getItemImage",
+          parameters: [idParam("артикула"), { name: "imageId", in: "path", required: true, description: "Идентификатор на снимката", schema: { type: "integer" } }, q("size", "full (по подразбиране) или thumb.", { type: "string", enum: ["full", "thumb"], default: "full" })],
+          responses: { "200": { description: "Изображението", content: { "image/webp": { schema: { type: "string", format: "binary" } } } }, ...errorResponses({ "404": "Снимката не е намерена." }) },
+        },
+        delete: {
+          tags: ["Артикули"],
+          summary: "Изтрива снимка",
+          operationId: "deleteItemImage",
+          parameters: [idParam("артикула"), { name: "imageId", in: "path", required: true, description: "Идентификатор на снимката", schema: { type: "integer" } }],
+          responses: { ...ok(data(obj({ id: int("Изтритата снимка"), deleted: bool("true") }))), ...errorResponses({ "404": "Снимката не е намерена." }) },
         },
       },
       "/api/v1/stock": {

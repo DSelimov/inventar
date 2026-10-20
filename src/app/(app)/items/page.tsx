@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, Package, Plus } from "lucide-react";
+import { Download, ImageOff, Package, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import { Badge, ColorBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/search-form";
 import { Table, TableWrap } from "@/components/ui/table";
 import { requireContext } from "@/lib/auth";
+import { imageUrl, primaryImages } from "@/lib/item-images";
 import { can } from "@/lib/permissions";
 import { listCategories, listItems, listLocations } from "@/lib/queries";
 import { formatDate, formatMoney, formatNumber, isLowStock, plural } from "@/lib/utils";
@@ -33,6 +34,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
     listCategories(ctx.db),
     listLocations(ctx.db),
   ]);
+  const photos = await primaryImages(ctx.db, [...new Set(rows.flatMap((r) => (r.parentId ? [r.id, r.parentId] : [r.id])))]);
   const hasFilters = Boolean(q || categoryId || locationId || low || status !== "active");
   const multiLocation = locations.length > 1;
 
@@ -115,16 +117,22 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
             <tbody>
               {rows.map((item) => {
                 const low = isLowStock(item);
+                const photo = photos.get(item.id) ?? (item.parentId ? photos.get(item.parentId) : undefined);
                 return (
                   <tr key={item.id}>
                     <td>
-                      <Link href={`/items/${item.id}`} className="font-medium hover:text-accent">
-                        {item.name}
-                        {item.variantLabel && <span className="ml-1 text-muted">· {item.variantLabel}</span>}
-                      </Link>
-                      <div className="font-mono text-xs text-muted">
-                        {item.sku}
-                        {item.barcode && <span className="ml-2">▮ {item.barcode}</span>}
+                      <div className="flex items-center gap-3">
+                        <Thumb src={photo && imageUrl(photo, "thumb")} />
+                        <div className="min-w-0">
+                          <Link href={`/items/${item.id}`} className="font-medium hover:text-accent">
+                            {item.name}
+                            {item.variantLabel && <span className="ml-1 text-muted">· {item.variantLabel}</span>}
+                          </Link>
+                          <div className="font-mono text-xs text-muted">
+                            {item.sku}
+                            {item.barcode && <span className="ml-2">▮ {item.barcode}</span>}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td>{item.category ? <ColorBadge color={item.category.color}>{item.category.name}</ColorBadge> : <span className="text-muted">—</span>}</td>
@@ -171,4 +179,15 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
       </p>
     </>
   );
+}
+
+function Thumb({ src }: { src?: string }) {
+  if (!src)
+    return (
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-line">
+        <ImageOff className="h-4 w-4" />
+      </div>
+    );
+  // eslint-disable-next-line @next/next/no-img-element -- защитени файлове, без оптимизатора на Next
+  return <img src={src} alt="" width={40} height={40} loading="lazy" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" />;
 }
