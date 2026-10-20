@@ -38,6 +38,8 @@ export const users = mysqlTable("users", {
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   /** Може да създава организации от началната страница. */
   canCreateOrganizations: boolean("can_create_organizations").notNull().default(true),
+  /** Администратор на платформата: /admin на основния домейн (всички организации, пул от бази). */
+  isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
   createdAt: createdAt(),
 });
 

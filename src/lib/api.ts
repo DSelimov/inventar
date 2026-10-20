@@ -24,6 +24,7 @@ export class ApiError extends Error {
 export async function authenticate(req: Request, needed: ApiScope = "read"): Promise<ApiContext> {
   const org = await tenantFromRequest(req);
   if (!org) throw new ApiError(404, "Непознат поддомейн. API адресът е https://<фирма>.<домейн>/api/v1/…");
+  if (org.status === "suspended") throw new ApiError(503, "Организацията е спряна. Свържете се с администратора на системата.");
   if (org.status !== "active") throw new ApiError(503, "Организацията все още се подготвя.");
   const header = req.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";

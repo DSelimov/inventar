@@ -62,6 +62,11 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
         </details>
       )}
 
+      {session.user.isPlatformAdmin && (
+        <a href="/admin" className="mt-6 block rounded-xl border border-line px-4 py-3 text-center text-sm font-medium text-accent hover:bg-surface-2">
+          Администрация на платформата →
+        </a>
+      )}
       <form action={logout} className="mt-6 text-center">
         <Button type="submit" variant="ghost" size="sm">
           Изход ({session.user.email})

@@ -17,7 +17,7 @@ const today = new Date();
 async function resetControl() {
   await migrate(controlDb, { migrationsFolder: path.join(process.cwd(), "drizzle", "control") });
   await controlDb.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
-  for (const table of ["password_resets", "sessions", "memberships", "database_pool", "users", "organizations"]) {
+  for (const table of ["rate_limits", "password_resets", "sessions", "memberships", "database_pool", "users", "organizations"]) {
     await controlDb.execute(sql.raw(`TRUNCATE TABLE \`${table}\``));
   }
   await controlDb.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
@@ -234,7 +234,7 @@ async function main() {
   const [{ id: adminId }, { id: workerId }] = await controlDb
     .insert(users)
     .values([
-      { email: "admin@demo.bg", name: "Админ Демо", passwordHash: hashPassword("demo1234") },
+      { email: "admin@demo.bg", name: "Админ Демо", passwordHash: hashPassword("demo1234"), isPlatformAdmin: true },
       { email: "sklad@demo.bg", name: "Иван Складов", passwordHash: hashPassword("demo1234"), canCreateOrganizations: false },
     ])
     .$returningId();
