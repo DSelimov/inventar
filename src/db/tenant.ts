@@ -63,6 +63,12 @@ export function getTenantDb(org: Organization): TenantDb {
   return entry.db;
 }
 
+/** Затваря всички кеширани връзки (тестове, спиране на процеса). */
+export async function closeTenantPools() {
+  await Promise.all([...cache.values()].map((e) => e.pool.end()));
+  cache.clear();
+}
+
 // ---------------------------------------------------------------- provisioning
 export function tenantDbName(subdomain: string) {
   const prefix = process.env.TENANT_DB_PREFIX ?? "inv_";

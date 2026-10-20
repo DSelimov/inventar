@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:studio": "drizzle-kit studio --config drizzle.tenant.config.ts",
     "db:seed": "tsx --env-file=.env src/db/seed.ts",
     "db:reset": "pnpm db:migrate && pnpm db:seed",
@@ -39,7 +41,8 @@
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@11.11.0"
 }
