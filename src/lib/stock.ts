@@ -1,24 +1,18 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
-import { db, type DbOrTx } from "@/db";
-import { items, lots, stockLevels, stockMovements, type MovementType } from "@/db/schema";
+import type { Db, TenantDb } from "@/db/tenant";
+import { items, lots, stockLevels, stockMovements, type MovementType } from "@/db/tenant-schema";
 import { emit } from "./webhooks";
 
-export type LotInput =
-  /** Outbound / transfer-out from an existing lot. */
-  | { lotId: number }
-  /** Inbound: create or top up a lot. For serial items `lotNumber` holds one serial per line/comma. */
-  | { lotNumber: string; expiryDate?: string | null; serialNumber?: string | null }
-  | null
-  | undefined;
+export type LotInput = { lotId: number } | { lotNumber: string; expiryDate?: string | null; serialNumber?: string | null } | null | undefined;
+export type Actor = { id: number; name: string } | null;
 
 export type MovementInput = {
-  orgId: number;
-  userId: number | null;
+  actor: Actor;
   itemId: number;
   locationId: number;
   type: MovementType;
-  /** Positive quantity. For `adjust` it is the new absolute quantity at the location. */
+  /** Положително количество; за adjust — новото абсолютно количество в локацията. */
   quantity: number;
   reason?: string | null;
   shipmentId?: number | null;
@@ -26,18 +20,15 @@ export type MovementInput = {
 };
 
 /**
- * Applies one stock movement: updates the per-location level, the lot (if tracked),
- * the cached item total, and writes the movement row. Call inside a transaction.
+ * Прилага едно складово движение: ниво по локация, партида (ако има), кеширана обща
+ * наличност и ред в историята. Извиква се в транзакция.
  */
-export async function applyMovement(tx: DbOrTx, input: MovementInput) {
-  const item = await tx.query.items.findFirst({ where: and(eq(items.id, input.itemId), eq(items.organizationId, input.orgId)) });
+export async function applyMovement(tx: Db, input: MovementInput) {
+  const item = await tx.query.items.findFirst({ where: eq(items.id, input.itemId) });
   if (!item) throw new Error("Артикулът не е намерен.");
   if (input.quantity < 0 || !Number.isInteger(input.quantity)) throw new Error("Въведете валидно количество.");
 
-  const [level] = await tx
-    .select()
-    .from(stockLevels)
-    .where(and(eq(stockLevels.itemId, item.id), eq(stockLevels.locationId, input.locationId)));
+  const [level] = await tx.select().from(stockLevels).where(and(eq(stockLevels.itemId, item.id), eq(stockLevels.locationId, input.locationId)));
   const before = level?.quantity ?? 0;
 
   let delta: number;
@@ -49,7 +40,6 @@ export async function applyMovement(tx: DbOrTx, input: MovementInput) {
   const after = before + delta;
   if (after < 0) throw new Error(`Недостатъчна наличност в локацията (има ${before} ${item.unit}).`);
 
-  // ---- lots / serial numbers
   let lotId: number | null = null;
   if (item.tracking !== "none") {
     if (input.type === "adjust") throw new Error("За артикули с партиди/серийни номера използвайте приход или разход с партида.");
@@ -69,46 +59,24 @@ export async function applyMovement(tx: DbOrTx, input: MovementInput) {
           const dup = await tx.query.lots.findFirst({ where: and(eq(lots.itemId, item.id), eq(lots.serialNumber, serial)) });
           if (dup && dup.quantity > 0) throw new Error(`Сериен номер ${serial} вече е в наличност.`);
           if (dup) await tx.update(lots).set({ quantity: 1, locationId: input.locationId }).where(eq(lots.id, dup.id));
-          else
-            await tx.insert(lots).values({
-              organizationId: input.orgId,
-              itemId: item.id,
-              locationId: input.locationId,
-              lotNumber: serial,
-              serialNumber: serial,
-              expiryDate: input.lot.expiryDate ?? null,
-              quantity: 1,
-            });
+          else await tx.insert(lots).values({ itemId: item.id, locationId: input.locationId, lotNumber: serial, serialNumber: serial, expiryDate: input.lot.expiryDate ?? null, quantity: 1 });
         }
       } else {
-        const existing = await tx.query.lots.findFirst({
-          where: and(eq(lots.itemId, item.id), eq(lots.locationId, input.locationId), eq(lots.lotNumber, input.lot.lotNumber)),
-        });
+        const existing = await tx.query.lots.findFirst({ where: and(eq(lots.itemId, item.id), eq(lots.locationId, input.locationId), eq(lots.lotNumber, input.lot.lotNumber)) });
         if (existing) {
-          await tx
-            .update(lots)
-            .set({ quantity: existing.quantity + input.quantity, expiryDate: input.lot.expiryDate ?? existing.expiryDate })
-            .where(eq(lots.id, existing.id));
+          await tx.update(lots).set({ quantity: existing.quantity + input.quantity, expiryDate: input.lot.expiryDate ?? existing.expiryDate }).where(eq(lots.id, existing.id));
           lotId = existing.id;
         } else {
           const [created] = await tx
             .insert(lots)
-            .values({
-              organizationId: input.orgId,
-              itemId: item.id,
-              locationId: input.locationId,
-              lotNumber: input.lot.lotNumber,
-              expiryDate: input.lot.expiryDate ?? null,
-              quantity: input.quantity,
-            })
-            .returning({ id: lots.id });
+            .values({ itemId: item.id, locationId: input.locationId, lotNumber: input.lot.lotNumber, expiryDate: input.lot.expiryDate ?? null, quantity: input.quantity })
+            .$returningId();
           lotId = created.id;
         }
       }
     }
   }
 
-  // ---- levels + cached total
   if (level) await tx.update(stockLevels).set({ quantity: after }).where(and(eq(stockLevels.itemId, item.id), eq(stockLevels.locationId, input.locationId)));
   else await tx.insert(stockLevels).values({ itemId: item.id, locationId: input.locationId, quantity: after });
 
@@ -116,11 +84,11 @@ export async function applyMovement(tx: DbOrTx, input: MovementInput) {
   await tx.update(items).set({ quantity: totalAfter, updatedAt: new Date() }).where(eq(items.id, item.id));
 
   await tx.insert(stockMovements).values({
-    organizationId: input.orgId,
     itemId: item.id,
     locationId: input.locationId,
     lotId,
-    userId: input.userId,
+    userId: input.actor?.id ?? null,
+    userName: input.actor?.name ?? (input.actor === null ? "API" : null),
     type: input.type,
     delta,
     quantityAfter: totalAfter,
@@ -128,24 +96,15 @@ export async function applyMovement(tx: DbOrTx, input: MovementInput) {
     shipmentId: input.shipmentId ?? null,
   });
 
-  emit(input.orgId, "movement.created", { itemId: item.id, sku: item.sku, locationId: input.locationId, type: input.type, delta, quantityAfter: totalAfter });
+  emit(tx, "movement.created", { itemId: item.id, sku: item.sku, locationId: input.locationId, type: input.type, delta, quantityAfter: totalAfter });
   if (item.minQuantity > 0 && totalAfter <= item.minQuantity && item.quantity > item.minQuantity) {
-    emit(input.orgId, "item.low_stock", { itemId: item.id, sku: item.sku, name: item.name, quantity: totalAfter, minQuantity: item.minQuantity });
+    emit(tx, "item.low_stock", { itemId: item.id, sku: item.sku, name: item.name, quantity: totalAfter, minQuantity: item.minQuantity });
   }
   return { delta, after: totalAfter };
 }
 
-/** Moves stock between two locations as a pair of transfer movements. */
-export async function transferStock(input: {
-  orgId: number;
-  userId: number | null;
-  itemId: number;
-  fromLocationId: number;
-  toLocationId: number;
-  quantity: number;
-  lotId?: number | null;
-  reason?: string | null;
-}) {
+/** Трансфер между две локации като двойка движения. */
+export async function transferStock(db: TenantDb, input: { actor: Actor; itemId: number; fromLocationId: number; toLocationId: number; quantity: number; lotId?: number | null; reason?: string | null }) {
   if (input.fromLocationId === input.toLocationId) throw new Error("Изберете две различни локации.");
   await db.transaction(async (tx) => {
     let lotForIn: LotInput = null;

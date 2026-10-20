@@ -1,21 +1,23 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: inventory-postgres
+  mysql:
+    image: mysql:8.4
+    container_name: inventory-mysql
     restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
     environment:
-      POSTGRES_USER: inventory
-      POSTGRES_PASSWORD: inventory
-      POSTGRES_DB: inventory
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: inventory_control
+      MYSQL_USER: inventory
+      MYSQL_PASSWORD: inventory
     ports:
-      - "5440:5432"
+      - "3307:3306"
     volumes:
-      - inventory-pgdata:/var/lib/postgresql/data
+      - inventory-mysqldata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U inventory"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
 
 volumes:
-  inventory-pgdata:
+  inventory-mysqldata:

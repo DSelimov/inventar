@@ -17,7 +17,7 @@ import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isL
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
-  const item = await getItem(ctx.org.id, Number((await params).id));
+  const item = await getItem(ctx.db, Number((await params).id));
   return { title: item?.name ?? "Артикул" };
 }
 
@@ -25,7 +25,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [item, locations] = await Promise.all([getItem(ctx.org.id, id), listLocations(ctx.org.id)]);
+  const [item, locations] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db)]);
   if (!item) notFound();
 
   const currency = ctx.org.currency;
@@ -258,7 +258,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                           (m.reason ?? "—")
                         )}
                       </td>
-                      <td className="text-xs text-muted">{m.user?.name ?? "—"}</td>
+                      <td className="text-xs text-muted">{m.userName ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>

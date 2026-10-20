@@ -15,7 +15,7 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, label, plural, t
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
-  const s = await getShipment(ctx.org.id, Number((await params).id));
+  const s = await getShipment(ctx.db, Number((await params).id));
   return { title: s?.reference ?? "Пратка" };
 }
 
@@ -23,7 +23,7 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const shipment = await getShipment(ctx.org.id, id);
+  const shipment = await getShipment(ctx.db, id);
   if (!shipment) notFound();
 
   const currency = ctx.org.currency;

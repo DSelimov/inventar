@@ -32,7 +32,7 @@ const ENDPOINTS: Array<[string, string, string]> = [
 
 export default async function ApiPage() {
   const ctx = await requireContext("manage");
-  const [keys, newKey] = await Promise.all([listApiKeys(ctx.org.id), readNewKeyOnce()]);
+  const [keys, newKey] = await Promise.all([listApiKeys(ctx.db), readNewKeyOnce()]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">

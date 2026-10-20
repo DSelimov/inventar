@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Одит" };
 
 export default async function AuditPage() {
   const ctx = await requireContext("manage");
-  const rows = await listAudit(ctx.org.id);
+  const rows = await listAudit(ctx.db);
   return (
     <Card>
       {rows.length === 0 ? (
@@ -30,7 +30,7 @@ export default async function AuditPage() {
             {rows.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap text-muted">{formatDateTime(r.createdAt)}</td>
-                <td>{r.user?.name ?? "—"}</td>
+                <td>{r.userName ?? "—"}</td>
                 <td>
                   <Badge tone={r.action === "delete" ? "danger" : r.action === "create" ? "success" : "neutral"}>{AUDIT_ACTION_LABELS[r.action] ?? r.action}</Badge>
                 </td>

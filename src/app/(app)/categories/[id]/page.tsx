@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Table } from "@/components/ui/table";
 import { addField, deleteCategory, deleteField, updateCategory } from "@/lib/actions/categories";
-import { FIELD_TYPES } from "@/db/schema";
+import { FIELD_TYPES } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getCategory, listItems } from "@/lib/queries";
@@ -17,7 +17,7 @@ import { label, plural } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
-  const c = await getCategory(ctx.org.id, Number((await params).id));
+  const c = await getCategory(ctx.db, Number((await params).id));
   return { title: c?.name ?? "Категория" };
 }
 
@@ -26,7 +26,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
   if (!Number.isInteger(id)) notFound();
   const ctx = await requireContext();
   const manage = can(ctx.role, "manage");
-  const [category, items] = await Promise.all([getCategory(ctx.org.id, id), listItems(ctx.org.id, { categoryId: id, status: "all" })]);
+  const [category, items] = await Promise.all([getCategory(ctx.db, id), listItems(ctx.db, { categoryId: id, status: "all" })]);
   if (!category) notFound();
 
   return (

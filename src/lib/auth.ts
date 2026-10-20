@@ -4,102 +4,122 @@ import { and, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { db } from "@/db";
-import { memberships, organizations, sessions, users, type Organization, type Role, type User } from "@/db/schema";
+import { controlDb } from "@/db/control";
+import { memberships, organizations, sessions, users, type Organization, type Role, type User } from "@/db/control-schema";
+import { getTenantDb, type TenantDb } from "@/db/tenant";
+import { sha256 } from "./auth-crypto";
 import { can, type Level } from "./permissions";
+import { APP_DOMAIN, APP_PROTOCOL, currentTenant, rootUrl } from "./tenant";
+
+export { hashPassword, verifyPassword, sha256 } from "./auth-crypto";
 
 const COOKIE = "inv_session";
 const SESSION_DAYS = 30;
 
-export { hashPassword, verifyPassword, sha256 } from "./auth-crypto";
-import { hashPassword as _h, sha256 } from "./auth-crypto";
-void _h;
+function cookieDomain(): string | undefined {
+  const host = APP_DOMAIN.split(":")[0];
+  // За localhost браузърите не приемат domain cookie; всеки поддомейн има собствена сесия.
+  if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return undefined;
+  return `.${host}`;
+}
 
 // ------------------------------------------------------------------ sessions
 export async function createSession(userId: number, organizationId: number | null) {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
-  await db.insert(sessions).values({ id: sha256(token), userId, organizationId, expiresAt });
+  await controlDb.insert(sessions).values({ id: sha256(token), userId, organizationId, expiresAt });
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: APP_PROTOCOL === "https",
     expires: expiresAt,
     path: "/",
+    domain: cookieDomain(),
   });
 }
 
 export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
-  if (token) await db.delete(sessions).where(eq(sessions.id, sha256(token)));
-  jar.delete(COOKIE);
+  if (token) await controlDb.delete(sessions).where(eq(sessions.id, sha256(token)));
+  jar.set(COOKIE, "", { maxAge: 0, path: "/", domain: cookieDomain() });
 }
 
-export async function switchOrganization(organizationId: number) {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
-  if (!token) return;
-  await db.update(sessions).set({ organizationId }).where(eq(sessions.id, sha256(token)));
-}
-
-// ------------------------------------------------------------------- context
-export type Context = {
+// ------------------------------------------------------------------- session
+export type SessionInfo = {
   user: User;
-  org: Organization;
-  role: Role;
   memberships: Array<{ organizationId: number; role: Role; organization: Organization }>;
 };
 
-/** Current user + organization, or null when not logged in. Cached per request. */
-export const getContext = cache(async (): Promise<Context | null> => {
+/** Влезлият потребител и организациите му, независимо от поддомейна. */
+export const getSession = cache(async (): Promise<SessionInfo | null> => {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
-  const session = await db.query.sessions.findFirst({ where: eq(sessions.id, sha256(token)) });
+  const [session] = await controlDb.select().from(sessions).where(eq(sessions.id, sha256(token))).limit(1);
   if (!session || session.expiresAt < new Date()) return null;
-  const user = await db.query.users.findFirst({ where: eq(users.id, session.userId) });
+  const [user] = await controlDb.select().from(users).where(eq(users.id, session.userId)).limit(1);
   if (!user) return null;
-  const all = await db.query.memberships.findMany({
-    where: eq(memberships.userId, user.id),
-    with: { organization: true },
-  });
-  if (all.length === 0) return null;
-  const active = all.find((m) => m.organizationId === session.organizationId) ?? all[0];
-  return {
-    user,
-    org: active.organization,
-    role: active.role,
-    memberships: all.map((m) => ({ organizationId: m.organizationId, role: m.role, organization: m.organization })),
-  };
+  const rows = await controlDb
+    .select({ organizationId: memberships.organizationId, role: memberships.role, organization: organizations })
+    .from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
+    .where(eq(memberships.userId, user.id));
+  return { user, memberships: rows };
 });
 
-/** Redirects to /login when not authenticated; throws when the role is too low. */
+// ------------------------------------------------------------------- context
+export type Context = SessionInfo & {
+  org: Organization;
+  role: Role;
+  /** Базата на текущата организация. */
+  db: TenantDb;
+};
+
+/**
+ * Потребител + организация според поддомейна. null ако няма сесия, няма поддомейн,
+ * или потребителят не е член на тази организация.
+ */
+export const getContext = cache(async (): Promise<Context | null> => {
+  const [session, org] = await Promise.all([getSession(), currentTenant()]);
+  if (!session || !org) return null;
+  const m = session.memberships.find((x) => x.organizationId === org.id);
+  if (!m) return null;
+  return { ...session, org, role: m.role, db: getTenantDb(org) };
+});
+
+/** Пренасочва към вход/портал при липса на достъп; хвърля при недостатъчна роля. */
 export async function requireContext(level: Level = "read"): Promise<Context> {
-  const ctx = await getContext();
-  if (!ctx) redirect("/login");
-  if (!can(ctx.role, level)) throw new Error("Нямате права за това действие.");
-  return ctx;
+  const [session, org] = await Promise.all([getSession(), currentTenant()]);
+  if (!org) redirect(rootUrl("/portal"));
+  if (!session) redirect("/login");
+  if (org.status !== "active") redirect("/provisioning");
+  const m = session.memberships.find((x) => x.organizationId === org.id);
+  if (!m) redirect(rootUrl("/portal?denied=" + encodeURIComponent(org.subdomain)));
+  if (!can(m.role, level)) throw new Error("Нямате права за това действие.");
+  return { ...session, org, role: m.role, db: getTenantDb(org) };
 }
 
 export async function findMembership(userId: number, organizationId: number) {
-  return db.query.memberships.findFirst({
-    where: and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)),
-  });
+  const [m] = await controlDb
+    .select()
+    .from(memberships)
+    .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)))
+    .limit(1);
+  return m ?? null;
 }
 
-export function slugify(name: string) {
-  const map: Record<string, string> = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sht", ъ: "a", ь: "y", ю: "yu", я: "ya" };
-  const base = name
+const CYR: Record<string, string> = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sht", ъ: "a", ь: "y", ю: "yu", я: "ya" };
+
+/** Предложение за поддомейн от име на фирма: „Демо Трейдинг ЕООД“ → demo-treyding-eood */
+export function suggestSubdomain(name: string) {
+  return name
     .toLowerCase()
     .split("")
-    .map((c) => map[c] ?? c)
+    .map((c) => CYR[c] ?? c)
     .join("")
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
+    .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-  return `${base || "org"}-${randomBytes(2).toString("hex")}`;
 }
-
-export { organizations };

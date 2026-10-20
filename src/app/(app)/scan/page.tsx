@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Сканиране" };
 export default async function ScanPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
   const ctx = await requireContext();
   const { code } = await searchParams;
-  const [item, locations] = await Promise.all([code ? findItemByCode(ctx.org.id, code) : null, listLocations(ctx.org.id)]);
+  const [item, locations] = await Promise.all([code ? findItemByCode(ctx.db, code) : null, listLocations(ctx.db)]);
   const writable = can(ctx.role, "write");
 
   return (

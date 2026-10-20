@@ -18,7 +18,7 @@ export default async function DashboardPage() {
   const ctx = await requireContext();
   const today = todayIso();
   const weekAhead = format(addDays(new Date(), 7), "yyyy-MM-dd");
-  const [data, settings] = await Promise.all([getDashboard(ctx.org.id, today, weekAhead), getSettings(ctx.org.id)]);
+  const [data, settings] = await Promise.all([getDashboard(ctx.db, today, weekAhead), getSettings(ctx.db)]);
   const { totals, shipmentTotals, orderTotals, lowStockItems, recentMovements, upcoming, byCategory, byLocation, expiringSoon } = data;
   const maxCategoryValue = Math.max(1, ...byCategory.map((c) => c.value));
   const money = (v: number) => formatMoney(v, ctx.org.currency);

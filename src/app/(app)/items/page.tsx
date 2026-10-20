@@ -29,9 +29,9 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   const imported = Number(first(sp.imported)) || 0;
 
   const [rows, categories, locations] = await Promise.all([
-    listItems(ctx.org.id, { q, categoryId, status, low, locationId }),
-    listCategories(ctx.org.id),
-    listLocations(ctx.org.id),
+    listItems(ctx.db, { q, categoryId, status, low, locationId }),
+    listCategories(ctx.db),
+    listLocations(ctx.db),
   ]);
   const hasFilters = Boolean(q || categoryId || locationId || low || status !== "active");
   const multiLocation = locations.length > 1;

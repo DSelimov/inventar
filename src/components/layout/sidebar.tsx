@@ -19,7 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import type { Role } from "@/db/schema";
-import { logout, switchOrg } from "@/lib/actions/auth";
+import { logout } from "@/lib/actions/auth";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
@@ -42,12 +42,14 @@ export function Sidebar({
   role,
   currentOrgId,
   organizations,
+  portalUrl,
 }: {
   companyName: string;
   userName: string;
   role: Role;
   currentOrgId: number;
-  organizations: Array<{ id: number; name: string }>;
+  organizations: Array<{ id: number; name: string; url: string }>;
+  portalUrl: string;
 }) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -69,7 +71,10 @@ export function Sidebar({
               aria-label="Организация"
               className="w-full truncate bg-transparent text-sm font-semibold leading-tight focus:outline-none"
               value={currentOrgId}
-              onChange={(e) => void switchOrg(Number(e.target.value))}
+              onChange={(e) => {
+                const target = organizations.find((o) => String(o.id) === e.target.value);
+                if (target && target.id !== currentOrgId) window.location.href = target.url;
+              }}
             >
               {organizations.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -80,7 +85,9 @@ export function Sidebar({
           ) : (
             <div className="truncate text-sm font-semibold leading-tight">{companyName}</div>
           )}
-          <div className="text-xs text-muted">Инвентар</div>
+          <a href={portalUrl} className="text-xs text-muted hover:text-accent">
+            Инвентар · портал
+          </a>
         </div>
       </div>
 

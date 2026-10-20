@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Категории" };
 
 export default async function CategoriesPage() {
   const ctx = await requireContext();
-  const categories = await listCategories(ctx.org.id);
+  const categories = await listCategories(ctx.db);
   const writable = can(ctx.role, "write");
   return (
     <>

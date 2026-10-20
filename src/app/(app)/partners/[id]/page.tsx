@@ -15,7 +15,7 @@ import { formatDate, formatMoney, label } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
-  const p = await getPartner(ctx.org.id, Number((await params).id));
+  const p = await getPartner(ctx.db, Number((await params).id));
   return { title: p?.name ?? "Партньор" };
 }
 
@@ -23,7 +23,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const partner = await getPartner(ctx.org.id, id);
+  const partner = await getPartner(ctx.db, id);
   if (!partner) notFound();
   const writable = can(ctx.role, "write");
 

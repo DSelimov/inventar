@@ -11,7 +11,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   const ctx = await requireContext("write");
   const sp = await searchParams;
   const type = sp.type === "sales" ? "sales" : "purchase";
-  const [items, locations, partnersList, number] = await Promise.all([listItemOptions(ctx.org.id), listLocations(ctx.org.id), listPartners(ctx.org.id), nextOrderNumber(ctx.org.id, type)]);
+  const [items, locations, partnersList, number] = await Promise.all([listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), nextOrderNumber(ctx.db, type)]);
   const itemId = Number(sp.item);
   const initialLines = Number.isInteger(itemId) && itemId > 0 ? [{ itemId, quantity: 1 }] : undefined;
   const partners = await Promise.all(partnersList.map(async (p) => ({ id: p.id, name: p.name, type: p.type, leadTimeDays: p.leadTimeDays })));

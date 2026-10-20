@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableWrap } from "@/components/ui/table";
-import type { PartnerType } from "@/db/schema";
+import type { PartnerType } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listPartners } from "@/lib/queries";
@@ -18,7 +18,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
   const ctx = await requireContext();
   const sp = await searchParams;
   const type = (["supplier", "customer"].includes(sp.type ?? "") ? sp.type : "all") as PartnerType | "all";
-  const rows = await listPartners(ctx.org.id, type);
+  const rows = await listPartners(ctx.db, type);
 
   return (
     <>

@@ -12,7 +12,7 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
   const ctx = await requireContext("write");
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [item, categories, locations] = await Promise.all([getItem(ctx.org.id, id), listCategoriesWithFields(ctx.org.id), listLocations(ctx.org.id)]);
+  const [item, categories, locations] = await Promise.all([getItem(ctx.db, id), listCategoriesWithFields(ctx.db), listLocations(ctx.db)]);
   if (!item) notFound();
   const values = Object.fromEntries(item.fieldValues.map((v) => [v.fieldId, v.value]));
 

@@ -1,33 +1,15 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { auditLog } from "@/db/schema";
+import { desc } from "drizzle-orm";
+import type { Db } from "@/db/tenant";
+import { auditLog } from "@/db/tenant-schema";
 import type { Context } from "./auth";
 
-export async function audit(
-  ctx: Pick<Context, "org" | "user">,
-  action: string,
-  entity: string,
-  entityId: number | null = null,
-  details: Record<string, unknown> | null = null,
-) {
-  await db.insert(auditLog).values({
-    organizationId: ctx.org.id,
-    userId: ctx.user.id,
-    action,
-    entity,
-    entityId,
-    details,
-  });
+export async function audit(ctx: Pick<Context, "db" | "user">, action: string, entity: string, entityId: number | null = null, details: Record<string, unknown> | null = null) {
+  await ctx.db.insert(auditLog).values({ userId: ctx.user.id, userName: ctx.user.name, action, entity, entityId, details });
 }
 
-export async function listAudit(organizationId: number, limit = 200) {
-  return db.query.auditLog.findMany({
-    where: eq(auditLog.organizationId, organizationId),
-    orderBy: [desc(auditLog.createdAt), desc(auditLog.id)],
-    limit,
-    with: { user: true },
-  });
+export async function listAudit(db: Db, limit = 200) {
+  return db.select().from(auditLog).orderBy(desc(auditLog.createdAt), desc(auditLog.id)).limit(limit);
 }
 
 export const AUDIT_ACTION_LABELS: Record<string, string> = {

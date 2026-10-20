@@ -1,14 +1,11 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { orderLines, orders, shipments, type ShipmentStatus } from "@/db/schema";
-import { applyMovement } from "./stock";
+import { eq } from "drizzle-orm";
+import type { Db, TenantDb } from "@/db/tenant";
+import { orderLines, orders, shipments, type ShipmentStatus } from "@/db/tenant-schema";
+import { applyMovement, type Actor } from "./stock";
 import { emit } from "./webhooks";
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/** Recomputes an order's fulfilment after a linked shipment is delivered. */
-async function fulfilOrder(tx: Tx, orderId: number, delivered: Array<{ itemId: number; quantity: number }>) {
+async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: number; quantity: number }>) {
   const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { lines: true } });
   if (!order) return;
   for (const d of delivered) {
@@ -23,13 +20,13 @@ async function fulfilOrder(tx: Tx, orderId: number, delivered: Array<{ itemId: n
   const status = complete ? "completed" : any ? "partial" : order.status;
   if (status !== order.status) {
     await tx.update(orders).set({ status }).where(eq(orders.id, orderId));
-    emit(order.organizationId, "order.status_changed", { id: orderId, number: order.number, status });
+    emit(tx, "order.status_changed", { id: orderId, number: order.number, status });
   }
 }
 
-/** Shared by the UI action and the REST API. Delivering applies stock in one transaction. */
-export async function changeShipmentStatus(orgId: number, userId: number | null, id: number, status: ShipmentStatus) {
-  const shipment = await db.query.shipments.findFirst({ where: and(eq(shipments.id, id), eq(shipments.organizationId, orgId)), with: { lines: true } });
+/** Общо за UI и API. Доставката прилага наличността в една транзакция. */
+export async function changeShipmentStatus(db: TenantDb, actor: Actor, id: number, status: ShipmentStatus) {
+  const shipment = await db.query.shipments.findFirst({ where: eq(shipments.id, id), with: { lines: true } });
   if (!shipment) throw new Error("Пратката не е намерена.");
   if (shipment.status === "delivered" || shipment.status === "cancelled") throw new Error("Доставена или отказана пратка не може да сменя статуса си.");
 
@@ -39,8 +36,7 @@ export async function changeShipmentStatus(orgId: number, userId: number | null,
       const type = shipment.direction === "inbound" ? "in" : "out";
       for (const line of shipment.lines) {
         await applyMovement(tx, {
-          orgId,
-          userId,
+          actor,
           itemId: line.itemId,
           locationId: shipment.locationId,
           type,
@@ -54,6 +50,6 @@ export async function changeShipmentStatus(orgId: number, userId: number | null,
     }
     await tx.update(shipments).set({ status, deliveredAt: status === "delivered" ? new Date() : null }).where(eq(shipments.id, id));
   });
-  emit(orgId, "shipment.status_changed", { id, reference: shipment.reference, status });
+  emit(db, "shipment.status_changed", { id, reference: shipment.reference, status });
   return shipment;
 }

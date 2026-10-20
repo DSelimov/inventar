@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Колекции" };
 
 export default async function CollectionsPage() {
   const ctx = await requireContext();
-  const collections = await listCollections(ctx.org.id);
+  const collections = await listCollections(ctx.db);
   const writable = can(ctx.role, "write");
   return (
     <>

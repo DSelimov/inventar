@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Нова пратка" };
 export default async function NewShipmentPage({ searchParams }: { searchParams: Promise<{ direction?: string; item?: string }> }) {
   const ctx = await requireContext("write");
   const sp = await searchParams;
-  const [items, locations, partners, lots] = await Promise.all([listItemOptions(ctx.org.id), listLocations(ctx.org.id), listPartners(ctx.org.id), listAvailableLots(ctx.org.id)]);
+  const [items, locations, partners, lots] = await Promise.all([listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), listAvailableLots(ctx.db)]);
   const direction = sp.direction === "outbound" ? "outbound" : "inbound";
   const itemId = Number(sp.item);
   const initialLines = Number.isInteger(itemId) && itemId > 0 ? [{ itemId, quantity: 1 }] : undefined;

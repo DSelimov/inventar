@@ -1,11 +1,13 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { db } from "@/db";
-import { apiKeys, type ApiScope } from "@/db/schema";
-import { sha256 } from "./auth";
+import type { Organization } from "@/db/control-schema";
+import { getTenantDb, type TenantDb } from "@/db/tenant";
+import { apiKeys, type ApiScope } from "@/db/tenant-schema";
+import { sha256 } from "./auth-crypto";
+import { tenantFromRequest } from "./tenant";
 
-export type ApiContext = { orgId: number; scopes: ApiScope[]; keyId: number };
+export type ApiContext = { db: TenantDb; org: Organization; scopes: ApiScope[]; keyId: number };
 
 export class ApiError extends Error {
   constructor(
@@ -16,27 +18,27 @@ export class ApiError extends Error {
   }
 }
 
+/** Клиентът се определя от поддомейна на заявката; ключът се търси в неговата база. */
 export async function authenticate(req: Request, needed: ApiScope = "read"): Promise<ApiContext> {
+  const org = await tenantFromRequest(req);
+  if (!org) throw new ApiError(404, "Непознат поддомейн. API адресът е https://<фирма>.<домейн>/api/v1/…");
+  if (org.status !== "active") throw new ApiError(503, "Организацията все още се подготвя.");
   const header = req.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) throw new ApiError(401, "Липсва Authorization: Bearer <api key>.");
-  const key = await db.query.apiKeys.findFirst({ where: eq(apiKeys.keyHash, sha256(token)) });
+  const db = getTenantDb(org);
+  const [key] = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, sha256(token))).limit(1);
   if (!key) throw new ApiError(401, "Невалиден API ключ.");
-  const scopes = key.scopes as ApiScope[];
-  if (!scopes.includes(needed)) throw new ApiError(403, `Ключът няма право „${needed}“.`);
+  if (!key.scopes.includes(needed)) throw new ApiError(403, `Ключът няма право „${needed}“.`);
   void db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, key.id));
-  return { orgId: key.organizationId, scopes, keyId: key.id };
+  return { db, org, scopes: key.scopes, keyId: key.id };
 }
 
 export function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }
 
-/** Wraps a handler: authenticates, catches ApiError/Error into JSON responses. */
-export function handler<T extends unknown[]>(
-  scope: ApiScope,
-  fn: (req: Request, ctx: ApiContext, ...rest: T) => Promise<Response>,
-) {
+export function handler<T extends unknown[]>(scope: ApiScope, fn: (req: Request, ctx: ApiContext, ...rest: T) => Promise<Response>) {
   return async (req: Request, ...rest: T) => {
     try {
       const ctx = await authenticate(req, scope);

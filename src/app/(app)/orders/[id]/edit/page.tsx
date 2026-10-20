@@ -12,7 +12,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
   const ctx = await requireContext("write");
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [order, items, locations, partnersList] = await Promise.all([getOrder(ctx.org.id, id), listItemOptions(ctx.org.id), listLocations(ctx.org.id), listPartners(ctx.org.id)]);
+  const [order, items, locations, partnersList] = await Promise.all([getOrder(ctx.db, id), listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db)]);
   if (!order) notFound();
   if (order.status !== "draft") redirect(`/orders/${id}`);
   return (

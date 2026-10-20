@@ -2,17 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth/auth-form";
-import { getContext } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { login } from "@/lib/actions/auth";
+import { currentTenant, rootUrl } from "@/lib/tenant";
 
 export const metadata: Metadata = { title: "Вход" };
 
 export default async function LoginPage() {
-  if (await getContext()) redirect("/");
+  const [session, tenant] = await Promise.all([getSession(), currentTenant()]);
+  if (session) redirect(tenant ? "/" : "/portal");
   return (
     <>
       <h1 className="text-xl font-semibold">Вход</h1>
-      <p className="mt-1 text-sm text-muted">Влезте с имейл и парола.</p>
+      <p className="mt-1 text-sm text-muted">{tenant ? <>Организация: <strong>{tenant.name}</strong></> : "Влезте с имейл и парола. След това избирате организация."}</p>
       <AuthForm
         action={login}
         submitLabel="Вход"
@@ -23,7 +25,7 @@ export default async function LoginPage() {
       />
       <p className="mt-6 text-center text-sm text-muted">
         Нямате акаунт?{" "}
-        <Link href="/register" className="font-medium text-accent hover:underline">
+        <Link href={tenant ? rootUrl("/register") : "/register"} className="font-medium text-accent hover:underline">
           Създайте организация
         </Link>
       </p>

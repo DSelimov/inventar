@@ -17,7 +17,7 @@ import { formatMoney, formatNumber } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
-  const c = await getCollection(ctx.org.id, Number((await params).id));
+  const c = await getCollection(ctx.db, Number((await params).id));
   return { title: c?.name ?? "Колекция" };
 }
 
@@ -27,7 +27,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
   const ctx = await requireContext();
   const writable = can(ctx.role, "write");
   const settings = { currency: ctx.org.currency };
-  const [collection, options] = await Promise.all([getCollection(ctx.org.id, id), listItemOptions(ctx.org.id)]);
+  const [collection, options] = await Promise.all([getCollection(ctx.db, id), listItemOptions(ctx.db)]);
   if (!collection) notFound();
 
   const members = collection.collectionItems.map((ci) => ci.item);

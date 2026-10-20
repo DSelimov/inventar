@@ -19,8 +19,8 @@ export const metadata: Metadata = { title: "Отчети" };
 
 export default async function ReportsPage() {
   const ctx = await requireContext();
-  const settings = await getSettings(ctx.org.id);
-  const r = await buildReports(ctx.org.id, settings);
+  const settings = await getSettings(ctx.db);
+  const r = await buildReports(ctx.db, settings);
   const money = (v: number) => formatMoney(v, ctx.org.currency);
   const marginPct = r.totals.revenue > 0 ? ((r.totals.revenue - r.totals.cost) / r.totals.revenue) * 100 : 0;
   const maxSeries = Math.max(1, ...r.series.map((s) => s.value));

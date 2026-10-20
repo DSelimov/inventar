@@ -1,10 +1,10 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
-import { SHIPMENT_DIRECTIONS, SHIPMENT_STATUSES, shipmentLines, shipments, type ShipmentStatus } from "@/db/schema";
+import type { Db } from "@/db/tenant";
+import { SHIPMENT_DIRECTIONS, SHIPMENT_STATUSES, shipmentLines, shipments, type ShipmentStatus } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { oneOf, optional, optionalInt, required, str } from "@/lib/forms";
@@ -34,23 +34,17 @@ function readLines(fd: FormData): LineInput[] {
     const itemId = Number(id);
     const quantity = Math.trunc(Number(qtys[i] ?? 0));
     if (Number.isInteger(itemId) && itemId > 0 && quantity > 0) {
-      lines.push({
-        itemId,
-        quantity,
-        lotNumber: lotNumbers[i]?.trim() || null,
-        expiryDate: expiries[i]?.trim() || null,
-        lotId: Number(lotIds[i]) > 0 ? Number(lotIds[i]) : null,
-      });
+      lines.push({ itemId, quantity, lotNumber: lotNumbers[i]?.trim() || null, expiryDate: expiries[i]?.trim() || null, lotId: Number(lotIds[i]) > 0 ? Number(lotIds[i]) : null });
     }
   });
   return lines;
 }
 
-async function readShipment(fd: FormData, orgId: number) {
+async function readShipment(db: Db, fd: FormData) {
   return {
     reference: required(str(fd, "reference"), "Референция"),
     direction: oneOf(fd, "direction", SHIPMENT_DIRECTIONS, "inbound"),
-    locationId: optionalInt(fd, "locationId") ?? (await getDefaultLocation(orgId))?.id ?? null,
+    locationId: optionalInt(fd, "locationId") ?? (await getDefaultLocation(db))?.id ?? null,
     partnerId: optionalInt(fd, "partnerId"),
     partner: optional(fd, "partner"),
     carrier: optional(fd, "carrier"),
@@ -61,37 +55,32 @@ async function readShipment(fd: FormData, orgId: number) {
   };
 }
 
-async function own(orgId: number, id: number) {
-  const s = await db.query.shipments.findFirst({ where: and(eq(shipments.id, id), eq(shipments.organizationId, orgId)), with: { lines: true } });
-  if (!s) throw new Error("Пратката не е намерена.");
-  return s;
-}
-
 export async function createShipment(fd: FormData) {
   const ctx = await requireContext("write");
-  const data = await readShipment(fd, ctx.org.id);
+  const data = await readShipment(ctx.db, fd);
   const lines = readLines(fd);
   if (!lines.length) throw new Error("Добавете поне един ред към пратката.");
   if (!data.locationId) throw new Error("Изберете локация.");
-  const id = await db.transaction(async (tx) => {
-    const [row] = await tx.insert(shipments).values({ ...data, organizationId: ctx.org.id, createdBy: ctx.user.id }).returning({ id: shipments.id });
+  const id = await ctx.db.transaction(async (tx) => {
+    const [row] = await tx.insert(shipments).values({ ...data, createdBy: ctx.user.id }).$returningId();
     await tx.insert(shipmentLines).values(lines.map((l) => ({ ...l, shipmentId: row.id })));
     return row.id;
   });
   await audit(ctx, "create", "shipment", id, { reference: data.reference, direction: data.direction });
-  emit(ctx.org.id, "shipment.created", { id, ...data, lines });
+  emit(ctx.db, "shipment.created", { id, ...data, lines });
   revalidate(id);
   redirect(`/shipments/${id}`);
 }
 
 export async function updateShipment(id: number, fd: FormData) {
   const ctx = await requireContext("write");
-  const existing = await own(ctx.org.id, id);
-  const data = await readShipment(fd, ctx.org.id);
+  const existing = await ctx.db.query.shipments.findFirst({ where: eq(shipments.id, id) });
+  if (!existing) throw new Error("Пратката не е намерена.");
+  const data = await readShipment(ctx.db, fd);
   const lines = readLines(fd);
   const editable = existing.status === "pending" || existing.status === "in_transit";
   if (editable && !lines.length) throw new Error("Добавете поне един ред към пратката.");
-  await db.transaction(async (tx) => {
+  await ctx.db.transaction(async (tx) => {
     await tx.update(shipments).set(editable ? data : { notes: data.notes, carrier: data.carrier, trackingNumber: data.trackingNumber }).where(eq(shipments.id, id));
     if (editable) {
       await tx.delete(shipmentLines).where(eq(shipmentLines.shipmentId, id));
@@ -106,7 +95,7 @@ export async function updateShipment(id: number, fd: FormData) {
 export async function setShipmentStatus(id: number, status: ShipmentStatus) {
   const ctx = await requireContext("write");
   if (!SHIPMENT_STATUSES.includes(status)) throw new Error("Непознат статус.");
-  const shipment = await changeShipmentStatus(ctx.org.id, ctx.user.id, id, status);
+  const shipment = await changeShipmentStatus(ctx.db, ctx.user, id, status);
   await audit(ctx, "status", "shipment", id, { reference: shipment.reference, status });
   revalidate(id);
   if (shipment.orderId) revalidatePath(`/orders/${shipment.orderId}`);
@@ -114,8 +103,9 @@ export async function setShipmentStatus(id: number, status: ShipmentStatus) {
 
 export async function deleteShipment(id: number) {
   const ctx = await requireContext("delete");
-  const s = await own(ctx.org.id, id);
-  await db.delete(shipments).where(eq(shipments.id, id));
+  const s = await ctx.db.query.shipments.findFirst({ where: eq(shipments.id, id) });
+  if (!s) throw new Error("Пратката не е намерена.");
+  await ctx.db.delete(shipments).where(eq(shipments.id, id));
   await audit(ctx, "delete", "shipment", id, { reference: s.reference });
   revalidate();
   redirect("/shipments");

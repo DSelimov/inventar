@@ -13,11 +13,11 @@ export default async function EditShipmentPage({ params }: { params: Promise<{ i
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const [shipment, items, locations, partners, lots] = await Promise.all([
-    getShipment(ctx.org.id, id),
-    listItemOptions(ctx.org.id),
-    listLocations(ctx.org.id),
-    listPartners(ctx.org.id),
-    listAvailableLots(ctx.org.id),
+    getShipment(ctx.db, id),
+    listItemOptions(ctx.db),
+    listLocations(ctx.db),
+    listPartners(ctx.db),
+    listAvailableLots(ctx.db),
   ]);
   if (!shipment) notFound();
   const editable = shipment.status === "pending" || shipment.status === "in_transit";

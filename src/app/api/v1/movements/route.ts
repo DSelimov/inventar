@@ -1,6 +1,5 @@
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { items } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { items } from "@/db/tenant-schema";
 import { ApiError, handler, json, readJson } from "@/lib/api";
 import { applyMovement } from "@/lib/stock";
 
@@ -11,14 +10,11 @@ export const POST = handler("write", async (req, ctx) => {
   if (!["in", "out", "adjust"].includes(b.type)) throw new ApiError(422, "type трябва да е in, out или adjust.");
   if (!Number.isInteger(b.quantity) || b.quantity < 0) throw new ApiError(422, "quantity трябва да е цяло неотрицателно число.");
   if (!b.locationId) throw new ApiError(422, "locationId е задължително.");
-  const item = await db.query.items.findFirst({
-    where: and(eq(items.organizationId, ctx.orgId), b.itemId ? eq(items.id, b.itemId) : eq(items.sku, b.sku ?? "")),
-  });
+  const item = await ctx.db.query.items.findFirst({ where: b.itemId ? eq(items.id, b.itemId) : eq(items.sku, b.sku ?? "") });
   if (!item) throw new ApiError(404, "Артикулът не е намерен.");
-  const result = await db.transaction((tx) =>
+  const result = await ctx.db.transaction((tx) =>
     applyMovement(tx, {
-      orgId: ctx.orgId,
-      userId: null,
+      actor: null,
       itemId: item.id,
       locationId: b.locationId,
       type: b.type,

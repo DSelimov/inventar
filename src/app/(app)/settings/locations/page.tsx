@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Локации" };
 
 export default async function LocationsPage() {
   const ctx = await requireContext("manage");
-  const locations = await listLocations(ctx.org.id, true);
+  const locations = await listLocations(ctx.db, true);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">

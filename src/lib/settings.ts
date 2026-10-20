@@ -1,18 +1,12 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { settings } from "@/db/schema";
+import type { Db } from "@/db/tenant";
+import { settings } from "@/db/tenant-schema";
 
 export type AppSettings = {
   lowStockAlerts: boolean;
-  /** Analysis window for turnover and usage (days). */
   windowDays: number;
-  /** No outbound movement for this many days = dead stock. */
   deadStockDays: number;
-  /** Default supplier lead time when the partner has none. */
   leadTimeDays: number;
-  /** Extra days of cover to keep as safety stock. */
   safetyDays: number;
-  /** Target gross margin in percent, highlighted in reports. */
   targetMarginPct: number;
 };
 
@@ -25,8 +19,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   targetMarginPct: 30,
 };
 
-export async function getSettings(organizationId: number): Promise<AppSettings> {
-  const rows = await db.select().from(settings).where(eq(settings.organizationId, organizationId));
+export async function getSettings(db: Db): Promise<AppSettings> {
+  const rows = await db.select().from(settings);
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   const num = (key: keyof AppSettings) => {
     const v = Number(map[key]);
@@ -42,9 +36,6 @@ export async function getSettings(organizationId: number): Promise<AppSettings> 
   };
 }
 
-export async function setSetting(organizationId: number, key: string, value: string) {
-  await db
-    .insert(settings)
-    .values({ organizationId, key, value })
-    .onConflictDoUpdate({ target: [settings.organizationId, settings.key], set: { value } });
+export async function setSetting(db: Db, key: string, value: string) {
+  await db.insert(settings).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
 }

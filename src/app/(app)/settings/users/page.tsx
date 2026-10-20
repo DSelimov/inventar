@@ -7,11 +7,11 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, Input, Select } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Table } from "@/components/ui/table";
-import { ROLES } from "@/db/schema";
+import { ROLES } from "@/db/control-schema";
 import { addMember, changeRole, removeMember } from "@/lib/actions/members";
 import { requireContext } from "@/lib/auth";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/permissions";
-import { listMembers } from "@/lib/queries";
+import { listMembers } from "@/lib/members";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Потребители" };

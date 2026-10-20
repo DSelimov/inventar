@@ -3,17 +3,17 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Checkbox, Field, Input } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { changeOwnPassword } from "@/lib/actions/members";
-import { createOrganization } from "@/lib/actions/auth";
 import { saveOrganization, saveReportParameters } from "@/lib/actions/settings";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getSettings } from "@/lib/settings";
+import { rootUrl, tenantUrl } from "@/lib/tenant";
 
 export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const s = await getSettings(ctx.org.id);
+  const s = await getSettings(ctx.db);
   const manage = can(ctx.role, "manage");
 
   return (
@@ -79,14 +79,12 @@ export default async function SettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Нова организация" description="Отделна фирма с отделни данни. Превключвате от страничното меню." />
-        <CardBody>
-          <form action={createOrganization} className="flex flex-wrap items-end gap-3">
-            <Field label="Име на фирмата" className="min-w-60 flex-1">
-              <Input name="name" required placeholder="напр. Втора фирма ООД" />
-            </Field>
-            <SubmitButton variant="secondary">Създай</SubmitButton>
-          </form>
+        <CardHeader title="Организации" description={`Адрес на тази организация: ${tenantUrl(ctx.org.subdomain)}`} />
+        <CardBody className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="text-muted">Всяка организация има собствена база данни и собствен поддомейн. Нова организация се създава от портала.</p>
+          <a href={rootUrl("/portal")} className="font-medium text-accent hover:underline">
+            Към портала →
+          </a>
         </CardBody>
       </Card>
     </div>

@@ -1,6 +1,5 @@
-import { and, eq, ilike, or, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { items, TRACKING_MODES } from "@/db/schema";
+import { eq, like, or, sql } from "drizzle-orm";
+import { items, TRACKING_MODES } from "@/db/tenant-schema";
 import { ApiError, handler, json, readJson } from "@/lib/api";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
@@ -10,10 +9,10 @@ export const GET = handler("read", async (req, ctx) => {
   const q = url.searchParams.get("q") ?? "";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
   const pageSize = Math.min(200, Math.max(1, Number(url.searchParams.get("pageSize") ?? 50)));
-  const where = and(eq(items.organizationId, ctx.orgId), q ? or(ilike(items.name, `%${q}%`), ilike(items.sku, `%${q}%`), ilike(items.barcode, `%${q}%`)) : undefined);
+  const where = q ? or(like(items.name, `%${q}%`), like(items.sku, `%${q}%`), like(items.barcode, `%${q}%`)) : undefined;
   const [rows, [{ total }]] = await Promise.all([
-    db.query.items.findMany({ where, with: { category: true, stockLevels: { with: { location: true } } }, orderBy: [items.name], limit: pageSize, offset: (page - 1) * pageSize }),
-    db.select({ total: sql<number>`count(*)`.mapWith(Number) }).from(items).where(where),
+    ctx.db.query.items.findMany({ where, with: { category: true, stockLevels: { with: { location: true } } }, orderBy: [items.name], limit: pageSize, offset: (page - 1) * pageSize }),
+    ctx.db.select({ total: sql<number>`count(*)`.mapWith(Number) }).from(items).where(where),
   ]);
   return json({ data: rows, page, pageSize, total });
 });
@@ -24,12 +23,11 @@ export const POST = handler("write", async (req, ctx) => {
   const body = await readJson<Body>(req);
   if (!body.name) throw new ApiError(422, "Полето name е задължително.");
   const sku = body.sku?.trim() || slugSku(body.name);
-  const dup = await db.query.items.findFirst({ where: and(eq(items.organizationId, ctx.orgId), eq(items.sku, sku)) });
+  const dup = await ctx.db.query.items.findFirst({ where: eq(items.sku, sku) });
   if (dup) throw new ApiError(409, `Вече има артикул с код „${sku}“.`);
-  const [row] = await db
+  const [{ id }] = await ctx.db
     .insert(items)
     .values({
-      organizationId: ctx.orgId,
       sku,
       name: body.name,
       barcode: body.barcode ?? null,
@@ -41,7 +39,8 @@ export const POST = handler("write", async (req, ctx) => {
       minQuantity: body.minQuantity ?? 0,
       tracking: (TRACKING_MODES as readonly string[]).includes(body.tracking ?? "") ? (body.tracking as (typeof TRACKING_MODES)[number]) : "none",
     })
-    .returning();
-  emit(ctx.orgId, "item.created", { id: row.id, sku: row.sku, name: row.name, source: "api" });
+    .$returningId();
+  const row = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
+  emit(ctx.db, "item.created", { id, sku, name: body.name, source: "api" });
   return json({ data: row }, 201);
 });

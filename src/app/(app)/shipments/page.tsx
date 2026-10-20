@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableWrap } from "@/components/ui/table";
-import { SHIPMENT_STATUSES, type ShipmentStatus } from "@/db/schema";
+import { SHIPMENT_STATUSES, type ShipmentStatus } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listShipments } from "@/lib/queries";
@@ -20,7 +20,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const ctx = await requireContext();
   const sp = await searchParams;
   const status = (TABS.some((t) => t.value === sp.status) ? sp.status : "all") as ShipmentStatus | "all";
-  const rows = await listShipments(ctx.org.id, status);
+  const rows = await listShipments(ctx.db, status);
   const today = todayIso();
 
   return (

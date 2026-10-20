@@ -8,7 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/fields";
 import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { EVENT_TYPES } from "@/db/schema";
+import { EVENT_TYPES } from "@/db/tenant-schema";
 import { createEvent, deleteEvent } from "@/lib/actions/calendar";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -36,7 +36,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const gridStart = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
-  const entries = await listCalendarEntries(ctx.org.id, format(gridStart, "yyyy-MM-dd"), format(gridEnd, "yyyy-MM-dd"));
+  const entries = await listCalendarEntries(ctx.db, format(gridStart, "yyyy-MM-dd"), format(gridEnd, "yyyy-MM-dd"));
   const byDate = new Map<string, CalendarEntry[]>();
   for (const e of entries) byDate.set(e.date, [...(byDate.get(e.date) ?? []), e]);
   const today = todayIso();

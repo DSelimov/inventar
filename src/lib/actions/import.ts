@@ -1,10 +1,9 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
-import { categories, items, locations } from "@/db/schema";
+import { categories, items, locations } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { str } from "@/lib/forms";
@@ -25,7 +24,6 @@ export type ImportRow = {
   description?: string;
 };
 
-/** Upserts items by SKU. Quantities set the absolute level at the given (or default) location. */
 export async function importItems(fd: FormData) {
   const ctx = await requireContext("manage");
   let rows: ImportRow[];
@@ -37,22 +35,22 @@ export async function importItems(fd: FormData) {
   if (!rows.length) throw new Error("Няма редове за импорт.");
   const setQuantities = str(fd, "setQuantities") === "1";
 
-  const cats = await db.select().from(categories).where(eq(categories.organizationId, ctx.org.id));
-  const locs = await db.select().from(locations).where(eq(locations.organizationId, ctx.org.id));
-  const defaultLoc = await getDefaultLocation(ctx.org.id);
+  const cats = await ctx.db.select().from(categories);
+  const locs = await ctx.db.select().from(locations);
+  const defaultLoc = await getDefaultLocation(ctx.db);
   const catByName = new Map(cats.map((c) => [c.name.toLowerCase(), c.id]));
   const locByName = new Map(locs.flatMap((l) => [[l.name.toLowerCase(), l.id], [(l.code ?? "").toLowerCase(), l.id]] as const).filter(([k]) => k));
 
   let created = 0;
   let updated = 0;
-  await db.transaction(async (tx) => {
+  await ctx.db.transaction(async (tx) => {
     for (const r of rows) {
       if (!r.sku || !r.name) continue;
       let categoryId: number | null = null;
       if (r.category) {
         categoryId = catByName.get(r.category.toLowerCase()) ?? null;
         if (!categoryId) {
-          const [c] = await tx.insert(categories).values({ organizationId: ctx.org.id, name: r.category }).returning({ id: categories.id });
+          const [c] = await tx.insert(categories).values({ name: r.category }).$returningId();
           categoryId = c.id;
           catByName.set(r.category.toLowerCase(), c.id);
         }
@@ -67,29 +65,21 @@ export async function importItems(fd: FormData) {
         unitPrice: Math.max(0, r.unitPrice ?? 0),
         description: r.description || null,
       };
-      const existing = await tx.query.items.findFirst({ where: and(eq(items.organizationId, ctx.org.id), eq(items.sku, r.sku)) });
+      const existing = await tx.query.items.findFirst({ where: eq(items.sku, r.sku) });
       let itemId: number;
       if (existing) {
         await tx.update(items).set({ ...base, updatedAt: new Date() }).where(eq(items.id, existing.id));
         itemId = existing.id;
         updated++;
       } else {
-        const [row] = await tx.insert(items).values({ ...base, sku: r.sku, organizationId: ctx.org.id }).returning({ id: items.id });
+        const [row] = await tx.insert(items).values({ ...base, sku: r.sku }).$returningId();
         itemId = row.id;
         created++;
       }
       if (setQuantities && r.quantity !== undefined && Number.isFinite(r.quantity)) {
         const locationId = (r.location ? locByName.get(r.location.toLowerCase()) : undefined) ?? defaultLoc?.id;
         if (!locationId) throw new Error("Няма локация за количествата. Създайте локация първо.");
-        await applyMovement(tx, {
-          orgId: ctx.org.id,
-          userId: ctx.user.id,
-          itemId,
-          locationId,
-          type: "adjust",
-          quantity: Math.max(0, Math.trunc(r.quantity)),
-          reason: "Импорт от CSV",
-        });
+        await applyMovement(tx, { actor: ctx.user, itemId, locationId, type: "adjust", quantity: Math.max(0, Math.trunc(r.quantity)), reason: "Импорт от CSV" });
       }
     }
   });

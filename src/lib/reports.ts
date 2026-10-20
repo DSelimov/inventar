@@ -1,8 +1,8 @@
 import "server-only";
-import { and, eq, gt, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import { addDays, format, startOfMonth, subDays, subMonths } from "date-fns";
-import { db } from "@/db";
-import { categories, items, lots, partners, stockMovements, type Item } from "@/db/schema";
+import type { Db } from "@/db/tenant";
+import { categories, items, lots, partners, stockMovements, type Item } from "@/db/tenant-schema";
 import { incomingQuantities } from "./queries";
 import type { AppSettings } from "./settings";
 
@@ -10,15 +10,12 @@ const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 
 export type Reports = Awaited<ReturnType<typeof buildReports>>;
 
-export async function buildReports(orgId: number, s: AppSettings) {
+export async function buildReports(db: Db, s: AppSettings) {
   const now = new Date();
   const windowStart = subDays(now, s.windowDays);
   const deadStart = subDays(now, s.deadStockDays);
 
-  const activeItems = await db.query.items.findMany({
-    where: and(eq(items.organizationId, orgId), eq(items.status, "active")),
-    with: { category: true },
-  });
+  const activeItems = await db.query.items.findMany({ where: eq(items.status, "active"), with: { category: true } });
 
   // ---- outbound / inbound per item within the window
   const flows = await db
@@ -28,7 +25,7 @@ export async function buildReports(orgId: number, s: AppSettings) {
       inn: n(sql<number>`coalesce(sum(case when ${stockMovements.type} = 'in' then ${stockMovements.delta} else 0 end), 0)`),
     })
     .from(stockMovements)
-    .where(and(eq(stockMovements.organizationId, orgId), gte(stockMovements.createdAt, windowStart)))
+    .where(gte(stockMovements.createdAt, windowStart))
     .groupBy(stockMovements.itemId);
   const flowByItem = new Map(flows.map((f) => [f.itemId, f]));
 
@@ -40,7 +37,6 @@ export async function buildReports(orgId: number, s: AppSettings) {
       lastIn: sql<Date | null>`max(case when ${stockMovements.type} in ('in','transfer_in') or (${stockMovements.type} = 'adjust' and ${stockMovements.delta} > 0) then ${stockMovements.createdAt} end)`,
     })
     .from(stockMovements)
-    .where(eq(stockMovements.organizationId, orgId))
     .groupBy(stockMovements.itemId);
   const lastByItem = new Map(lastMoves.map((m) => [m.itemId, { lastOut: m.lastOut ? new Date(m.lastOut) : null, lastIn: m.lastIn ? new Date(m.lastIn) : null }]));
 
@@ -97,8 +93,8 @@ export async function buildReports(orgId: number, s: AppSettings) {
   }
 
   // ---- reorder suggestions
-  const incoming = await incomingQuantities(orgId);
-  const supplierLead = await db.select({ lead: partners.leadTimeDays }).from(partners).where(and(eq(partners.organizationId, orgId), inArray(partners.type, ["supplier", "both"])));
+  const incoming = await incomingQuantities(db);
+  const supplierLead = await db.select({ lead: partners.leadTimeDays }).from(partners).where(inArray(partners.type, ["supplier", "both"]));
   const avgLead = supplierLead.filter((x) => x.lead).length ? Math.round(supplierLead.reduce((a, x) => a + (x.lead ?? 0), 0) / supplierLead.filter((x) => x.lead).length) : s.leadTimeDays;
   const coverDays = avgLead + s.safetyDays;
   const reorder = activeItems
@@ -118,13 +114,13 @@ export async function buildReports(orgId: number, s: AppSettings) {
   const monthStart = startOfMonth(subMonths(now, 11));
   const monthly = await db
     .select({
-      month: sql<string>`to_char(date_trunc('month', ${stockMovements.createdAt}), 'YYYY-MM')`,
+      month: sql<string>`date_format(${stockMovements.createdAt}, '%Y-%m')`,
       deltaValue: n(sql<number>`coalesce(sum(${stockMovements.delta} * ${items.unitCost}), 0)`),
     })
     .from(stockMovements)
     .innerJoin(items, eq(items.id, stockMovements.itemId))
-    .where(and(eq(stockMovements.organizationId, orgId), gte(stockMovements.createdAt, monthStart)))
-    .groupBy(sql`1`);
+    .where(gte(stockMovements.createdAt, monthStart))
+    .groupBy(sql`date_format(${stockMovements.createdAt}, '%Y-%m')`);
   const deltaByMonth = new Map(monthly.map((m) => [m.month, m.deltaValue]));
   const currentValue = activeItems.reduce((a, it) => a + it.quantity * it.unitCost, 0);
   const series: Array<{ month: string; label: string; value: number }> = [];
@@ -138,13 +134,13 @@ export async function buildReports(orgId: number, s: AppSettings) {
 
   // ---- expiring lots
   const expiring = await db.query.lots.findMany({
-    where: and(eq(lots.organizationId, orgId), gt(lots.quantity, 0), sql`${lots.expiryDate} <= ${format(addDays(now, 90), "yyyy-MM-dd")}::date`),
+    where: and(gt(lots.quantity, 0), lte(lots.expiryDate, format(addDays(now, 90), "yyyy-MM-dd"))),
     with: { item: true, location: true },
     orderBy: (l, { asc }) => [asc(l.expiryDate)],
     limit: 50,
   });
 
-  const [{ catCount }] = await db.select({ catCount: n(sql<number>`count(*)`) }).from(categories).where(eq(categories.organizationId, orgId));
+  const [{ catCount }] = await db.select({ catCount: n(sql<number>`count(*)`) }).from(categories);
 
   return { settings: s, windowStart, totals, turnover, topMovers, deadStock, ageing, reorder, series, currentValue, expiring, coverDays, avgLead, catCount, itemCount: activeItems.length };
 }

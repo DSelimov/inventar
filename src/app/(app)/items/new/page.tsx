@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Нов артикул" };
 export default async function NewItemPage({ searchParams }: { searchParams: Promise<{ barcode?: string }> }) {
   const ctx = await requireContext("write");
   const sp = await searchParams;
-  const [categories, locations] = await Promise.all([listCategoriesWithFields(ctx.org.id), listLocations(ctx.org.id)]);
+  const [categories, locations] = await Promise.all([listCategoriesWithFields(ctx.db), listLocations(ctx.db)]);
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Нов артикул" back={{ href: "/items", label: "Артикули" }} />

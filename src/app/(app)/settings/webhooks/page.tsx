@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Checkbox, Field, Input } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { WEBHOOK_EVENTS } from "@/db/schema";
+import { WEBHOOK_EVENTS } from "@/db/tenant-schema";
 import { createWebhook, deleteWebhook, sendTestWebhook, toggleWebhook } from "@/lib/actions/webhooks";
 import { requireContext } from "@/lib/auth";
 import { listWebhooks } from "@/lib/queries";
@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Webhooks" };
 
 export default async function WebhooksPage() {
   const ctx = await requireContext("manage");
-  const hooks = await listWebhooks(ctx.org.id);
+  const hooks = await listWebhooks(ctx.db);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">

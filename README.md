@@ -10,25 +10,55 @@
 |---|---|---|
 | Език | **TypeScript** навсякъде | един език за интерфейс, сървър и схема на базата |
 | Framework | **Next.js 16** (App Router, Server Actions, Route Handlers) | страници, сървърна логика и REST API в един проект |
-| База данни | **PostgreSQL 16** чрез **Drizzle ORM** (node-postgres) | транзакции, индекси, готова за много потребители и организации |
+| База данни | **MySQL 8** чрез **Drizzle ORM** (mysql2) | **една база на клиент** + контролна база; работи на Hostinger и всеки MySQL/MariaDB |
 | Стилове | **Tailwind CSS 4** | малка, консистентна дизайн система в `src/app/globals.css` |
 | Други | lucide-react (икони), date-fns (дати, bg локал), html5-qrcode (камера) | |
+
+## Архитектура: един клиент = един поддомейн = една база
+
+- **Контролна база** (`CONTROL_DATABASE_URL`): организации, потребители, членства, сесии и пул от бази.
+  Схема: `src/db/control-schema.ts`, миграции: `drizzle/control`.
+- **База на клиента**: всички данни на организацията (артикули, наличности, поръчки, пратки, API ключове,
+  webhooks, одит). Схема: `src/db/tenant-schema.ts`, миграции: `drizzle/tenant`, прилагат се към всяка база.
+- **Поддомейн**: `<поддомейн>.APP_DOMAIN`. Клиентът се определя от `Host` заглавието (`src/lib/tenant.ts`),
+  връзката към неговата база се кешира (`src/db/tenant.ts`). Основният домейн показва портала
+  (вход, списък организации, създаване на организация).
+- **Създаване на организация** (`provisionTenant`): в режим `auto` приложението изпълнява `CREATE DATABASE`
+  и миграциите; в режим `manual` взема предварително създадена база от пула (`pnpm db:pool:add`).
+- Потребител може да е член на няколко организации с различни роли; сесията е обща за всички поддомейни
+  (cookie за `.APP_DOMAIN`), освен на `localhost`, където всеки поддомейн има отделен вход.
 
 ## Стартиране
 
 ```bash
 pnpm install
-cp .env.example .env          # DATABASE_URL + APP_SECRET
-docker compose up -d postgres # PostgreSQL на порт 5440
-pnpm db:push                  # създава таблиците
-pnpm db:seed                  # демо данни (по избор)
-pnpm dev                      # http://localhost:3000
+cp .env.example .env          # APP_DOMAIN, бази, APP_SECRET
+docker compose up -d mysql    # MySQL 8 на порт 3307
+pnpm db:migrate               # контролна база + всички клиентски бази
+pnpm db:seed                  # демо: организации demo и vtora
+pnpm dev                      # портал: http://localhost:3000 · клиент: http://demo.localhost:3000
 ```
 
-Демо вход след `db:seed`: **admin@demo.bg / demo1234** (собственик) и **sklad@demo.bg / demo1234** (служител).
+Демо вход след `db:seed`: **admin@demo.bg / demo1234** (собственик на demo и vtora) и
+**sklad@demo.bg / demo1234** (служител в demo). Браузърите резолват `*.localhost` към 127.0.0.1 без настройки.
 
-Други скриптове: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm db:studio`
-(разглеждане на базата), `pnpm db:reset` (push + seed).
+Други скриптове: `pnpm db:generate` (нови миграции след промяна на схема), `pnpm db:pool:add`,
+`pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm db:studio`.
+
+## Деплой (Hostinger или друг хостинг)
+
+1. **Node.js.** Next.js е сървърно приложение: нужен е план с Node.js (Hostinger VPS, или споделен план,
+   който изрично поддържа Node.js приложения). Статичният хостинг не е достатъчен. Стартиране:
+   `pnpm build && pnpm start` (или чрез PM2/systemd на VPS).
+2. **Домейн.** `APP_DOMAIN=inventar.bg`, `APP_PROTOCOL=https`. DNS: A запис за `inventar.bg` и **wildcard**
+   `*.inventar.bg` към сървъра. SSL трябва да покрива wildcard-а (Let's Encrypt с DNS предизвикателство,
+   или Cloudflare пред сървъра). На споделен хостинг добавете поддомейните ръчно в hPanel, ако wildcard не
+   се поддържа.
+3. **Бази.** На VPS: `TENANT_DB_MODE=auto` с MySQL потребител с право `CREATE`. На споделен хостинг
+   (без право за CREATE DATABASE): `TENANT_DB_MODE=manual`, създайте базите в hPanel и ги добавете в пула с
+   `pnpm db:pool:add <база> <потребител> <парола> <host>`; всяка нова организация взема следващата свободна.
+   Миграции при нова версия: `pnpm db:migrate` обхожда всички клиентски бази.
+4. **Секрети.** `APP_SECRET` е задължителен (сесии и криптиране на паролите на базите в пула).
 
 ## Функционалности
 
@@ -61,8 +91,8 @@ pnpm dev                      # http://localhost:3000
 ### Потребители и организации
 - Вход с имейл и парола (scrypt, сесии в базата, httpOnly cookie). SSO не е включен на този етап.
 - **Роли**: собственик, администратор, мениджър, служител, само четене; проверка на всяко действие.
-- **Няколко организации** (multi-tenant): всички данни са разделени по организация; един потребител
-  може да е член на няколко и да превключва от страничното меню.
+- **Няколко организации** (multi-tenant): всяка със собствена база данни и поддомейн; един потребител
+  може да е член на няколко и превключва от страничното меню или портала.
 - **Одит**: кой какво е променил, с детайли.
 
 ### Интеграции
@@ -87,10 +117,11 @@ src/
     items/        ItemForm (динамични полета)
     shipments/    ShipmentForm (динамични редове)
     orders/, partners/, scan/, settings/, auth/
-  db/             schema.ts (Drizzle, PostgreSQL), index.ts (pool), seed.ts
+  db/             control-schema.ts, tenant-schema.ts, control.ts, tenant.ts (пул + provisioning), migrate.ts, seed.ts
   lib/
-    actions/      server actions (всички записи са тук; всяко действие проверява роля)
-    queries.ts    всички четения (винаги с organizationId)
+    actions/      server actions (всички записи; всяко действие взема ctx.db и проверява роля)
+    queries.ts    всички четения (приемат базата на клиента)
+    tenant.ts     поддомейн → организация
     stock.ts      двигател на наличностите: локации, партиди, серийни номера, трансфери
     shipment-service.ts  доставка на пратка (общо за UI и API)
     reports.ts    изчисления за Отчети
