@@ -65,9 +65,7 @@ export default async function ReportsPage() {
                 const isNow = i === r.series.length - 1;
                 return (
                   <g key={s.month}>
-                    <title>
-                      {s.month}: {money(s.value)}
-                    </title>
+                    <title>{`${s.month}: ${money(s.value)}`}</title>
                     <rect x={x} y={150 - h} width={26} height={h} rx={4} className={isNow ? "fill-accent" : "fill-accent/60"} />
                     <text x={x + 13} y={168} textAnchor="middle" className="fill-muted text-[10px]">
                       {format(subMonths(now, r.series.length - 1 - i), "LLL", { locale: LOCALE })}
