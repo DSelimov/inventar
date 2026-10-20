@@ -69,7 +69,10 @@ pnpm dev                      # http://localhost:3000
 - **CSV импорт** на артикули (преглед преди запис, upsert по код, автоматични категории, наличности по
   локация) и **CSV експорт** на артикули, наличности по локации и движения.
 - **REST API** `/api/v1/*` с API ключове (четене / запис) — артикули, наличности, движения, пратки
-  (вкл. смяна на статус), поръчки, локации, партньори, категории. Списъкът е в Настройки › API.
+  (вкл. смяна на статус), поръчки, локации, партньори, категории.
+- **API документация**: `/api/v1/openapi.json` (OpenAPI 3.1 спецификация), `/docs/api/swagger` (Swagger UI с
+  Authorize и Try it out) и `/docs/api` (четима версия на български, генерирана от същата спецификация, с
+  webhooks и примери за проверка на подписа). Източник: `src/lib/openapi.ts`.
 - **Webhooks**: POST с HMAC-SHA256 подпис за събития (създаден/променен артикул, ниска наличност,
   движение, пратка, поръчка), с журнал на доставките и тестово събитие.
 
@@ -92,7 +95,9 @@ src/
     shipment-service.ts  доставка на пратка (общо за UI и API)
     reports.ts    изчисления за Отчети
     auth.ts, permissions.ts, audit.ts, webhooks.ts, api.ts, csv.ts, settings.ts, forms.ts, utils.ts
-  app/api/        export/[kind] (CSV), v1/* (REST API)
+  app/api/        export/[kind] (CSV), v1/* (REST API), v1/openapi.json
+  app/docs/       API документация: Swagger UI + четима версия (публични)
+  lib/openapi.ts  OpenAPI 3.1 спецификация — единствен източник за документацията
 ```
 
 Правила: страниците са server components, които четат чрез `lib/queries.ts` и

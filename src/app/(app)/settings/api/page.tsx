@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { KeyRound, Trash2 } from "lucide-react";
+import { BookOpen, KeyRound, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -85,8 +85,23 @@ export default async function ApiPage() {
           )}
         </Card>
 
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            ["/docs/api", "Пълна документация", "Всички крайни точки, схеми, грешки, webhooks и примери."],
+            ["/docs/api/swagger", "Swagger UI", "Стандартният интерактивен интерфейс: Authorize + Try it out с вашия ключ."],
+            ["/api/v1/openapi.json", "OpenAPI 3.1 (JSON)", "За Postman, Insomnia и генератори на клиенти."],
+          ].map(([href, title, hint]) => (
+            <a key={href} href={href} target={href.endsWith(".json") ? "_blank" : undefined} rel="noreferrer" className="rounded-2xl border border-line bg-surface p-4 shadow-sm transition-colors hover:border-accent/40">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <BookOpen className="h-4 w-4 text-accent" /> {title}
+              </div>
+              <p className="mt-1 text-xs text-muted">{hint}</p>
+            </a>
+          ))}
+        </div>
+
         <Card>
-          <CardHeader title="Крайни точки (REST, JSON)" description={`Базов адрес: ${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}`} />
+          <CardHeader title="Крайни точки (кратко)" description="Подробности, схеми и примери: вижте пълната документация." />
           <Table>
             <thead>
               <tr>
