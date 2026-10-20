@@ -12,6 +12,7 @@ import { requireContext } from "@/lib/auth";
 import { listWebhooks } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
 import { WEBHOOK_EVENT_LABELS } from "@/lib/webhooks";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Webhooks" };
 
@@ -37,16 +38,16 @@ export default async function WebhooksPage() {
               actions={
                 <>
                   <Badge tone={h.active ? "success" : "neutral"}>{h.active ? "Активен" : "Спрян"}</Badge>
-                  <form action={toggleWebhook.bind(null, h.id, !h.active)}>
+                  <Form action={toggleWebhook.bind(null, h.id, !h.active)}>
                     <Button type="submit" variant="ghost" size="sm" aria-label={h.active ? "Спри" : "Пусни"}>
                       {h.active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                     </Button>
-                  </form>
-                  <form action={deleteWebhook.bind(null, h.id)}>
+                  </Form>
+                  <Form action={deleteWebhook.bind(null, h.id)}>
                     <ConfirmButton variant="ghost" size="sm" message="Да изтрия ли този webhook?" aria-label="Изтрий">
                       <Trash2 className="h-4 w-4" />
                     </ConfirmButton>
-                  </form>
+                  </Form>
                 </>
               }
             />
@@ -72,18 +73,18 @@ export default async function WebhooksPage() {
           </Card>
         ))}
         {hooks.length > 0 && (
-          <form action={sendTestWebhook}>
+          <Form action={sendTestWebhook}>
             <Button type="submit" variant="secondary" size="sm">
               <Send className="h-4 w-4" /> Изпрати тестово събитие
             </Button>
-          </form>
+          </Form>
         )}
       </div>
 
       <Card className="h-fit">
         <CardHeader title="Нов webhook" />
         <CardBody>
-          <form action={createWebhook} className="space-y-3">
+          <Form action={createWebhook} className="space-y-3">
             <Field label="URL">
               <Input name="url" type="url" required placeholder="https://example.com/hooks/inventory" />
             </Field>
@@ -103,7 +104,7 @@ export default async function WebhooksPage() {
             <SubmitButton className="w-full">
               <WebhookIcon className="h-4 w-4" /> Добави
             </SubmitButton>
-          </form>
+          </Form>
         </CardBody>
       </Card>
     </div>

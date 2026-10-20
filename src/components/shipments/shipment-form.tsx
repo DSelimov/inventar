@@ -6,6 +6,8 @@ import type { Location, Shipment, ShipmentDirection, TrackingMode } from "@/db/s
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Form } from "@/components/ui/form";
+import type { ActionResult } from "@/lib/action";
 
 export type ItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; tracking: TrackingMode; variantLabel: string | null };
 export type LotOption = { id: number; itemId: number; locationId: number; lotNumber: string; quantity: number; expiryDate: string | null };
@@ -34,7 +36,7 @@ export function ShipmentForm({
   initialDirection?: ShipmentDirection;
   linesEditable?: boolean;
   orderId?: number | null;
-  action: (fd: FormData) => Promise<void>;
+  action: (fd: FormData) => Promise<ActionResult>;
   cancelHref: string;
 }) {
   const [direction, setDirection] = useState<ShipmentDirection>(shipment?.direction ?? initialDirection);
@@ -60,7 +62,7 @@ export function ShipmentForm({
   const itemLabel = (i: ItemOption) => `${i.name}${i.variantLabel ? ` · ${i.variantLabel}` : ""} (${i.sku}) · ${i.quantity} ${i.unit}`;
 
   return (
-    <form action={action} className="space-y-6">
+    <Form action={action} className="space-y-6">
       {orderId && <input type="hidden" name="orderId" value={orderId} />}
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold">Пратка</h2>
@@ -209,6 +211,6 @@ export function ShipmentForm({
         </ButtonLink>
         <SubmitButton>{shipment ? "Запази промените" : "Създай пратка"}</SubmitButton>
       </FormActions>
-    </form>
+    </Form>
   );
 }

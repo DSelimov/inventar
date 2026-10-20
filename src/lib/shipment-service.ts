@@ -4,6 +4,7 @@ import type { Db, TenantDb } from "@/db/tenant";
 import { orderLines, orders, shipments, type ShipmentStatus } from "@/db/tenant-schema";
 import { applyMovement, type Actor } from "./stock";
 import { emit } from "./webhooks";
+import { UserError } from "@/lib/errors";
 
 async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: number; quantity: number }>) {
   const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { lines: true } });
@@ -27,12 +28,12 @@ async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: n
 /** Общо за UI и API. Доставката прилага наличността в една транзакция. */
 export async function changeShipmentStatus(db: TenantDb, actor: Actor, id: number, status: ShipmentStatus) {
   const shipment = await db.query.shipments.findFirst({ where: eq(shipments.id, id), with: { lines: true } });
-  if (!shipment) throw new Error("Пратката не е намерена.");
-  if (shipment.status === "delivered" || shipment.status === "cancelled") throw new Error("Доставена или отказана пратка не може да сменя статуса си.");
+  if (!shipment) throw new UserError("Пратката не е намерена.");
+  if (shipment.status === "delivered" || shipment.status === "cancelled") throw new UserError("Доставена или отказана пратка не може да сменя статуса си.");
 
   await db.transaction(async (tx) => {
     if (status === "delivered") {
-      if (!shipment.locationId) throw new Error("Пратката няма локация.");
+      if (!shipment.locationId) throw new UserError("Пратката няма локация.");
       const type = shipment.direction === "inbound" ? "in" : "out";
       for (const line of shipment.lines) {
         await applyMovement(tx, {

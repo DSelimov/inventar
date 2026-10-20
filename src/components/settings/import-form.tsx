@@ -6,6 +6,8 @@ import { Checkbox } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { ImportRow } from "@/lib/actions/import";
 import { mapHeader, parseCsv } from "@/lib/csv";
+import { Form } from "@/components/ui/form";
+import type { ActionResult } from "@/lib/action";
 
 const num = (v: string | undefined) => {
   if (v === undefined || v === "") return undefined;
@@ -13,7 +15,7 @@ const num = (v: string | undefined) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-export function ImportForm({ action }: { action: (fd: FormData) => Promise<void> }) {
+export function ImportForm({ action }: { action: (fd: FormData) => Promise<ActionResult> }) {
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
@@ -48,7 +50,7 @@ export function ImportForm({ action }: { action: (fd: FormData) => Promise<void>
   };
 
   return (
-    <form action={action} className="space-y-4">
+    <Form action={action} className="space-y-4">
       <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface-2/50 p-8 text-center text-sm hover:border-accent/50">
         <Upload className="h-6 w-6 text-muted" />
         <span className="font-medium">{fileName || "Изберете CSV файл"}</span>
@@ -96,6 +98,6 @@ export function ImportForm({ action }: { action: (fd: FormData) => Promise<void>
           <SubmitButton>Импортирай {rows.length} реда</SubmitButton>
         </>
       )}
-    </form>
+    </Form>
   );
 }

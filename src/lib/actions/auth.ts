@@ -7,6 +7,7 @@ import { memberships, organizations, passwordResets, sessions, users } from "@/d
 import { getTenantDb, provisionTenant, tenantDbName } from "@/db/tenant";
 import { locations } from "@/db/tenant-schema";
 import { createSession, destroySession, getSession, hashPassword, suggestSubdomain, verifyPassword } from "@/lib/auth";
+import { UserError } from "@/lib/errors";
 import { str } from "@/lib/forms";
 import { passwordResetMail, sendMail } from "@/lib/mail";
 import { createPasswordLink, findPasswordLink, recentResetExists } from "@/lib/password-tokens";
@@ -34,9 +35,9 @@ export async function login(_prev: string | undefined, fd: FormData): Promise<st
 /** Нова организация: създава база, прилага миграциите, прави потребителя собственик. */
 async function createOrganizationFor(userId: number, name: string, subdomainInput: string) {
   const subdomain = (subdomainInput || suggestSubdomain(name)).toLowerCase();
-  if (!isValidSubdomain(subdomain)) throw new Error("Поддомейнът може да съдържа само малки латински букви, цифри и тире (3–63 знака) и да не е запазена дума.");
+  if (!isValidSubdomain(subdomain)) throw new UserError("Поддомейнът може да съдържа само малки латински букви, цифри и тире (3–63 знака) и да не е запазена дума.");
   const [taken] = await controlDb.select({ id: organizations.id }).from(organizations).where(eq(organizations.subdomain, subdomain)).limit(1);
-  if (taken) throw new Error(`Поддомейнът „${subdomain}“ вече е зает.`);
+  if (taken) throw new UserError(`Поддомейнът „${subdomain}“ вече е зает.`);
 
   const [{ id }] = await controlDb.insert(organizations).values({ name, subdomain, dbName: tenantDbName(subdomain) }).$returningId();
   await controlDb.insert(memberships).values({ userId, organizationId: id, role: "owner" });
@@ -63,7 +64,9 @@ export async function register(_prev: string | undefined, fd: FormData): Promise
     org = await createOrganizationFor(userId, orgName, subdomain);
     await createSession(userId, org.id);
   } catch (e) {
-    return e instanceof Error ? e.message : "Грешка при създаване на организацията.";
+    if (e instanceof UserError) return e.message;
+    console.error("[register] create organization", e);
+    return "Грешка при създаване на организацията. Опитайте отново.";
   }
   redirect(tenantUrl(org.subdomain));
 }
@@ -79,7 +82,9 @@ export async function createOrganization(_prev: string | undefined, fd: FormData
   try {
     org = await createOrganizationFor(session.user.id, name, str(fd, "subdomain"));
   } catch (e) {
-    return e instanceof Error ? e.message : "Грешка при създаване на организацията.";
+    if (e instanceof UserError) return e.message;
+    console.error("[register] create organization", e);
+    return "Грешка при създаване на организацията. Опитайте отново.";
   }
   redirect(tenantUrl(org.subdomain));
 }

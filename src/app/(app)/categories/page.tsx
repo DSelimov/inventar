@@ -10,6 +10,7 @@ import { createCategory } from "@/lib/actions/categories";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listCategories } from "@/lib/queries";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Категории" };
 
@@ -51,7 +52,7 @@ export default async function CategoriesPage() {
         {writable && <Card className="h-fit">
           <CardHeader title="Нова категория" />
           <CardBody>
-            <form action={createCategory} className="space-y-3">
+            <Form action={createCategory} className="space-y-3">
               <Field label="Име">
                 <Input name="name" required placeholder="напр. Електроника" />
               </Field>
@@ -65,7 +66,7 @@ export default async function CategoriesPage() {
                 <Plus className="h-4 w-4" />
                 Създай категория
               </SubmitButton>
-            </form>
+            </Form>
           </CardBody>
         </Card>}
       </div>

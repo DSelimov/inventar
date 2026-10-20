@@ -6,6 +6,8 @@ import type { Location, Order, OrderType } from "@/db/schema";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Form } from "@/components/ui/form";
+import type { ActionResult } from "@/lib/action";
 
 export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number };
 export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null };
@@ -29,7 +31,7 @@ export function OrderForm({
   initialLines?: { itemId: number; quantity: number; unitPrice?: number }[];
   initialType?: OrderType;
   numberPlaceholder: string;
-  action: (fd: FormData) => Promise<void>;
+  action: (fd: FormData) => Promise<ActionResult>;
   cancelHref: string;
 }) {
   const [type, setType] = useState<OrderType>(order?.type ?? initialType);
@@ -54,7 +56,7 @@ export function OrderForm({
   const total = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.price) || 0), 0);
 
   return (
-    <form action={action} className="space-y-6">
+    <Form action={action} className="space-y-6">
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold">Поръчка</h2>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -173,6 +175,6 @@ export function OrderForm({
           </>
         )}
       </FormActions>
-    </form>
+    </Form>
   );
 }

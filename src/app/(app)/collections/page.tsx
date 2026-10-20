@@ -11,6 +11,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listCollections } from "@/lib/queries";
 import { formatNumber } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Колекции" };
 
@@ -52,7 +53,7 @@ export default async function CollectionsPage() {
         {writable && <Card className="h-fit">
           <CardHeader title="Нова колекция" />
           <CardBody>
-            <form action={createCollection} className="space-y-3">
+            <Form action={createCollection} className="space-y-3">
               <Field label="Име">
                 <Input name="name" required placeholder="напр. Лято 2026" />
               </Field>
@@ -66,7 +67,7 @@ export default async function CollectionsPage() {
                 <Plus className="h-4 w-4" />
                 Създай колекция
               </SubmitButton>
-            </form>
+            </Form>
           </CardBody>
         </Card>}
       </div>

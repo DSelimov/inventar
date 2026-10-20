@@ -15,6 +15,7 @@ import { listMembers } from "@/lib/members";
 import { mailConfigured } from "@/lib/mail";
 import { isPendingInvite } from "@/lib/password-tokens";
 import { formatDate } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Потребители" };
 
@@ -50,7 +51,7 @@ export default async function UsersPage() {
                   {m.userId === ctx.user.id || (m.role === "owner" && ctx.role !== "owner") ? (
                     <Badge tone="accent">{ROLE_LABELS[m.role]}</Badge>
                   ) : (
-                    <form action={changeRole.bind(null, m.id)} className="flex items-center gap-2">
+                    <Form action={changeRole.bind(null, m.id)} className="flex items-center gap-2">
                       <Select name="role" defaultValue={m.role} className="w-auto">
                         {assignable.map((r) => (
                           <option key={r} value={r}>
@@ -61,25 +62,25 @@ export default async function UsersPage() {
                       <Button type="submit" variant="ghost" size="sm">
                         Запази
                       </Button>
-                    </form>
+                    </Form>
                   )}
                 </td>
                 <td className="text-muted">{formatDate(m.createdAt)}</td>
                 <td className="text-right">
                   <div className="flex justify-end gap-1">
                   {isPendingInvite(m.user) && (
-                    <form action={resendInvite.bind(null, m.id)}>
+                    <Form action={resendInvite.bind(null, m.id)}>
                       <SubmitButton variant="ghost" size="sm" title="Изпрати поканата отново" aria-label="Изпрати поканата отново">
                         <Send className="h-4 w-4" />
                       </SubmitButton>
-                    </form>
+                    </Form>
                   )}
                   {m.userId !== ctx.user.id && m.role !== "owner" && (
-                    <form action={removeMember.bind(null, m.id)}>
+                    <Form action={removeMember.bind(null, m.id)}>
                       <ConfirmButton variant="ghost" size="sm" message={`Да премахна ли ${m.user.name} от организацията?`} aria-label="Премахни">
                         <X className="h-4 w-4" />
                       </ConfirmButton>
-                    </form>
+                    </Form>
                   )}
                   </div>
                 </td>
@@ -93,7 +94,7 @@ export default async function UsersPage() {
         <Card>
           <CardHeader title="Добави потребител" description="Новите потребители получават покана по имейл с линк за парола. Ако имейлът вече има акаунт, той просто получава достъп." />
           <CardBody>
-            <form action={addMember} className="space-y-3">
+            <Form action={addMember} className="space-y-3">
               <Field label="Име">
                 <Input name="name" required />
               </Field>
@@ -116,7 +117,7 @@ export default async function UsersPage() {
                 <UserPlus className="h-4 w-4" />
                 Добави
               </SubmitButton>
-            </form>
+            </Form>
           </CardBody>
         </Card>
         <Card>

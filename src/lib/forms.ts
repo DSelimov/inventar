@@ -1,4 +1,5 @@
 /** Помощни функции за четене на FormData в server actions. */
+import { UserError } from "./errors";
 
 export function str(fd: FormData, key: string, fallback = ""): string {
   const v = fd.get(key);
@@ -42,6 +43,6 @@ export function oneOf<T extends readonly string[]>(
 }
 
 export function required(value: string, name: string): string {
-  if (!value) throw new Error(`Полето „${name}“ е задължително.`);
+  if (!value) throw new UserError(`Полето „${name}“ е задължително.`);
   return value;
 }

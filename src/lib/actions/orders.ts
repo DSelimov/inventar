@@ -2,7 +2,6 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import type { Db } from "@/db/tenant";
 import { ORDER_TYPES, orderLines, orders, shipmentLines, shipments, type OrderStatus } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
@@ -10,6 +9,8 @@ import { requireContext } from "@/lib/auth";
 import { oneOf, optional, optionalInt, str } from "@/lib/forms";
 import { getDefaultLocation, nextOrderNumber } from "@/lib/queries";
 import { emit } from "@/lib/webhooks";
+import { act, redirectWith } from "@/lib/action";
+import { UserError } from "@/lib/errors";
 
 function revalidate(id?: number) {
   revalidatePath("/");
@@ -37,15 +38,15 @@ function readLines(fd: FormData) {
 
 async function own(db: Db, id: number) {
   const o = await db.query.orders.findFirst({ where: eq(orders.id, id), with: { lines: { with: { item: true } }, partner: true } });
-  if (!o) throw new Error("Поръчката не е намерена.");
+  if (!o) throw new UserError("Поръчката не е намерена.");
   return o;
 }
 
-export async function createOrder(fd: FormData) {
+export const createOrder = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const type = oneOf(fd, "type", ORDER_TYPES, "purchase");
   const lines = readLines(fd);
-  if (!lines.length) throw new Error("Добавете поне един ред към поръчката.");
+  if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   const number = str(fd, "number") || (await nextOrderNumber(ctx.db, type));
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
   const id = await ctx.db.transaction(async (tx) => {
@@ -69,15 +70,15 @@ export async function createOrder(fd: FormData) {
   await audit(ctx, "create", "order", id, { number, type });
   emit(ctx.db, "order.created", { id, number, type, lines });
   revalidate(id);
-  redirect(`/orders/${id}`);
-}
+  return redirectWith(`/orders/${id}`, "Поръчката е създадена.");
+});
 
-export async function updateOrder(id: number, fd: FormData) {
+export const updateOrder = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const existing = await own(ctx.db, id);
-  if (existing.status !== "draft") throw new Error("Само чернови могат да се редактират. Създайте пратка за промени в изпълнението.");
+  if (existing.status !== "draft") throw new UserError("Само чернови могат да се редактират. Създайте пратка за промени в изпълнението.");
   const lines = readLines(fd);
-  if (!lines.length) throw new Error("Добавете поне един ред към поръчката.");
+  if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   await ctx.db.transaction(async (tx) => {
     await tx
       .update(orders)
@@ -95,29 +96,30 @@ export async function updateOrder(id: number, fd: FormData) {
   });
   await audit(ctx, "update", "order", id, { number: existing.number });
   revalidate(id);
-  redirect(`/orders/${id}`);
-}
+  return redirectWith(`/orders/${id}`, "Поръчката е запазена.");
+});
 
-export async function setOrderStatus(id: number, status: OrderStatus) {
+export const setOrderStatus = act(async (id: number, status: OrderStatus) => {
   const ctx = await requireContext("write");
   const o = await own(ctx.db, id);
   const allowed: Record<OrderStatus, OrderStatus[]> = { draft: ["confirmed", "cancelled"], confirmed: ["cancelled"], partial: ["cancelled", "completed"], completed: [], cancelled: [] };
-  if (!allowed[o.status].includes(status)) throw new Error(`Преход от „${o.status}“ към „${status}“ не е позволен.`);
+  if (!allowed[o.status].includes(status)) throw new UserError(`Преход от „${o.status}“ към „${status}“ не е позволен.`);
   await ctx.db.update(orders).set({ status }).where(eq(orders.id, id));
   await audit(ctx, "status", "order", id, { number: o.number, status });
   emit(ctx.db, "order.status_changed", { id, number: o.number, status });
   revalidate(id);
-}
+  return "Статусът на поръчката е сменен.";
+});
 
-export async function createShipmentForRemaining(id: number) {
+export const createShipmentForRemaining = act(async (id: number) => {
   const ctx = await requireContext("write");
   const o = await own(ctx.db, id);
-  if (o.status !== "confirmed" && o.status !== "partial") throw new Error("Потвърдете поръчката, преди да създадете пратка.");
+  if (o.status !== "confirmed" && o.status !== "partial") throw new UserError("Потвърдете поръчката, преди да създадете пратка.");
   const openShipments = await ctx.db.query.shipments.findMany({ where: eq(shipments.orderId, id), with: { lines: true } });
   const reserved = new Map<number, number>();
   for (const s of openShipments) if (s.status === "pending" || s.status === "in_transit") for (const l of s.lines) reserved.set(l.itemId, (reserved.get(l.itemId) ?? 0) + l.quantity);
   const remaining = o.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity - l.fulfilledQuantity - (reserved.get(l.itemId) ?? 0) })).filter((l) => l.quantity > 0);
-  if (!remaining.length) throw new Error("Няма оставащи количества: всичко е доставено или вече е в пратка.");
+  if (!remaining.length) throw new UserError("Няма оставащи количества: всичко е доставено или вече е в пратка.");
 
   const count = openShipments.length + 1;
   const shipmentId = await ctx.db.transaction(async (tx) => {
@@ -141,14 +143,14 @@ export async function createShipmentForRemaining(id: number) {
   emit(ctx.db, "shipment.created", { id: shipmentId, orderId: o.id, lines: remaining });
   revalidate(id);
   revalidatePath("/shipments");
-  redirect(`/shipments/${shipmentId}/edit`);
-}
+  return redirectWith(`/shipments/${shipmentId}/edit`, "Пратката за остатъка е създадена.");
+});
 
-export async function deleteOrder(id: number) {
+export const deleteOrder = act(async (id: number) => {
   const ctx = await requireContext("delete");
   const o = await own(ctx.db, id);
   await ctx.db.delete(orders).where(eq(orders.id, id));
   await audit(ctx, "delete", "order", id, { number: o.number });
   revalidate();
-  redirect("/orders");
-}
+  return redirectWith("/orders", "Поръчката е изтрита.");
+});

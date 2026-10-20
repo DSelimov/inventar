@@ -2,13 +2,14 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { categories, items, locations } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { str } from "@/lib/forms";
 import { getDefaultLocation } from "@/lib/queries";
 import { applyMovement } from "@/lib/stock";
+import { act, redirectWith } from "@/lib/action";
+import { UserError } from "@/lib/errors";
 
 export type ImportRow = {
   sku: string;
@@ -24,15 +25,15 @@ export type ImportRow = {
   description?: string;
 };
 
-export async function importItems(fd: FormData) {
+export const importItems = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
   let rows: ImportRow[];
   try {
     rows = JSON.parse(str(fd, "rows")) as ImportRow[];
   } catch {
-    throw new Error("Невалидни данни за импорт.");
+    throw new UserError("Невалидни данни за импорт.");
   }
-  if (!rows.length) throw new Error("Няма редове за импорт.");
+  if (!rows.length) throw new UserError("Няма редове за импорт.");
   const setQuantities = str(fd, "setQuantities") === "1";
 
   const cats = await ctx.db.select().from(categories);
@@ -78,7 +79,7 @@ export async function importItems(fd: FormData) {
       }
       if (setQuantities && r.quantity !== undefined && Number.isFinite(r.quantity)) {
         const locationId = (r.location ? locByName.get(r.location.toLowerCase()) : undefined) ?? defaultLoc?.id;
-        if (!locationId) throw new Error("Няма локация за количествата. Създайте локация първо.");
+        if (!locationId) throw new UserError("Няма локация за количествата. Създайте локация първо.");
         await applyMovement(tx, { actor: ctx.user, itemId, locationId, type: "adjust", quantity: Math.max(0, Math.trunc(r.quantity)), reason: "Импорт от CSV" });
       }
     }
@@ -86,5 +87,5 @@ export async function importItems(fd: FormData) {
   await audit(ctx, "import", "item", null, { created, updated, rows: rows.length });
   revalidatePath("/items");
   revalidatePath("/");
-  redirect(`/items?imported=${created + updated}`);
-}
+  return redirectWith(`/items?imported=${created + updated}`, "Импортът приключи.");
+});

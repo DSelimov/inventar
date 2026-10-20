@@ -12,6 +12,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getOrder } from "@/lib/queries";
 import { formatDate, formatDateTime, formatMoney, formatNumber, label } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -64,12 +65,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 </ButtonLink>
               )}
               {can(ctx.role, "delete") && (
-                <form action={deleteOrder.bind(null, id)}>
+                <Form action={deleteOrder.bind(null, id)}>
                   <ConfirmButton variant="danger" message={`Да изтрия ли поръчка ${order.number}? Свързаните пратки остават.`}>
                     <Trash2 className="h-4 w-4" />
                     Изтрий
                   </ConfirmButton>
-                </form>
+                </Form>
               )}
             </>
           )
@@ -171,32 +172,32 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <CardHeader title="Действия" />
               <CardBody className="space-y-2">
                 {order.status === "draft" && (
-                  <form action={setOrderStatus.bind(null, id, "confirmed")}>
+                  <Form action={setOrderStatus.bind(null, id, "confirmed")}>
                     <Button type="submit" className="w-full">
                       <Check className="h-4 w-4" /> Потвърди поръчката
                     </Button>
-                  </form>
+                  </Form>
                 )}
                 {active && (
-                  <form action={createShipmentForRemaining.bind(null, id)}>
+                  <Form action={createShipmentForRemaining.bind(null, id)}>
                     <Button type="submit" className="w-full" disabled={remainingToShip === 0}>
                       <Truck className="h-4 w-4" /> Създай пратка за оставащото ({formatNumber(remainingToShip)})
                     </Button>
-                  </form>
+                  </Form>
                 )}
                 {order.status === "partial" && (
-                  <form action={setOrderStatus.bind(null, id, "completed")}>
+                  <Form action={setOrderStatus.bind(null, id, "completed")}>
                     <ConfirmButton variant="secondary" className="w-full" message="Да приключа ли поръчката без да се доставя остатъкът?">
                       Приключи с остатък
                     </ConfirmButton>
-                  </form>
+                  </Form>
                 )}
                 {(order.status === "draft" || active) && (
-                  <form action={setOrderStatus.bind(null, id, "cancelled")}>
+                  <Form action={setOrderStatus.bind(null, id, "cancelled")}>
                     <ConfirmButton variant="ghost" className="w-full" message="Да откажа ли поръчката?">
                       <X className="h-4 w-4" /> Откажи
                     </ConfirmButton>
-                  </form>
+                  </Form>
                 )}
                 {order.status === "completed" && <p className="text-sm text-muted">Поръчката е изпълнена.</p>}
                 {order.status === "cancelled" && <p className="text-sm text-muted">Поръчката е отказана.</p>}

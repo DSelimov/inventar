@@ -12,6 +12,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getShipment } from "@/lib/queries";
 import { formatDate, formatDateTime, formatMoney, formatNumber, label, plural, todayIso } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -73,12 +74,12 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
                 Редакция
               </ButtonLink>
               {can(ctx.role, "delete") && (
-                <form action={deleteShipment.bind(null, id)}>
+                <Form action={deleteShipment.bind(null, id)}>
                   <ConfirmButton variant="danger" message={`Да изтрия ли пратка ${shipment.reference}? Вече приложените складови движения се запазват.`}>
                     <Trash2 className="h-4 w-4" />
                     Изтрий
                   </ConfirmButton>
-                </form>
+                </Form>
               )}
             </>
           )
@@ -159,28 +160,28 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
                 </p>
               )}
               {writable && shipment.status === "pending" && (
-                <form action={setShipmentStatus.bind(null, id, "in_transit")}>
+                <Form action={setShipmentStatus.bind(null, id, "in_transit")}>
                   <Button type="submit" variant="secondary" className="w-full">
                     <Truck className="h-4 w-4" />
                     Отбележи „в движение“
                   </Button>
-                </form>
+                </Form>
               )}
               {writable && open && (
-                <form action={setShipmentStatus.bind(null, id, "delivered")}>
+                <Form action={setShipmentStatus.bind(null, id, "delivered")}>
                   <ConfirmButton className="w-full" disabled={missingLots.length > 0} message={inbound ? "Да отбележа ли като доставена и да добавя количествата към наличността?" : "Да отбележа ли като доставена и да извадя количествата от наличността?"}>
                     <Check className="h-4 w-4" />
                     Отбележи като доставена
                   </ConfirmButton>
-                </form>
+                </Form>
               )}
               {writable && open && (
-                <form action={setShipmentStatus.bind(null, id, "cancelled")}>
+                <Form action={setShipmentStatus.bind(null, id, "cancelled")}>
                   <ConfirmButton variant="ghost" className="w-full" message="Да откажа ли пратката? Наличността няма да се промени.">
                     <X className="h-4 w-4" />
                     Откажи пратката
                   </ConfirmButton>
-                </form>
+                </Form>
               )}
               {shipment.status === "delivered" && <p className="text-sm text-muted">Доставена на {formatDateTime(shipment.deliveredAt)}. Наличността е обновена.</p>}
               {shipment.status === "cancelled" && <p className="text-sm text-muted">Пратката е отказана. Наличността не е променена.</p>}

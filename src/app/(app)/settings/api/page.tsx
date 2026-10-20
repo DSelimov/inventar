@@ -10,6 +10,7 @@ import { createApiKey, deleteApiKey, readNewKeyOnce } from "@/lib/actions/api-ke
 import { requireContext } from "@/lib/auth";
 import { listApiKeys } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "API" };
 
@@ -72,11 +73,11 @@ export default async function ApiPage() {
                     </td>
                     <td className="text-muted">{k.lastUsedAt ? formatDateTime(k.lastUsedAt) : "—"}</td>
                     <td className="text-right">
-                      <form action={deleteApiKey.bind(null, k.id)}>
+                      <Form action={deleteApiKey.bind(null, k.id)}>
                         <ConfirmButton variant="ghost" size="sm" message="Да изтрия ли ключа? Интеграциите, които го ползват, ще спрат." aria-label="Изтрий">
                           <Trash2 className="h-4 w-4" />
                         </ConfirmButton>
-                      </form>
+                      </Form>
                     </td>
                   </tr>
                 ))}
@@ -134,7 +135,7 @@ export default async function ApiPage() {
       <Card className="h-fit">
         <CardHeader title="Нов ключ" />
         <CardBody>
-          <form action={createApiKey} className="space-y-3">
+          <Form action={createApiKey} className="space-y-3">
             <Field label="Име" hint="За кого е ключът: онлайн магазин, счетоводство…">
               <Input name="name" required placeholder="напр. Онлайн магазин" />
             </Field>
@@ -142,7 +143,7 @@ export default async function ApiPage() {
             <SubmitButton className="w-full">
               <KeyRound className="h-4 w-4" /> Създай ключ
             </SubmitButton>
-          </form>
+          </Form>
         </CardBody>
       </Card>
     </div>

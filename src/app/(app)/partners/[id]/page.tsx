@@ -12,6 +12,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getPartner } from "@/lib/queries";
 import { formatDate, formatMoney, label } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -40,11 +41,11 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
         }
         actions={
           can(ctx.role, "delete") && (
-            <form action={deletePartner.bind(null, id)}>
+            <Form action={deletePartner.bind(null, id)}>
               <ConfirmButton variant="danger" message={`Да изтрия ли „${partner.name}“? Поръчките и пратките остават без партньор.`}>
                 <Trash2 className="h-4 w-4" /> Изтрий
               </ConfirmButton>
-            </form>
+            </Form>
           )
         }
       />
@@ -125,9 +126,9 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
           <CardHeader title="Данни" />
           <CardBody>
             {writable ? (
-              <form action={updatePartner.bind(null, id)}>
+              <Form action={updatePartner.bind(null, id)}>
                 <PartnerFields partner={partner} submitLabel="Запази" />
-              </form>
+              </Form>
             ) : (
               <dl className="space-y-2 text-sm">
                 {[

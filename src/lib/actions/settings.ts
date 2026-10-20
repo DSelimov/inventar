@@ -8,8 +8,10 @@ import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { bool, int, str } from "@/lib/forms";
 import { setSetting } from "@/lib/settings";
+import { act } from "@/lib/action";
+import { UserError } from "@/lib/errors";
 
-export async function saveOrganization(fd: FormData) {
+export const saveOrganization = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
   const name = str(fd, "name") || ctx.org.name;
   const currency = (str(fd, "currency") || "EUR").toUpperCase().slice(0, 3);
@@ -17,9 +19,10 @@ export async function saveOrganization(fd: FormData) {
   await setSetting(ctx.db, "lowStockAlerts", String(bool(fd, "lowStockAlerts")));
   await audit(ctx, "update", "organization", ctx.org.id, { name, currency });
   revalidatePath("/", "layout");
-}
+  return "Настройките са запазени.";
+});
 
-export async function saveReportParameters(fd: FormData) {
+export const saveReportParameters = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
   const params = {
     windowDays: int(fd, "windowDays", 30),
@@ -29,10 +32,11 @@ export async function saveReportParameters(fd: FormData) {
     targetMarginPct: int(fd, "targetMarginPct", 30),
   };
   for (const [key, value] of Object.entries(params)) {
-    if (value <= 0) throw new Error("Всички параметри трябва да са положителни числа.");
+    if (value <= 0) throw new UserError("Всички параметри трябва да са положителни числа.");
     await setSetting(ctx.db, key, String(value));
   }
   await audit(ctx, "update", "settings", null, params);
   revalidatePath("/reports");
   revalidatePath("/settings");
-}
+  return "Параметрите на отчетите са запазени.";
+});

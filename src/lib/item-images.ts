@@ -5,6 +5,7 @@ import sharp from "sharp";
 import type { Organization } from "@/db/control-schema";
 import type { Db } from "@/db/tenant";
 import { itemImages, items, type ItemImage } from "@/db/tenant-schema";
+import { UserError } from "./errors";
 import { deleteFiles, getFile, putFile } from "./storage";
 
 /** Снимки на артикули: общо за интерфейса и REST API. */
@@ -15,7 +16,7 @@ export type ImageSize = (typeof IMAGE_SIZES)[number];
 
 const ACCEPTED = new Set(["jpeg", "png", "webp", "gif", "avif", "tiff"]);
 
-export class ImageError extends Error {}
+export class ImageError extends UserError {}
 
 /** URL за интерфейса (сесия). За API: /api/v1/items/{id}/images/{imageId}. */
 export const imageUrl = (img: Pick<ItemImage, "id">, size: ImageSize = "full") => `/files/item-images/${img.id}/${size}`;

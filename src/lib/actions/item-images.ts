@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { addItemImages, deleteItemImage, getItemImage, ImageError, makePrimaryImage } from "@/lib/item-images";
+import { act } from "@/lib/action";
+import { UserError } from "@/lib/errors";
 
 export type UploadState = { error?: string; added?: number; at?: number };
 
@@ -26,19 +28,21 @@ export async function uploadItemImages(itemId: number, _prev: UploadState, fd: F
   }
 }
 
-export async function removeItemImage(imageId: number) {
+export const removeItemImage = act(async (imageId: number) => {
   const ctx = await requireContext("write");
   const img = await getItemImage(ctx.db, imageId);
-  if (!img) throw new Error("Снимката не е намерена.");
+  if (!img) throw new UserError("Снимката не е намерена.");
   await deleteItemImage(ctx.db, img);
   await audit(ctx, "update", "item", img.itemId, { photoRemoved: img.id });
   revalidate(img.itemId);
-}
+  return "Снимката е изтрита.";
+});
 
-export async function setPrimaryImage(imageId: number) {
+export const setPrimaryImage = act(async (imageId: number) => {
   const ctx = await requireContext("write");
   const img = await getItemImage(ctx.db, imageId);
-  if (!img) throw new Error("Снимката не е намерена.");
+  if (!img) throw new UserError("Снимката не е намерена.");
   await makePrimaryImage(ctx.db, img);
   revalidate(img.itemId);
-}
+  return "Главната снимка е сменена.";
+});

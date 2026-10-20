@@ -14,6 +14,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getCategory, listItems } from "@/lib/queries";
 import { label, plural } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -45,12 +46,12 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
             <ButtonLink href={`/items?category=${id}&status=all`} variant="secondary">
               Виж артикулите
             </ButtonLink>
-            {can(ctx.role, "delete") && <form action={deleteCategory.bind(null, id)}>
+            {can(ctx.role, "delete") && <Form action={deleteCategory.bind(null, id)}>
               <ConfirmButton variant="danger" message={`Да изтрия ли „${category.name}“? Артикулите остават, но губят категорията и стойностите на персонализираните полета.`}>
                 <Trash2 className="h-4 w-4" />
                 Изтрий
               </ConfirmButton>
-            </form>}
+            </Form>}
           </>
         }
       />
@@ -82,11 +83,11 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
                       </td>
                       <td className="text-muted">{f.options ? (JSON.parse(f.options) as string[]).join(", ") : "—"}</td>
                       <td className="text-right">
-                        {manage && <form action={deleteField.bind(null, id, f.id)}>
+                        {manage && <Form action={deleteField.bind(null, id, f.id)}>
                           <Button type="submit" variant="ghost" size="sm" aria-label="Изтрий полето">
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        </form>}
+                        </Form>}
                       </td>
                     </tr>
                   ))}
@@ -98,7 +99,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
           <Card>
             <CardHeader title="Настройки на категорията" />
             <CardBody>
-              <form action={updateCategory.bind(null, id)} className="grid gap-4 sm:grid-cols-[1fr_auto]">
+              <Form action={updateCategory.bind(null, id)} className="grid gap-4 sm:grid-cols-[1fr_auto]">
                 <Field label="Име">
                   <Input name="name" required defaultValue={category.name} />
                 </Field>
@@ -111,7 +112,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
                 <div className="sm:col-span-2 flex justify-end">
                   <SubmitButton variant="secondary">Запази</SubmitButton>
                 </div>
-              </form>
+              </Form>
             </CardBody>
           </Card>
         </div>
@@ -119,7 +120,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
         {manage && <Card className="h-fit">
           <CardHeader title="Добави поле" />
           <CardBody>
-            <form action={addField.bind(null, id)} className="space-y-3">
+            <Form action={addField.bind(null, id)} className="space-y-3">
               <Field label="Име на полето">
                 <Input name="name" required placeholder="напр. Размер" />
               </Field>
@@ -143,7 +144,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
                 <Plus className="h-4 w-4" />
                 Добави поле
               </SubmitButton>
-            </form>
+            </Form>
           </CardBody>
         </Card>}
       </div>

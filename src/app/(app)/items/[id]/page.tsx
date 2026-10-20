@@ -16,6 +16,7 @@ import { can } from "@/lib/permissions";
 import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
 import { getItem, listLocations } from "@/lib/queries";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -69,12 +70,12 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 Редакция
               </ButtonLink>
               {can(ctx.role, "delete") && (
-                <form action={deleteItem.bind(null, id)}>
+                <Form action={deleteItem.bind(null, id)}>
                   <ConfirmButton variant="danger" message={`Да изтрия ли „${title}“ заедно с цялата му складова история?`}>
                     <Trash2 className="h-4 w-4" />
                     Изтрий
                   </ConfirmButton>
-                </form>
+                </Form>
               )}
             </>
           )
@@ -195,7 +196,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               )}
               {writable && (
                 <CardBody className={item.variants.length ? "border-t border-line" : ""}>
-                  <form action={createVariant.bind(null, id)} className="grid gap-3 sm:grid-cols-[1fr_1fr_8rem_8rem_auto]">
+                  <Form action={createVariant.bind(null, id)} className="grid gap-3 sm:grid-cols-[1fr_1fr_8rem_8rem_auto]">
                     <Field label="Вариант">
                       <Input name="variantLabel" required placeholder="напр. L / Черен" />
                     </Field>
@@ -213,7 +214,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                         <GitBranch className="h-4 w-4" /> Добави
                       </SubmitButton>
                     </div>
-                  </form>
+                  </Form>
                 </CardBody>
               )}
             </Card>
@@ -317,7 +318,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <Card>
               <CardHeader title="Корекция на наличност" description={tracked ? "При приход въведете партида; при разход изберете партида." : "Приход, разход или точно преброено количество."} />
               <CardBody>
-                <form action={adjustStock.bind(null, id)} className="space-y-3">
+                <Form action={adjustStock.bind(null, id)} className="space-y-3">
                   <Field label="Локация">
                     <Select name="locationId" defaultValue={defaultLoc?.id ?? ""}>
                       {locations.map((l) => (
@@ -367,7 +368,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                     <SlidersHorizontal className="h-4 w-4" />
                     Приложи
                   </SubmitButton>
-                </form>
+                </Form>
               </CardBody>
             </Card>
           )}
@@ -376,7 +377,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <Card>
               <CardHeader title="Трансфер между локации" />
               <CardBody>
-                <form action={transfer.bind(null, id)} className="space-y-3">
+                <Form action={transfer.bind(null, id)} className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="От">
                       <Select name="fromLocationId" defaultValue={defaultLoc?.id ?? ""}>
@@ -419,7 +420,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                     <ArrowLeftRight className="h-4 w-4" />
                     Прехвърли
                   </SubmitButton>
-                </form>
+                </Form>
               </CardBody>
             </Card>
           )}

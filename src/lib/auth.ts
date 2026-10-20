@@ -8,6 +8,7 @@ import { controlDb } from "@/db/control";
 import { memberships, organizations, sessions, users, type Organization, type Role, type User } from "@/db/control-schema";
 import { getTenantDb, type TenantDb } from "@/db/tenant";
 import { sha256 } from "./auth-crypto";
+import { UserError } from "./errors";
 import { can, type Level } from "./permissions";
 import { APP_DOMAIN, APP_PROTOCOL, currentTenant, rootUrl } from "./tenant";
 
@@ -97,7 +98,7 @@ export async function requireContext(level: Level = "read"): Promise<Context> {
   if (org.status !== "active") redirect("/provisioning");
   const m = session.memberships.find((x) => x.organizationId === org.id);
   if (!m) redirect(rootUrl("/portal?denied=" + encodeURIComponent(org.subdomain)));
-  if (!can(m.role, level)) throw new Error("Нямате права за това действие.");
+  if (!can(m.role, level)) throw new UserError("Нямате права за това действие.");
   return { ...session, org, role: m.role, db: getTenantDb(org) };
 }
 

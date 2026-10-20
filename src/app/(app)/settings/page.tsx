@@ -8,6 +8,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getSettings } from "@/lib/settings";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Настройки" };
 
@@ -21,7 +22,7 @@ export default async function SettingsPage() {
       <Card>
         <CardHeader title="Организация" description="Име и валута на фирмата." />
         <CardBody>
-          <form action={saveOrganization} className="space-y-4">
+          <Form action={saveOrganization} className="space-y-4">
             <Field label="Име на фирмата">
               <Input name="name" defaultValue={ctx.org.name} required disabled={!manage} />
             </Field>
@@ -34,14 +35,14 @@ export default async function SettingsPage() {
                 <SubmitButton>Запази</SubmitButton>
               </div>
             )}
-          </form>
+          </Form>
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader title="Параметри за анализи" description="Използват се в Отчети за оборот, залежала стока и предложения за поръчка." />
         <CardBody>
-          <form action={saveReportParameters} className="grid gap-4 sm:grid-cols-2">
+          <Form action={saveReportParameters} className="grid gap-4 sm:grid-cols-2">
             <Field label="Прозорец за анализ (дни)" hint="Период за оборот и средна дневна консумация.">
               <Input name="windowDays" type="number" min={1} defaultValue={s.windowDays} disabled={!manage} />
             </Field>
@@ -62,19 +63,19 @@ export default async function SettingsPage() {
                 <SubmitButton variant="secondary">Запази параметрите</SubmitButton>
               </div>
             )}
-          </form>
+          </Form>
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader title="Вашият профил" description={`${ctx.user.name} · ${ctx.user.email}`} />
         <CardBody>
-          <form action={changeOwnPassword} className="flex flex-wrap items-end gap-3">
+          <Form action={changeOwnPassword} className="flex flex-wrap items-end gap-3">
             <Field label="Нова парола" className="min-w-60 flex-1">
               <Input name="password" type="password" minLength={8} required autoComplete="new-password" />
             </Field>
             <SubmitButton variant="secondary">Смени паролата</SubmitButton>
-          </form>
+          </Form>
         </CardBody>
       </Card>
 

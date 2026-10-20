@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { removeItemImage, setPrimaryImage, uploadItemImages, type UploadState } from "@/lib/actions/item-images";
 import { cn } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export type GalleryImage = { id: number; full: string; thumb: string; width: number; height: number };
 
@@ -70,19 +71,19 @@ export function ItemGallery({
       {editable && own && selected && (
         <div className="mt-3 flex flex-wrap gap-2">
           {selected.id !== images[0]?.id && (
-            <form action={setPrimaryImage.bind(null, selected.id)}>
+            <Form action={setPrimaryImage.bind(null, selected.id)}>
               <Button type="submit" variant="secondary" size="sm">
                 <Star className="h-3.5 w-3.5" />
                 Направи главна
               </Button>
-            </form>
+            </Form>
           )}
-          <form action={removeItemImage.bind(null, selected.id)} onSubmit={() => setSelectedId(null)}>
+          <Form action={removeItemImage.bind(null, selected.id)} onSubmit={() => setSelectedId(null)}>
             <ConfirmButton variant="ghost" size="sm" message="Да изтрия ли тази снимка?">
               <Trash2 className="h-3.5 w-3.5" />
               Изтрий снимката
             </ConfirmButton>
-          </form>
+          </Form>
         </div>
       )}
 

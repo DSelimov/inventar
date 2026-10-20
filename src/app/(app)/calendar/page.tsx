@@ -14,6 +14,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listCalendarEntries, type CalendarEntry } from "@/lib/queries";
 import { LOCALE, cn, label, plural, todayIso } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Календар" };
 
@@ -109,7 +110,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           {writable && <Card>
             <CardHeader title="Добави в календара" />
             <CardBody>
-              <form action={createEvent} className="space-y-3">
+              <Form action={createEvent} className="space-y-3">
                 <Field label="Заглавие">
                   <Input name="title" required placeholder="Инвентаризация, посещение на доставчик…" />
                 </Field>
@@ -134,7 +135,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                   <Plus className="h-4 w-4" />
                   Добави
                 </SubmitButton>
-              </form>
+              </Form>
             </CardBody>
           </Card>}
 
@@ -150,11 +151,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                     <span className="min-w-0 flex-1 truncate">{e.href ? <Link href={e.href} className="hover:text-accent">{e.title}</Link> : e.title}</span>
                     <Badge tone={statusTone[e.kind] ?? "neutral"}>{label(e.kind)}</Badge>
                     {e.id && writable && (
-                      <form action={deleteEvent.bind(null, e.id)}>
+                      <Form action={deleteEvent.bind(null, e.id)}>
                         <Button type="submit" variant="ghost" size="sm" aria-label="Изтрий">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
-                      </form>
+                      </Form>
                     )}
                   </li>
                 ))}

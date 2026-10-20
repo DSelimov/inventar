@@ -13,6 +13,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { findItemByCode, listLocations } from "@/lib/queries";
 import { formatMoney, formatNumber, isLowStock } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Сканиране" };
 
@@ -93,7 +94,7 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                   </div>
                 </div>
                 {writable && item.tracking === "none" && (
-                  <form action={adjustStock.bind(null, item.id)} className="space-y-3">
+                  <Form action={adjustStock.bind(null, item.id)} className="space-y-3">
                     <Field label="Локация">
                       <Select name="locationId" defaultValue={locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? ""}>
                         {locations.map((l) => (
@@ -120,7 +121,7 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                     </Field>
                     <input type="hidden" name="redirectTo" value={`/scan?code=${encodeURIComponent(code)}`} />
                     <SubmitButton className="w-full">Приложи</SubmitButton>
-                  </form>
+                  </Form>
                 )}
                 {writable && item.tracking !== "none" && (
                   <p className="text-sm text-muted">Артикулът е с партиди/серийни номера. Направете движението от страницата на артикула, където избирате партида.</p>

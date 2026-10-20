@@ -8,8 +8,9 @@ import { apiKeys, type ApiScope } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext, sha256 } from "@/lib/auth";
 import { bool, required, str } from "@/lib/forms";
+import { act } from "@/lib/action";
 
-export async function createApiKey(fd: FormData) {
+export const createApiKey = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
   const name = required(str(fd, "name"), "Име");
   const scopes: ApiScope[] = bool(fd, "write") ? ["read", "write"] : ["read"];
@@ -18,14 +19,16 @@ export async function createApiKey(fd: FormData) {
   await audit(ctx, "create", "api_key", row.id, { name, scopes });
   (await cookies()).set("inv_new_key", plain, { httpOnly: true, sameSite: "lax", maxAge: 60, path: "/" });
   revalidatePath("/settings/api");
-}
+  return "API ключът е създаден. Копирайте го сега — няма да се покаже отново.";
+});
 
-export async function deleteApiKey(id: number) {
+export const deleteApiKey = act(async (id: number) => {
   const ctx = await requireContext("manage");
   await ctx.db.delete(apiKeys).where(eq(apiKeys.id, id));
   await audit(ctx, "delete", "api_key", id);
   revalidatePath("/settings/api");
-}
+  return "API ключът е изтрит.";
+});
 
 export async function readNewKeyOnce(): Promise<string | null> {
   const jar = await cookies();

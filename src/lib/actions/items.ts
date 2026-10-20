@@ -2,7 +2,6 @@
 
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import type { Db } from "@/db/tenant";
 import { fieldDefinitions, itemFieldValues, items, ITEM_STATUSES, TRACKING_MODES, type MovementType } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
@@ -13,6 +12,8 @@ import { getDefaultLocation } from "@/lib/queries";
 import { applyMovement, transferStock } from "@/lib/stock";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
+import { act, redirectWith } from "@/lib/action";
+import { UserError } from "@/lib/errors";
 
 function revalidateItems(id?: number) {
   revalidatePath("/");
@@ -30,7 +31,7 @@ async function saveFieldValues(db: Db, itemId: number, categoryId: number | null
       const raw = fd.get(`field_${def.id}`);
       let value = typeof raw === "string" ? raw.trim() : "";
       if (def.type === "boolean") value = raw === "on" || raw === "true" ? "true" : "false";
-      if (def.required && def.type !== "boolean" && value === "") throw new Error(`Полето „${def.name}“ е задължително.`);
+      if (def.required && def.type !== "boolean" && value === "") throw new UserError(`Полето „${def.name}“ е задължително.`);
       return { itemId, fieldId: def.id, value };
     })
     .filter((v) => v.value !== "");
@@ -57,10 +58,10 @@ function readItem(fd: FormData) {
 
 async function assertUniqueSku(db: Db, sku: string, exceptId?: number) {
   const dup = await db.query.items.findFirst({ where: eq(items.sku, sku) });
-  if (dup && dup.id !== exceptId) throw new Error(`Вече има артикул с код „${sku}“.`);
+  if (dup && dup.id !== exceptId) throw new UserError(`Вече има артикул с код „${sku}“.`);
 }
 
-export async function createItem(fd: FormData) {
+export const createItem = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
   await assertUniqueSku(ctx.db, data.sku);
@@ -73,7 +74,7 @@ export async function createItem(fd: FormData) {
   const id = await ctx.db.transaction(async (tx) => {
     const [row] = await tx.insert(items).values({ ...data, parentId }).$returningId();
     if (quantity > 0) {
-      if (!locationId) throw new Error("Създайте първо локация (Настройки › Локации).");
+      if (!locationId) throw new UserError("Създайте първо локация (Настройки › Локации).");
       await applyMovement(tx, {
         actor: ctx.user,
         itemId: row.id,
@@ -90,39 +91,39 @@ export async function createItem(fd: FormData) {
   await audit(ctx, "create", "item", id, { name: data.name, sku: data.sku });
   emit(ctx.db, "item.created", { id, ...data });
   revalidateItems(id);
-  redirect(`/items/${id}`);
-}
+  return redirectWith(`/items/${id}`, "Артикулът е създаден.");
+});
 
-export async function updateItem(id: number, fd: FormData) {
+export const updateItem = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
   await assertUniqueSku(ctx.db, data.sku, id);
   const existing = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
-  if (!existing) throw new Error("Артикулът не е намерен.");
-  if (existing.tracking !== data.tracking && existing.quantity > 0) throw new Error("Режимът на проследяване може да се смени само при нулева наличност.");
+  if (!existing) throw new UserError("Артикулът не е намерен.");
+  if (existing.tracking !== data.tracking && existing.quantity > 0) throw new UserError("Режимът на проследяване може да се смени само при нулева наличност.");
   await ctx.db.update(items).set({ ...data, updatedAt: new Date() }).where(eq(items.id, id));
   await saveFieldValues(ctx.db, id, data.categoryId, fd);
   await audit(ctx, "update", "item", id, { name: data.name });
   emit(ctx.db, "item.updated", { id, ...data });
   revalidateItems(id);
-  redirect(`/items/${id}`);
-}
+  return redirectWith(`/items/${id}`, "Артикулът е запазен.");
+});
 
-export async function deleteItem(id: number) {
+export const deleteItem = act(async (id: number) => {
   const ctx = await requireContext("delete");
   const existing = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
-  if (!existing) throw new Error("Артикулът не е намерен.");
+  if (!existing) throw new UserError("Артикулът не е намерен.");
   await ctx.db.delete(items).where(eq(items.id, id));
   await deleteItemFiles(ctx.org, id);
   await audit(ctx, "delete", "item", id, { name: existing.name, sku: existing.sku });
   revalidateItems();
-  redirect("/items");
-}
+  return redirectWith("/items", "Артикулът е изтрит.");
+});
 
-export async function createVariant(parentId: number, fd: FormData) {
+export const createVariant = act(async (parentId: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const parent = await ctx.db.query.items.findFirst({ where: eq(items.id, parentId) });
-  if (!parent) throw new Error("Артикулът не е намерен.");
+  if (!parent) throw new UserError("Артикулът не е намерен.");
   const variantLabel = required(str(fd, "variantLabel"), "Вариант");
   const sku = str(fd, "sku") || `${parent.sku}-${variantLabel.toUpperCase().replace(/[^A-ZА-Я0-9]+/gi, "").slice(0, 8)}`;
   await assertUniqueSku(ctx.db, sku);
@@ -147,16 +148,16 @@ export async function createVariant(parentId: number, fd: FormData) {
   if (values.length) await ctx.db.insert(itemFieldValues).values(values.map((v) => ({ ...v, itemId: row.id })));
   await audit(ctx, "create", "item", row.id, { name: parent.name, variant: variantLabel });
   revalidateItems(parent.id);
-  redirect(`/items/${row.id}`);
-}
+  return redirectWith(`/items/${row.id}`, "Вариантът е създаден.");
+});
 
-export async function adjustStock(itemId: number, fd: FormData) {
+export const adjustStock = act(async (itemId: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const type = oneOf(fd, "type", ["in", "out", "adjust"] as const, "in") as MovementType;
   const quantity = int(fd, "quantity", 0);
   const locationId = int(fd, "locationId", 0) || (await getDefaultLocation(ctx.db))?.id;
-  if (!locationId) throw new Error("Изберете локация.");
-  if (quantity < 0 || (type !== "adjust" && quantity === 0)) throw new Error("Въведете валидно количество.");
+  if (!locationId) throw new UserError("Изберете локация.");
+  if (quantity < 0 || (type !== "adjust" && quantity === 0)) throw new UserError("Въведете валидно количество.");
   const lotId = optionalInt(fd, "lotId");
   const lotNumber = optional(fd, "lotNumber");
   const lot = type === "out" ? (lotId ? { lotId } : null) : lotNumber ? { lotNumber, expiryDate: optional(fd, "expiryDate") } : null;
@@ -164,13 +165,14 @@ export async function adjustStock(itemId: number, fd: FormData) {
   await audit(ctx, "movement", "item", itemId, { type, quantity, locationId });
   revalidateItems(itemId);
   const back = optional(fd, "redirectTo");
-  if (back?.startsWith("/")) redirect(back);
-}
+  if (back?.startsWith("/")) return redirectWith(back, "Наличността е обновена.");
+  return "Наличността е обновена.";
+});
 
-export async function transfer(itemId: number, fd: FormData) {
+export const transfer = act(async (itemId: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const quantity = int(fd, "quantity", 0);
-  if (quantity <= 0) throw new Error("Въведете валидно количество.");
+  if (quantity <= 0) throw new UserError("Въведете валидно количество.");
   await transferStock(ctx.db, {
     actor: ctx.user,
     itemId,
@@ -182,6 +184,7 @@ export async function transfer(itemId: number, fd: FormData) {
   });
   await audit(ctx, "transfer", "item", itemId, { quantity });
   revalidateItems(itemId);
-}
+  return "Трансферът е извършен.";
+});
 
 export { and };

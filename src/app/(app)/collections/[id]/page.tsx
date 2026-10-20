@@ -14,6 +14,7 @@ import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getCollection, listItemOptions } from "@/lib/queries";
 import { formatMoney, formatNumber } from "@/lib/utils";
+import { Form } from "@/components/ui/form";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -48,12 +49,12 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
         }
         description={collection.description ?? undefined}
         actions={
-          can(ctx.role, "delete") && <form action={deleteCollection.bind(null, id)}>
+          can(ctx.role, "delete") && <Form action={deleteCollection.bind(null, id)}>
             <ConfirmButton variant="danger" message={`Да изтрия ли колекцията „${collection.name}“? Артикулите не се изтриват.`}>
               <Trash2 className="h-4 w-4" />
               Изтрий
             </ConfirmButton>
-          </form>
+          </Form>
         }
       />
 
@@ -94,11 +95,11 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
                     </td>
                     <td className="text-right tabular-nums">{formatMoney(m.quantity * m.unitCost, settings.currency)}</td>
                     <td className="text-right">
-                      {writable && <form action={removeItemFromCollection.bind(null, id, m.id)}>
+                      {writable && <Form action={removeItemFromCollection.bind(null, id, m.id)}>
                         <Button type="submit" variant="ghost" size="sm" aria-label="Премахни от колекцията">
                           <X className="h-4 w-4" />
                         </Button>
-                      </form>}
+                      </Form>}
                     </td>
                   </tr>
                 ))}
@@ -111,7 +112,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
           <Card>
             <CardHeader title="Добави артикул" />
             <CardBody>
-              <form action={addItemToCollection.bind(null, id)} className="space-y-3">
+              <Form action={addItemToCollection.bind(null, id)} className="space-y-3">
                 <Select name="itemId" required defaultValue="">
                   <option value="" disabled>
                     Изберете артикул…
@@ -126,14 +127,14 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
                   <Plus className="h-4 w-4" />
                   Добави в колекцията
                 </SubmitButton>
-              </form>
+              </Form>
             </CardBody>
           </Card>
 
           <Card>
             <CardHeader title="Настройки на колекцията" />
             <CardBody>
-              <form action={updateCollection.bind(null, id)} className="space-y-3">
+              <Form action={updateCollection.bind(null, id)} className="space-y-3">
                 <Field label="Име">
                   <Input name="name" required defaultValue={collection.name} />
                 </Field>
@@ -146,7 +147,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
                 <SubmitButton variant="secondary" className="w-full">
                   Запази
                 </SubmitButton>
-              </form>
+              </Form>
             </CardBody>
           </Card>
         </div>}
