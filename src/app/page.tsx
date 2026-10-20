@@ -1,69 +1,183 @@
-import Image from "next/image";
+import Link from "next/link";
+import type { Metadata } from "next";
+import { addDays, format } from "date-fns";
+import { AlertTriangle, ArrowRight, Boxes, CalendarDays, Coins, Package, Truck } from "lucide-react";
+import { Badge, ColorBadge, statusTone } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { getDashboard } from "@/lib/queries";
+import { getSettings } from "@/lib/settings";
+import { LOCALE, formatDate, formatDateTime, formatMoney, formatNumber, label, todayIso } from "@/lib/utils";
 
-export default function Home() {
+export const metadata: Metadata = { title: "Табло" };
+
+export default async function DashboardPage() {
+  const today = todayIso();
+  const weekAhead = format(addDays(new Date(), 7), "yyyy-MM-dd");
+  const [data, settings] = await Promise.all([getDashboard(today, weekAhead), getSettings()]);
+  const { totals, shipmentTotals, lowStockItems, recentMovements, upcoming, byCategory } = data;
+  const maxCategoryValue = Math.max(1, ...byCategory.map((c) => c.value));
+  const money = (v: number) => formatMoney(v, settings.currency);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Табло</h1>
+          <p className="mt-1 text-sm text-muted first-letter:uppercase">{format(new Date(), "EEEE, d MMMM yyyy", { locale: LOCALE })}</p>
+        </div>
+        <div className="flex gap-2">
+          <ButtonLink href="/shipments/new" variant="secondary">
+            <Truck className="h-4 w-4" />
+            Нова пратка
+          </ButtonLink>
+          <ButtonLink href="/items/new">
+            <Package className="h-4 w-4" />
+            Нов артикул
+          </ButtonLink>
+        </div>
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Активни артикули" value={formatNumber(totals.itemCount)} hint={`${formatNumber(totals.totalUnits)} единици на склад`} icon={Boxes} tone="accent" />
+        <StatCard label="Стойност на склада" value={money(totals.stockValue)} hint={`Продажна ${money(totals.retailValue)}`} icon={Coins} tone="success" />
+        <StatCard
+          label="Ниска наличност"
+          value={formatNumber(totals.lowStock)}
+          hint={totals.lowStock > 0 ? "артикули на или под минимума" : "всички артикули са над минимума"}
+          icon={AlertTriangle}
+          tone={totals.lowStock > 0 ? "danger" : "neutral"}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        <StatCard
+          label="Отворени пратки"
+          value={formatNumber(shipmentTotals.open)}
+          hint={shipmentTotals.overdue > 0 ? `${shipmentTotals.overdue} със закъснение` : "няма закъснели"}
+          icon={Truck}
+          tone={shipmentTotals.overdue > 0 ? "warning" : "neutral"}
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          {settings.lowStockAlerts && (
+            <Card>
+              <CardHeader
+                title="Изискват внимание"
+                description="Артикули на или под минималното количество."
+                actions={
+                  <Link href="/items?low=1" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                    Виж всички <ArrowRight className="h-3 w-3" />
+                  </Link>
+                }
+              />
+              {lowStockItems.length === 0 ? (
+                <CardBody className="text-sm text-muted">Всичко е над минималното ниво.</CardBody>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {lowStockItems.map((i) => (
+                    <li key={i.id} className="flex items-center gap-3 px-5 py-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <Link href={`/items/${i.id}`} className="font-medium hover:text-accent">
+                          {i.name}
+                        </Link>
+                        <div className="text-xs text-muted">
+                          {i.sku}
+                          {i.category && <> · {i.category.name}</>}
+                        </div>
+                      </div>
+                      <div className="text-right tabular-nums">
+                        <div className={i.quantity === 0 ? "font-semibold text-danger" : "font-semibold"}>
+                          {formatNumber(i.quantity)} {i.unit}
+                        </div>
+                        <div className="text-xs text-muted">мин. {i.minQuantity}</div>
+                      </div>
+                      <ButtonLink href={`/shipments/new?direction=inbound&item=${i.id}`} variant="secondary" size="sm">
+                        Поръчай
+                      </ButtonLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader title="Последна активност" description="Най-новите складови движения." />
+            {recentMovements.length === 0 ? (
+              <CardBody className="text-sm text-muted">Все още няма складови движения.</CardBody>
+            ) : (
+              <ul className="divide-y divide-line">
+                {recentMovements.map((m) => (
+                  <li key={m.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                    <Badge tone={statusTone[m.type]}>{label(m.type)}</Badge>
+                    <div className="min-w-0 flex-1 truncate">
+                      <Link href={`/items/${m.itemId}`} className="font-medium hover:text-accent">
+                        {m.item.name}
+                      </Link>
+                      {m.reason && <span className="text-muted"> · {m.reason}</span>}
+                    </div>
+                    <span className={`tabular-nums font-medium ${m.delta < 0 ? "text-danger" : "text-success"}`}>
+                      {m.delta > 0 ? "+" : ""}
+                      {formatNumber(m.delta)}
+                    </span>
+                    <span className="hidden w-36 text-right text-xs text-muted sm:block">{formatDateTime(m.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader
+              title="Следващите 7 дни"
+              actions={
+                <Link href="/calendar" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                  Календар <ArrowRight className="h-3 w-3" />
+                </Link>
+              }
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {upcoming.length === 0 ? (
+              <CardBody className="flex items-center gap-2 text-sm text-muted">
+                <CalendarDays className="h-4 w-4" /> Няма планирани събития.
+              </CardBody>
+            ) : (
+              <ul className="divide-y divide-line">
+                {upcoming.map((e) => (
+                  <li key={e.key} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                    <span className="w-14 shrink-0 text-xs tabular-nums text-muted">{formatDate(e.date, "d MMM")}</span>
+                    <span className="min-w-0 flex-1 truncate">{e.href ? <Link href={e.href} className="hover:text-accent">{e.title}</Link> : e.title}</span>
+                    <Badge tone={statusTone[e.kind] ?? "neutral"}>{label(e.kind)}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader title="Стойност по категория" description="По доставна цена." />
+            {byCategory.length === 0 ? (
+              <CardBody className="text-sm text-muted">Все още няма категории.</CardBody>
+            ) : (
+              <CardBody className="space-y-3">
+                {byCategory.map((c) => (
+                  <Link key={c.id} href={`/items?category=${c.id}`} className="block">
+                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                      <ColorBadge color={c.color}>{c.name}</ColorBadge>
+                      <span className="tabular-nums text-muted">{money(c.value)}</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-surface-2">
+                      <div className="h-1.5 rounded-full" style={{ width: `${Math.max(2, (c.value / maxCategoryValue) * 100)}%`, backgroundColor: c.color }} />
+                    </div>
+                  </Link>
+                ))}
+              </CardBody>
+            )}
+          </Card>
         </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

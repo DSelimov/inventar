@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Инвентар
 
-## Getting Started
+Универсална система за инвентар за всякакъв тип бизнес: дефинирайте собствени
+категории с персонализирани полета, следете артикули и наличности, получавайте и
+изпращайте стока, групирайте артикули в колекции и дръжте всичко в календар.
 
-First, run the development server:
+## Технологии
+
+| Слой | Избор | Защо |
+|---|---|---|
+| Език | **TypeScript** навсякъде | един език за интерфейс, сървър и схема на базата |
+| Framework | **Next.js 16** (App Router, Server Actions) | страници и сървърна логика в един проект, без отделен бекенд |
+| База данни | **SQLite** чрез **Drizzle ORM** + libsql | нулева настройка локално; по-късно лесна смяна към Turso/Postgres |
+| Стилове | **Tailwind CSS 4** | малка, консистентна дизайн система в `src/app/globals.css` |
+| Икони | lucide-react | |
+
+## Стартиране
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm db:push      # създава таблиците в data/inventory.db
+pnpm db:seed      # демонстрационни данни (по избор)
+pnpm dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Други скриптове: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm db:studio`
+(разглеждане на базата), `pnpm db:reset` (изтрива, създава наново и зарежда демо данни).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Функционалности (етап 1)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Табло**: показатели за артикули и стойност на склада, сигнали за ниска наличност с
+  бутон за поръчка, последни движения, следващите 7 дни, стойност по категория.
+- **Категории** с **персонализирани полета** (текст, число, дата, избор, да/не,
+  опция „задължително“), така че една и съща система да пасва на електроника, облекло,
+  храни, резервни части…
+- **Артикули**: код (генерира се автоматично, ако е празен), количество, минимум, мерна
+  единица, доставна/продажна цена, локация, архивиране, динамични полета по категория,
+  пълна складова история.
+- **Складови движения**: приход / разход / точно количество; всяка промяна се записва с причина.
+- **Пратки**: входящи и изходящи с редове, партньор, куриер, номер за проследяване,
+  очаквана дата и статуси (очаква се → в движение → доставена / отказана). Отбелязването
+  като доставена прилага складовите промени в една транзакция.
+- **Колекции**: свободно групиране на артикули (комплекти, сезони, проекти) с обобщения.
+- **Календар**: месечен изглед, който комбинира очакваните пратки със собствени събития,
+  напомняния и крайни срокове.
+- **Настройки**: име на фирмата, валута, сигнали за ниска наличност.
 
-## Learn More
+## Структура на проекта
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  app/            маршрути (по една папка на страница), layout, глобални стилове
+  components/
+    layout/       странично меню
+    ui/           бутони, полета, карти, етикети, таблици, празни състояния
+    items/        ItemForm (динамични полета)
+    shipments/    ShipmentForm (динамични редове)
+  db/             schema.ts (Drizzle), index.ts (връзка), seed.ts
+  lib/
+    actions/      server actions (всички записи са тук)
+    queries.ts    всички четения
+    settings.ts, forms.ts, utils.ts
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Правила: страниците са server components, които четат чрез `lib/queries.ts` и
+променят чрез `lib/actions/*`. Само формите, които изискват интерактивност, са
+client components.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Идеи за етап 2
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Потребители, роли (администратор / служител) и вход в системата
+- Параметри за анализи и месечни отчети (оборот, залежала стока, точки за презареждане)
+- Няколко склада / локации, баркод скенер, импорт/експорт в CSV
+- Хоствана база (Turso или Postgres) и деплой (Vercel или Docker)
