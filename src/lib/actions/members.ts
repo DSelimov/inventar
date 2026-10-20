@@ -14,6 +14,7 @@ import { can } from "@/lib/permissions";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { log } from "@/lib/log";
 
 function assertCanAssign(actorRole: Role, target: Role) {
   if (target === "owner" && actorRole !== "owner") throw new UserError("Само собственик може да дава роля „Собственик“.");
@@ -30,7 +31,7 @@ async function trySend(mail: Mail) {
   try {
     await sendMail(mail);
   } catch (e) {
-    console.error("[mail] invitation", e);
+    log.error("mail.invitation_failed", e, { to: mail.to });
     throw new UserError("Потребителят е добавен, но писмото не беше изпратено. Проверете SMTP настройките и натиснете „Изпрати поканата отново“.");
   }
 }

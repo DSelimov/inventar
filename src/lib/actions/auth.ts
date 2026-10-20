@@ -13,6 +13,7 @@ import { passwordResetMail, sendMail } from "@/lib/mail";
 import { createPasswordLink, findPasswordLink, recentResetExists } from "@/lib/password-tokens";
 import { clear, clientIp, hit, minutes, retryAfter } from "@/lib/rate-limit";
 import { currentTenant, isValidSubdomain, rootUrl, tenantUrl } from "@/lib/tenant";
+import { log } from "@/lib/log";
 
 /** Вход: до 5 грешни опита за имейл и 20 за IP адрес на 15 минути. */
 const loginLimits = (email: string, ip: string) => ({
@@ -78,7 +79,7 @@ export async function register(_prev: string | undefined, fd: FormData): Promise
     await createSession(userId, org.id);
   } catch (e) {
     if (e instanceof UserError) return e.message;
-    console.error("[register] create organization", e);
+    log.error("register.create_organization_failed", e);
     return "Грешка при създаване на организацията. Опитайте отново.";
   }
   redirect(tenantUrl(org.subdomain));
@@ -96,7 +97,7 @@ export async function createOrganization(_prev: string | undefined, fd: FormData
     org = await createOrganizationFor(session.user.id, name, str(fd, "subdomain"));
   } catch (e) {
     if (e instanceof UserError) return e.message;
-    console.error("[register] create organization", e);
+    log.error("register.create_organization_failed", e);
     return "Грешка при създаване на организацията. Опитайте отново.";
   }
   redirect(tenantUrl(org.subdomain));
@@ -119,7 +120,7 @@ export async function requestPasswordReset(_prev: string | undefined, fd: FormDa
     try {
       await sendMail(passwordResetMail({ to: user.email, name: user.name, url, orgName: org?.name }));
     } catch (e) {
-      console.error("[mail] password reset", e);
+      log.error("mail.password_reset_failed", e);
       return "Писмото не можа да бъде изпратено. Опитайте отново по-късно.";
     }
   }

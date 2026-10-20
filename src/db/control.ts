@@ -16,8 +16,9 @@ const url = process.env.CONTROL_DATABASE_URL ?? "mysql://root:root@localhost:330
 
 const g = globalThis as unknown as { __controlPool?: mysql.Pool };
 const pool = g.__controlPool ?? mysql.createPool({ uri: url, connectionLimit: 10, timezone: "Z", charset: "utf8mb4_0900_ai_ci" });
+// Един пул за процеса (и при HMR в dev, и между отделните бъндъли в production, напр. instrumentation).
 if (!g.__controlPool) utcSessions(pool);
-if (process.env.NODE_ENV !== "production") g.__controlPool = pool;
+g.__controlPool = pool;
 
 /** Контролна база: организации, потребители, сесии. */
 export const controlDb = drizzle(pool, { schema, mode: "default" });

@@ -23,7 +23,7 @@ function adminConn(): Omit<Conn, "database"> {
   return { host: u.hostname, port: Number(u.port || 3306), user: decodeURIComponent(u.username), password: decodeURIComponent(u.password) };
 }
 
-function connFor(org: Pick<Organization, "dbName" | "dbHost" | "dbPort" | "dbUser" | "dbPasswordEnc">): Conn {
+export function connFor(org: Pick<Organization, "dbName" | "dbHost" | "dbPort" | "dbUser" | "dbPasswordEnc">): Conn {
   if (org.dbHost && org.dbUser) {
     return { host: org.dbHost, port: org.dbPort ?? 3306, user: org.dbUser, password: org.dbPasswordEnc ? decrypt(org.dbPasswordEnc) : "", database: org.dbName };
   }
@@ -34,7 +34,7 @@ function connFor(org: Pick<Organization, "dbName" | "dbHost" | "dbPort" | "dbUse
 type Entry = { pool: mysql.Pool; db: TenantDb; lastUsed: number };
 const g = globalThis as unknown as { __tenantPools?: Map<string, Entry> };
 const cache: Map<string, Entry> = g.__tenantPools ?? new Map();
-if (process.env.NODE_ENV !== "production") g.__tenantPools = cache;
+g.__tenantPools = cache; // общ за процеса, както пула на контролната база
 const MAX_POOLS = 50;
 
 function open(conn: Conn, limit = 5): Entry {
@@ -62,6 +62,9 @@ export function getTenantDb(org: Organization): TenantDb {
   entry.lastUsed = Date.now();
   return entry.db;
 }
+
+/** Брой отворени пулове към клиентски бази (за /api/health). */
+export const tenantPoolCount = () => cache.size;
 
 /** Затваря всички кеширани връзки (тестове, спиране на процеса). */
 export async function closeTenantPools() {

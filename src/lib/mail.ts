@@ -1,5 +1,6 @@
 import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
+import { log } from "@/lib/log";
 
 export type Mail = { to: string; subject: string; text: string; html: string };
 
@@ -28,7 +29,9 @@ export function mailConfigured() {
 export async function sendMail(mail: Mail) {
   const t = transporter();
   if (!t) {
-    console.log(`\n[mail] SMTP не е настроен — писмото не е изпратено.\nДо: ${mail.to}\nТема: ${mail.subject}\n\n${mail.text}\n`);
+    // в production без съдържанието: линковете в писмата са еднократни токени
+    if (process.env.NODE_ENV === "production") log.warn("mail.not_sent", { reason: "SMTP_HOST не е зададен", to: mail.to, subject: mail.subject });
+    else console.log(`\n[mail] SMTP не е настроен — писмото не е изпратено.\nДо: ${mail.to}\nТема: ${mail.subject}\n\n${mail.text}\n`);
     return;
   }
   await t.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, ...mail });

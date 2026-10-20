@@ -58,8 +58,30 @@ pnpm dev                      # портал: http://localhost:3000 · клие�
 Друг сървър/потребител: `TEST_DATABASE_URL=mysql://root:root@127.0.0.1:3306`; друг префикс: `TEST_DB_PREFIX`
 (трябва да съдържа „test“). GitHub Actions (`.github/workflows/ci.yml`) пуска typecheck, lint, тестове и build.
 
-Други скриптове: `pnpm db:generate` (нови миграции след промяна на схема), `pnpm db:pool:add`,
+Други скриптове: `pnpm db:backup`, `pnpm db:generate` (нови миграции след промяна на схема), `pnpm db:pool:add`,
 `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm db:studio`.
+
+## Работа в production
+
+- **Миграции при стартиране.** Сървърът прилага миграциите към контролната и към всички клиентски бази при
+  всяко стартиране (`src/instrumentation.ts`, със заключване в MySQL при няколко процеса). Неуспешна база се
+  записва в лога и в `/api/health`; `AUTO_MIGRATE=0` изключва автоматичните миграции (тогава `pnpm db:migrate`).
+- **Проверка на състоянието.** `GET /api/health` (без вход): 200 и `{"status":"ok"}` при работеща контролна
+  база, 503 иначе; версия, време от стартиране, брой отворени пулове към клиентски бази, резултат от миграциите.
+  Подходящо за uptime мониторинг.
+- **Логове.** JSON по един ред (`time`, `level`, `msg`, …) в stdout/stderr. Всяка необработена грешка на сървъра
+  (`request.error`) и в браузъра (`client.error`) се записва; страницата за грешка показва код (digest), по който
+  записът се намира в лога. С `SENTRY_DSN` грешките отиват и в Sentry.
+- **Архиви.** `pnpm db:backup --keep 14` записва `mysqldump` на контролната и на всяка клиентска база (gzip) и
+  архив на `STORAGE_DIR` в `backups/<дата_час>/` с `manifest.json`, и изтрива архивите, по-стари от 14 дни.
+  Изисква `mysqldump` и `tar`. Пример за cron (всяка нощ в 03:15) на VPS или в hPanel › Cron Jobs:
+
+  ```
+  15 3 * * * cd /home/<user>/inventar && pnpm db:backup --keep 14 >> backups/backup.log 2>&1
+  ```
+
+  Възстановяване на една база: `gunzip < backups/<дата>/inv_demo.sql.gz | mysql -u <user> -p inv_demo`.
+  Копирайте архивите и извън сървъра (напр. rclone към облачно хранилище).
 
 ## Деплой (Hostinger или друг хостинг)
 

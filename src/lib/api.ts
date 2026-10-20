@@ -7,6 +7,7 @@ import { apiKeys, type ApiScope } from "@/db/tenant-schema";
 import { sha256 } from "./auth-crypto";
 import { UserError } from "./errors";
 import { tenantFromRequest } from "./tenant";
+import { log } from "@/lib/log";
 
 export type ApiContext = { db: TenantDb; org: Organization; scopes: ApiScope[]; keyId: number };
 
@@ -97,7 +98,7 @@ export function handler<T extends unknown[]>(scope: ApiScope, fn: (req: Request,
       const db = dbError(e);
       if (db) return withRateHeaders(json({ error: db.message }, db.status));
       // неочаквана грешка: детайлите само в лога, не към клиента
-      console.error("[api]", req.method, new URL(req.url).pathname, e);
+      log.error("api.unhandled", e, { method: req.method, path: new URL(req.url).pathname });
       return withRateHeaders(json({ error: "Вътрешна грешка на сървъра." }, 500));
     }
   };
