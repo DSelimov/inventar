@@ -82,7 +82,7 @@ export async function register(_prev: string | undefined, fd: FormData): Promise
     log.error("register.create_organization_failed", e);
     return "Грешка при създаване на организацията. Опитайте отново.";
   }
-  redirect(tenantUrl(org.subdomain));
+  redirect(tenantUrl(org.subdomain, "/onboarding"));
 }
 
 /** От портала: влязъл потребител създава още една организация. */
@@ -100,7 +100,7 @@ export async function createOrganization(_prev: string | undefined, fd: FormData
     log.error("register.create_organization_failed", e);
     return "Грешка при създаване на организацията. Опитайте отново.";
   }
-  redirect(tenantUrl(org.subdomain));
+  redirect(tenantUrl(org.subdomain, "/onboarding"));
 }
 
 /** Забравена парола: изпраща линк, ако има такъв акаунт. Отговорът е еднакъв и без акаунт. */

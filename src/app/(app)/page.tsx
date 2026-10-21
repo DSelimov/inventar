@@ -3,7 +3,11 @@ import type { Metadata } from "next";
 import { addDays, format } from "date-fns";
 import { AlertTriangle, ArrowRight, Boxes, CalendarDays, ClipboardList, Coins, MapPin, Package, Timer, Truck } from "lucide-react";
 import { Badge, ColorBadge, statusTone } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { OnboardingChecklist } from "@/components/onboarding/checklist";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Form } from "@/components/ui/form";
+import { hideOnboarding } from "@/lib/actions/onboarding";
+import { onboardingState } from "@/lib/onboarding";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { requireContext } from "@/lib/auth";
@@ -18,7 +22,8 @@ export default async function DashboardPage() {
   const ctx = await requireContext();
   const today = todayIso();
   const weekAhead = format(addDays(new Date(), 7), "yyyy-MM-dd");
-  const [data, settings] = await Promise.all([getDashboard(ctx.db, today, weekAhead), getSettings(ctx.db)]);
+  const [data, settings, onboarding] = await Promise.all([getDashboard(ctx.db, today, weekAhead), getSettings(ctx.db), onboardingState(ctx.db, ctx.org.id)]);
+  const showOnboarding = !onboarding.dismissed && (onboarding.done < onboarding.steps.length || onboarding.hasDemo);
   const { totals, shipmentTotals, orderTotals, lowStockItems, recentMovements, upcoming, byCategory, byLocation, expiringSoon } = data;
   const maxCategoryValue = Math.max(1, ...byCategory.map((c) => c.value));
   const money = (v: number) => formatMoney(v, ctx.org.currency);
@@ -44,6 +49,33 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      {showOnboarding && (
+        <Card className="mb-6 border-accent/30">
+          <CardHeader
+            title="Първи стъпки"
+            description={`${onboarding.done} от ${onboarding.steps.length} готови${onboarding.hasDemo ? " · заредени са демо данни" : ""}`}
+            actions={
+              <>
+                <ButtonLink href="/onboarding" size="sm">
+                  {onboarding.empty ? "Започнете" : "Продължете"}
+                  <ArrowRight className="h-4 w-4" />
+                </ButtonLink>
+                {can(ctx.role, "manage") && (
+                  <Form action={hideOnboarding}>
+                    <Button type="submit" variant="ghost" size="sm" aria-label="Скрий първите стъпки">
+                      Скрий
+                    </Button>
+                  </Form>
+                )}
+              </>
+            }
+          />
+          <CardBody>
+            <OnboardingChecklist steps={onboarding.steps} />
+          </CardBody>
+        </Card>
+      )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Активни артикули" value={formatNumber(totals.itemCount)} hint={`${formatNumber(totals.totalUnits)} единици`} icon={Boxes} tone="accent" />
