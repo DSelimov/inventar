@@ -131,10 +131,13 @@ tenant, default `EUR`.
 - Not yet: amount in words, several series by location, documents in a currency other than the tenant's.
 
 ### B2. Partner data lookup
-- ЕИК validation (checksum for 9- and 13-digit numbers) and ДДС № validation (`BG` + ЕИК).
-- VIES check for EU VAT numbers (with a short cache table and graceful failure when VIES is down).
-- Fill name and address from the Търговски регистър by ЕИК if a reliable public source or paid API is
-  available — research first, put it behind a feature flag, never block saving.
+- **Done.** Check digit for ЕИК (9 and 13 digits) and ЕГН (10) in `validEik` (`src/lib/tax-ids.ts`), used
+  for partners and for the company's own details; BG ДДС numbers must be BG + a valid ЕИК/ЕГН.
+- VIES (`src/lib/vies.ts`, public REST API of the European Commission): result cached in `vies_checks` for
+  7 days, 6 s timeout, "VIES не отговаря" with the last known result instead of an error; Greece is EL.
+  Partner page: badge and "Провери във VIES" (stores `vies_valid`, fills an empty address from VIES).
+- Търговски регистър: no free official API — not implemented; VIES already returns name and address for
+  VAT-registered companies.
 
 ### B3. Export for the accountant
 - Monthly export of sales and purchase documents (CSV/Excel in the layout accountants import) and a

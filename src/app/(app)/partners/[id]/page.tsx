@@ -1,18 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { ShieldCheck, Trash2 } from "lucide-react";
 import { PartnerFields } from "@/components/partners/partner-form";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { deletePartner, updatePartner } from "@/lib/actions/partners";
+import { checkPartnerVies, deletePartner, updatePartner } from "@/lib/actions/partners";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getPartner } from "@/lib/queries";
 import { formatDate, formatMoney, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { orderVat } from "@/lib/vat";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -149,6 +150,23 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
               </dl>
             )}
           </CardBody>
+          {partner.vatNumber && (
+            <CardBody className="flex flex-wrap items-center justify-between gap-2 border-t border-line text-sm">
+              <span className="flex items-center gap-2">
+                <Badge tone={partner.viesValid === true ? "success" : partner.viesValid === false ? "danger" : "neutral"}>
+                  {partner.viesValid === true ? "VIES: валиден" : partner.viesValid === false ? "VIES: невалиден" : "VIES: не е проверен"}
+                </Badge>
+                {partner.viesCheckedAt && <span className="text-xs text-muted">{formatDate(partner.viesCheckedAt)}</span>}
+              </span>
+              {writable && (
+                <Form action={checkPartnerVies.bind(null, id)}>
+                  <SubmitButton variant="secondary" size="sm">
+                    <ShieldCheck className="h-4 w-4" /> Провери във VIES
+                  </SubmitButton>
+                </Form>
+              )}
+            </CardBody>
+          )}
         </Card>
       </div>
     </>

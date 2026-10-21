@@ -38,6 +38,8 @@ Tailwind CSS 4 · lucide-react · date-fns (bg) · html5-qrcode. Package manager
   and relational queries silently miss the new columns.
   Don't run `pnpm build` while `pnpm dev` is running: the dev server goes stale and browsers reload in a
   loop. If it happens, stop dev, `rm -rf .next/dev`, start again.
+  The Playwright tooling writes to `var/qa/` inside the project; Turbopack watches it, so a page open in that
+  browser can refresh itself in a loop — navigate it to `about:blank` after each check.
 - Enum labels: `STATUS_LABELS` in `src/lib/utils.ts`; badge tones in `src/components/ui/badge.tsx`.
 - Keep the design: tokens in `src/app/globals.css`, components in `src/components/ui`.
 

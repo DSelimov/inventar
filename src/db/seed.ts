@@ -162,7 +162,7 @@ async function seedDemo(db: TenantDb, admin: { id: number; name: string }, worke
   const [{ id: techSupply }, { id: beans }, { id: officePoint }] = await db
     .insert(t.partners)
     .values([
-      { type: "supplier", name: "ТехСъплай ООД", email: "orders@techsupply.bg", phone: "+359 2 123 4567", leadTimeDays: 5, vatNumber: "BG123456789" },
+      { type: "supplier", name: "ТехСъплай ООД", email: "orders@techsupply.bg", phone: "+359 2 123 4567", leadTimeDays: 5, eik: "123456786", vatNumber: "BG123456786", vatRegistered: true, address: "гр. София, ул. Индустриална 12" },
       { type: "supplier", name: "Кафе Братя ЕООД", email: "sales@kafebratya.bg", leadTimeDays: 3 },
       { type: "customer", name: "Офис Пойнт ООД", email: "office@officepoint.bg", phone: "+359 88 765 4321" },
       { type: "both", name: "Студио Норд", email: "hello@studionord.bg" },

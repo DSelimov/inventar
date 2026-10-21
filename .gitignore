@@ -50,3 +50,6 @@ next-env.d.ts
 
 # database backups (pnpm db:backup)
 /backups
+
+# QA artifacts of the browser test tooling (Playwright snapshots, screenshots, console logs)
+/var/

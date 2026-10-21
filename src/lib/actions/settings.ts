@@ -15,6 +15,7 @@ import { items, orders, stockMovements } from "@/db/tenant-schema";
 import { isCurrency } from "@/lib/currency";
 import { convertTenantToEuro } from "@/lib/euro";
 import { getValuationMethod, VALUATION_KEY, VALUATION_METHODS } from "@/lib/valuation";
+import { normalizeEik, normalizeVatNumber } from "@/lib/tax-ids";
 
 export const saveOrganization = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
@@ -79,7 +80,8 @@ export const saveReportParameters = act(async (fd: FormData) => {
 export const saveCompanyDetails = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
   const details = Object.fromEntries(COMPANY_FIELDS.map((k) => [k, str(fd, k).slice(0, 300)]));
-  if (details.eik && !/^\d{9}(\d{4})?$/.test(details.eik)) throw new UserError("ЕИК трябва да е 9 или 13 цифри.");
+  details.eik = normalizeEik(details.eik) ?? "";
+  details.vatNumber = normalizeVatNumber(details.vatNumber) ?? "";
   for (const [k, v] of Object.entries(details)) await setSetting(ctx.db, `company.${k}`, v);
   await audit(ctx, "update", "settings", null, { company: details.legalName });
   revalidatePath("/settings");

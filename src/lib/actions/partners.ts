@@ -8,6 +8,8 @@ import { requireContext } from "@/lib/auth";
 import { bool, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { act, redirectWith } from "@/lib/action";
 import { readTaxFields } from "@/lib/tax-ids";
+import { checkVies } from "@/lib/vies";
+import { UserError } from "@/lib/errors";
 
 function read(fd: FormData) {
   return {
@@ -48,4 +50,23 @@ export const deletePartner = act(async (id: number) => {
   await audit(ctx, "delete", "partner", id);
   revalidatePath("/partners");
   return redirectWith("/partners", "Партньорът е изтрит.");
+});
+
+/** Проверка на ДДС номера във VIES; попълва празен адрес от отговора. */
+export const checkPartnerVies = act(async (id: number) => {
+  const ctx = await requireContext("write");
+  const partner = await ctx.db.query.partners.findFirst({ where: eq(partners.id, id) });
+  if (!partner) throw new UserError("Партньорът не е намерен.");
+  if (!partner.vatNumber) throw new UserError("Партньорът няма ДДС номер.");
+  const r = await checkVies(ctx.db, partner.vatNumber, { force: true });
+  if (r.valid !== null) {
+    await ctx.db
+      .update(partners)
+      .set({ viesValid: r.valid, viesCheckedAt: r.checkedAt, ...(r.valid ? { vatRegistered: true } : {}), ...(!partner.address && r.address ? { address: r.address.slice(0, 500) } : {}) })
+      .where(eq(partners.id, id));
+    await audit(ctx, "update", "partner", id, { vies: r.valid });
+  }
+  revalidatePath(`/partners/${id}`);
+  if (r.valid === null) throw new UserError(r.message);
+  return r.valid ? `${r.message}${r.name ? ` ${r.name}` : ""}` : r.message;
 });

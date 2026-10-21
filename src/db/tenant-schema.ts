@@ -218,6 +218,9 @@ export const partners = mysqlTable("partners", {
   /** ДДС номер (BG + ЕИК за български регистрирани лица, иначе с кода на държавата). */
   vatNumber: varchar("vat_number", { length: 32 }),
   vatRegistered: boolean("vat_registered").notNull().default(false),
+  /** Последна проверка на ДДС номера във VIES: true/false; null = не е проверяван или услугата не отговори. */
+  viesValid: boolean("vies_valid"),
+  viesCheckedAt: ts("vies_checked_at"),
   /** Държава по ISO 3166-1 alpha-2; ЕС/извън ЕС определя 0 % и обратното начисляване. */
   country: varchar("country", { length: 2 }).notNull().default("BG"),
   leadTimeDays: int("lead_time_days"),
@@ -523,6 +526,16 @@ export const invoicePayments = mysqlTable("invoice_payments", {
   note: varchar("note", { length: 255 }),
   createdBy: varchar("created_by", { length: 200 }),
   createdAt: createdAt(),
+});
+
+// ------------------------------------------------------------------------ VIES
+/** Кеш на проверките във VIES (системата на ЕС за ДДС номера), за да не се пита при всяко отваряне. */
+export const viesChecks = mysqlTable("vies_checks", {
+  vatNumber: varchar("vat_number", { length: 32 }).primaryKey(),
+  valid: boolean("valid").notNull(),
+  name: varchar("name", { length: 300 }),
+  address: varchar("address", { length: 500 }),
+  checkedAt: datetime("checked_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });
 
 // ------------------------------------------------------------ document numbers
