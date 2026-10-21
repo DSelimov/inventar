@@ -19,7 +19,9 @@ export function ItemForm({
   action,
   cancelHref,
   defaultBarcode,
+  vatRates,
 }: {
+  vatRates: Array<{ id: number; name: string }>;
   categories: CategoryWithFields[];
   locations: Location[];
   item?: Item;
@@ -120,6 +122,16 @@ export function ItemForm({
               <option value={1}>1 знак (0,5)</option>
               <option value={2}>2 знака (0,25)</option>
               <option value={3}>3 знака (0,750)</option>
+            </Select>
+          </Field>
+          <Field label="ДДС" hint="Празно = от категорията или ставката по подразбиране.">
+            <Select name="vatRateId" defaultValue={item?.vatRateId ?? ""}>
+              <option value="">{category?.vatRateId ? `От категорията (${vatRates.find((r) => r.id === category.vatRateId)?.name ?? "—"})` : "По подразбиране"}</option>
+              {vatRates.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
             </Select>
           </Field>
           <Field label="Доставна цена" hint={item && item.quantity > 0 ? "Средна от доставките — изчислява се автоматично при всеки приход." : "Колко плащате за единица."}>

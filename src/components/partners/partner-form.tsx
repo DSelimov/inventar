@@ -1,5 +1,5 @@
 import type { Partner } from "@/db/schema";
-import { Field, Input, Select, Textarea } from "@/components/ui/fields";
+import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 
 export function PartnerFields({ partner, submitLabel }: { partner?: Partner; submitLabel: string }) {
@@ -21,9 +21,18 @@ export function PartnerFields({ partner, submitLabel }: { partner?: Partner; sub
       <Field label="Лице за контакт">
         <Input name="contactName" defaultValue={partner?.contactName ?? ""} />
       </Field>
-      <Field label="ЕИК / ДДС номер">
-        <Input name="vatNumber" defaultValue={partner?.vatNumber ?? ""} className="font-mono" />
+      <Field label="ЕИК" hint="9 или 13 цифри; за физически лица — ЕГН.">
+        <Input name="eik" defaultValue={partner?.eik ?? ""} inputMode="numeric" className="font-mono" />
       </Field>
+      <Field label="ДДС номер" hint="Празно при регистрирано българско лице = BG + ЕИК.">
+        <Input name="vatNumber" defaultValue={partner?.vatNumber ?? ""} placeholder="BG…" className="font-mono uppercase" />
+      </Field>
+      <Field label="Държава" hint="Двубуквен код (BG, RO, DE…).">
+        <Input name="country" defaultValue={partner?.country ?? "BG"} maxLength={2} className="w-20 font-mono uppercase" />
+      </Field>
+      <div className="flex items-end pb-2">
+        <Checkbox name="vatRegistered" defaultChecked={partner?.vatRegistered ?? false} label="Регистриран по ЗДДС" />
+      </div>
       <Field label="Имейл">
         <Input name="email" type="email" defaultValue={partner?.email ?? ""} />
       </Field>

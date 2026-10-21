@@ -14,6 +14,8 @@ import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
 import { MAX_DECIMALS, addQty, parseQuantity, subQty } from "@/lib/quantity";
 import { assertItemQuantities } from "@/lib/stock";
+import { getSettings } from "@/lib/settings";
+import { assignVat } from "@/lib/vat-rates";
 
 function revalidate(id?: number) {
   revalidatePath("/");
@@ -26,14 +28,15 @@ function readLines(fd: FormData) {
   const ids = fd.getAll("lineItemId").map(String);
   const qtys = fd.getAll("lineQuantity").map(String);
   const prices = fd.getAll("linePrice").map(String);
-  const merged = new Map<number, { quantity: number; unitPrice: number }>();
+  const vats = fd.getAll("lineVatRateId").map(String);
+  const merged = new Map<number, { quantity: number; unitPrice: number; vatRateId: number | null }>();
   ids.forEach((id, i) => {
     const itemId = Number(id);
     const quantity = parseQuantity(qtys[i], MAX_DECIMALS, `Ред ${i + 1}: количество`);
     const unitPrice = parseMoney(prices[i], `Ред ${i + 1}: цена`);
     if (Number.isInteger(itemId) && itemId > 0 && quantity > 0) {
       const prev = merged.get(itemId);
-      merged.set(itemId, { quantity: addQty(prev?.quantity ?? 0, quantity), unitPrice });
+      merged.set(itemId, { quantity: addQty(prev?.quantity ?? 0, quantity), unitPrice, vatRateId: Number(vats[i]) > 0 ? Number(vats[i]) : null });
     }
   });
   return [...merged].map(([itemId, v]) => ({ itemId, ...v }));
@@ -48,7 +51,7 @@ async function own(db: Db, id: number) {
 export const createOrder = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const type = oneOf(fd, "type", ORDER_TYPES, "purchase");
-  const lines = readLines(fd);
+  const lines = await assignVat(ctx.db, readLines(fd));
   await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   const number = str(fd, "number") || (await nextOrderNumber(ctx.db, type));
@@ -65,6 +68,7 @@ export const createOrder = act(async (fd: FormData) => {
         orderDate: optional(fd, "orderDate") ?? new Date().toISOString().slice(0, 10),
         expectedDate: optional(fd, "expectedDate"),
         notes: optional(fd, "notes"),
+        pricesIncludeVat: (await getSettings(ctx.db)).pricesIncludeVat,
         createdBy: ctx.user.id,
       })
       .$returningId();
@@ -81,7 +85,7 @@ export const updateOrder = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const existing = await own(ctx.db, id);
   if (existing.status !== "draft") throw new UserError("Само чернови могат да се редактират. Създайте пратка за промени в изпълнението.");
-  const lines = readLines(fd);
+  const lines = await assignVat(ctx.db, readLines(fd));
   await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   await ctx.db.transaction(async (tx) => {

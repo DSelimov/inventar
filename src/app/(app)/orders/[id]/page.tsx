@@ -13,7 +13,8 @@ import { can } from "@/lib/permissions";
 import { getOrder } from "@/lib/queries";
 import { formatDate, formatDateTime, formatMoney, formatNumber, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
-import { lineTotal, sumLines } from "@/lib/money";
+import { sumLines } from "@/lib/money";
+import { orderVat } from "@/lib/vat";
 import { addQty, subQty, sumQty } from "@/lib/quantity";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +33,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const currency = ctx.org.currency;
   const writable = can(ctx.role, "write");
   const purchase = order.type === "purchase";
-  const total = sumLines(order.lines, (l) => l.quantity, (l) => l.unitPrice);
+  const vat = orderVat(order, order.lines.map((l) => ({ ...l, legalBasis: l.vatRateRecord?.legalBasis ?? null })));
   // поръчка отпреди превалутирането: сумата, с която е издадена
   const original = order.originalCurrency ? { currency: order.originalCurrency, total: sumLines(order.lines, (l) => l.quantity, (l) => l.originalUnitPrice ?? 0) } : null;
   const ordered = sumQty(order.lines, (l) => l.quantity);
@@ -84,7 +85,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Stat label="Стойност" value={formatMoney(total, currency)} hint={original ? `издадена за ${formatMoney(original.total, original.currency)}` : undefined} />
+        <Stat label="Стойност с ДДС" value={formatMoney(vat.gross, currency)} hint={`без ДДС ${formatMoney(vat.net, currency)}${original ? ` · издадена за ${formatMoney(original.total, original.currency)}` : ""}`} />
         <Stat label="Изпълнено" value={`${formatNumber(fulfilled)} / ${formatNumber(ordered)}`} hint={ordered ? `${Math.round((fulfilled / ordered) * 100)} %` : undefined} />
         <Stat label="Очаквана дата" value={formatDate(order.expectedDate)} hint={`Поръчана на ${formatDate(order.orderDate)}`} />
       </div>
@@ -101,12 +102,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <th className="text-right">Доставено</th>
                   <th className="text-right">Остава</th>
                   {returned > 0 && <th className="text-right">Върнато</th>}
-                  <th className="text-right">Ед. цена</th>
-                  <th className="text-right">Общо</th>
+                  <th className="text-right">Ед. цена{order.pricesIncludeVat ? " с ДДС" : ""}</th>
+                  <th className="text-right">ДДС</th>
+                  <th className="text-right">Основа</th>
                 </tr>
               </thead>
               <tbody>
-                {order.lines.map((l) => {
+                {vat.lines.map((l) => {
                   const rest = Math.max(0, subQty(l.quantity, l.fulfilledQuantity));
                   return (
                     <tr key={l.id}>
@@ -127,12 +129,27 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                         {formatMoney(l.unitPrice, currency)}
                         {original && l.originalUnitPrice !== null && <div className="text-xs">{formatMoney(l.originalUnitPrice, original.currency)}</div>}
                       </td>
-                      <td className="text-right tabular-nums">{formatMoney(lineTotal(l.quantity, l.unitPrice), currency)}</td>
+                      <td className="whitespace-nowrap text-right tabular-nums text-muted">{formatNumber(l.vatRate)} %</td>
+                      <td className="text-right tabular-nums">{formatMoney(l.netAmount, currency)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </Table>
+            <div className="border-t border-line px-5 py-3 text-sm">
+              {vat.rows.map((r) => (
+                <div key={`${r.rate}-${r.legalBasis}`} className="flex justify-end gap-6 tabular-nums text-muted">
+                  <span>
+                    ДДС {formatNumber(r.rate)} %{r.rate === 0 && r.legalBasis ? ` (${r.legalBasis})` : ""} върху {formatMoney(r.net, currency)}
+                  </span>
+                  <span className="w-28 text-right">{formatMoney(r.vat, currency)}</span>
+                </div>
+              ))}
+              <div className="mt-1 flex justify-end gap-6 font-semibold tabular-nums">
+                <span>Общо с ДДС</span>
+                <span className="w-28 text-right">{formatMoney(vat.gross, currency)}</span>
+              </div>
+            </div>
           </Card>
 
           <Card>

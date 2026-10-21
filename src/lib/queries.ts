@@ -1,33 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
-import {
-  apiKeys,
-  calendarEvents,
-  categories,
-  collectionItems,
-  collections,
-  fieldDefinitions,
-  items,
-  locations,
-  lots,
-  orders,
-  partners,
-  shipmentLines,
-  shipments,
-  stockLevels,
-  stockCountLines,
-  stockCounts,
-  stockMovements,
-  webhooks,
-  type ItemStatus,
-  type MovementType,
-  type OrderStatus,
-  type OrderType,
-  type PartnerType,
-  type ShipmentDirection,
-  type ShipmentStatus,
-} from "@/db/tenant-schema";
+import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, items, type ItemStatus, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 const countExpr = () => n(sql<number>`count(*)`);
@@ -127,10 +101,17 @@ export async function listItemOptions(db: Db) {
       variantLabel: items.variantLabel,
       unitCost: items.unitCost,
       unitPrice: items.unitPrice,
+      /** ДДС на артикула или на категорията му; null = ставката по подразбиране. */
+      vatRateId: sql<number | null>`coalesce(${items.vatRateId}, ${categories.vatRateId})`,
     })
     .from(items)
+    .leftJoin(categories, eq(categories.id, items.categoryId))
     .where(eq(items.status, "active"))
     .orderBy(asc(items.name), asc(items.variantLabel));
+}
+
+export async function listVatRates(db: Db, activeOnly = true) {
+  return db.select().from(vatRates).where(activeOnly ? eq(vatRates.active, true) : undefined).orderBy(asc(vatRates.sortOrder), desc(vatRates.rate));
 }
 
 export async function getItem(db: Db, id: number) {
@@ -167,6 +148,10 @@ const partnerColumns = {
   type: partners.type,
   email: partners.email,
   phone: partners.phone,
+  eik: partners.eik,
+  vatNumber: partners.vatNumber,
+  vatRegistered: partners.vatRegistered,
+  country: partners.country,
   leadTimeDays: partners.leadTimeDays,
   orderCount: n(sql<number>`(select count(*) from ${orders} where ${orders.partnerId} = ${partners.id})`),
 };
@@ -178,7 +163,7 @@ export async function listPartners(db: Db, type?: PartnerType | "all") {
 
 export async function pagePartners(db: Db, filters: { type?: PartnerType | "all"; q?: string }, page: number) {
   const term = filters.q ? `%${filters.q}%` : null;
-  const where = and(partnerTypeWhere(filters.type), term ? or(like(partners.name, term), like(partners.email, term), like(partners.phone, term), like(partners.vatNumber, term)) : undefined);
+  const where = and(partnerTypeWhere(filters.type), term ? or(like(partners.name, term), like(partners.email, term), like(partners.phone, term), like(partners.vatNumber, term), like(partners.eik, term)) : undefined);
   const [rows, [{ total }]] = await Promise.all([
     db.select(partnerColumns).from(partners).where(where).orderBy(asc(partners.name), asc(partners.id)).limit(PAGE_SIZE).offset(offsetOf(page)),
     db.select({ total: countExpr() }).from(partners).where(where),
@@ -230,7 +215,7 @@ export async function pageOrders(db: Db, filters: OrderFilters, page: number) {
 export async function getOrder(db: Db, id: number) {
   return db.query.orders.findFirst({
     where: eq(orders.id, id),
-    with: { partner: true, location: true, lines: { with: { item: true } }, shipments: { orderBy: [desc(shipments.createdAt)], with: { lines: true } } },
+    with: { partner: true, location: true, lines: { with: { item: true, vatRateRecord: true } }, shipments: { orderBy: [desc(shipments.createdAt)], with: { lines: true } } },
   });
 }
 

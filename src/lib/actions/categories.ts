@@ -5,14 +5,14 @@ import { revalidatePath } from "next/cache";
 import { categories, fieldDefinitions, FIELD_TYPES } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
-import { bool, int, oneOf, optional, required, str } from "@/lib/forms";
+import { bool, int, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 
 export const createCategory = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const name = required(str(fd, "name"), "Име");
-  const [row] = await ctx.db.insert(categories).values({ name, description: optional(fd, "description"), color: str(fd, "color", "#6366f1") }).$returningId();
+  const [row] = await ctx.db.insert(categories).values({ name, description: optional(fd, "description"), color: str(fd, "color", "#6366f1"), vatRateId: optionalInt(fd, "vatRateId") }).$returningId();
   await audit(ctx, "create", "category", row.id, { name });
   revalidatePath("/categories");
   return redirectWith(`/categories/${row.id}`, "Категорията е създадена.");
@@ -21,7 +21,7 @@ export const createCategory = act(async (fd: FormData) => {
 export const updateCategory = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const name = required(str(fd, "name"), "Име");
-  await ctx.db.update(categories).set({ name, description: optional(fd, "description"), color: str(fd, "color", "#6366f1") }).where(eq(categories.id, id));
+  await ctx.db.update(categories).set({ name, description: optional(fd, "description"), color: str(fd, "color", "#6366f1"), vatRateId: optionalInt(fd, "vatRateId") }).where(eq(categories.id, id));
   await audit(ctx, "update", "category", id, { name });
   revalidatePath("/categories");
   revalidatePath(`/categories/${id}`);

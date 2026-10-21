@@ -8,12 +8,13 @@ import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/fie
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
-import { sumLines } from "@/lib/money";
 import { itemDecimals, quantityStep } from "@/lib/quantity";
+import { orderVat } from "@/lib/vat";
 
-export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; quantityDecimals: number; tracking: string };
+export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; quantityDecimals: number; tracking: string; vatRateId: number | null };
+export type VatRateOption = { id: number; name: string; rate: number; isDefault: boolean };
 export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null };
-type Line = { key: number; itemId: string; quantity: string; price: string };
+type Line = { key: number; itemId: string; quantity: string; price: string; vat: string };
 
 export function OrderForm({
   items,
@@ -23,6 +24,8 @@ export function OrderForm({
   initialLines,
   initialType = "purchase",
   numberPlaceholder,
+  vatRates,
+  pricesIncludeVat,
   action,
   cancelHref,
 }: {
@@ -30,9 +33,12 @@ export function OrderForm({
   locations: Location[];
   partners: OrderPartnerOption[];
   order?: Order;
-  initialLines?: { itemId: number; quantity: number; unitPrice?: number }[];
+  initialLines?: { itemId: number; quantity: number; unitPrice?: number; vatRateId?: number | null }[];
   initialType?: OrderType;
   numberPlaceholder: string;
+  vatRates: VatRateOption[];
+  /** Цените на редовете са с ДДС (за нова поръчка — от настройките, за съществуваща — от нея). */
+  pricesIncludeVat: boolean;
   action: (fd: FormData) => Promise<ActionResult>;
   cancelHref: string;
 }) {
@@ -41,15 +47,18 @@ export function OrderForm({
     const it = items.find((i) => String(i.id) === itemId);
     return it ? String(t === "purchase" ? it.unitCost : it.unitPrice) : "0";
   };
+  const defaultVat = String(vatRates.find((r) => r.isDefault)?.id ?? vatRates[0]?.id ?? "");
+  const vatFor = (itemId: string) => String(items.find((i) => String(i.id) === itemId)?.vatRateId ?? defaultVat);
   const [lines, setLines] = useState<Line[]>(() =>
     (initialLines?.length ? initialLines : [{ itemId: 0, quantity: 1 }]).map((l, i) => ({
       key: i,
       itemId: l.itemId ? String(l.itemId) : "",
       quantity: String(l.quantity),
       price: l.unitPrice !== undefined ? String(l.unitPrice) : l.itemId ? priceFor(String(l.itemId), order?.type ?? initialType) : "0",
+      vat: l.vatRateId ? String(l.vatRateId) : l.itemId ? vatFor(String(l.itemId)) : defaultVat,
     })),
   );
-  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", price: "0" }]);
+  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", price: "0", vat: defaultVat }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
   const stepFor = (itemId: string) => {
     const it = items.find((i) => String(i.id) === itemId);
@@ -59,7 +68,10 @@ export function OrderForm({
 
   const purchase = type === "purchase";
   const partnerList = partners.filter((p) => p.type === "both" || p.type === (purchase ? "supplier" : "customer"));
-  const total = sumLines(lines, (l) => Number(l.quantity) || 0, (l) => Number(String(l.price).replace(",", ".")) || 0);
+  const totals = orderVat(
+    { pricesIncludeVat },
+    lines.map((l) => ({ quantity: Number(l.quantity) || 0, unitPrice: Number(String(l.price).replace(",", ".")) || 0, vatRate: vatRates.find((r) => String(r.id) === l.vat)?.rate ?? 0 })),
+  );
 
   return (
     <Form action={action} className="space-y-6">
@@ -120,18 +132,20 @@ export function OrderForm({
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold">Редове</h2>
-          <span className="text-xs text-muted">Общо: {total.toFixed(2)}</span>
+          <span className="text-xs text-muted tabular-nums">
+            Основа {totals.net.toFixed(2)} · ДДС {totals.vat.toFixed(2)} · Общо {totals.gross.toFixed(2)}
+          </span>
         </div>
         <div className="space-y-2">
           {lines.map((line) => {
             const chosen = items.find((i) => String(i.id) === line.itemId);
             return (
-              <div key={line.key} className="grid grid-cols-[1fr_6rem_7rem_2.5rem] items-start gap-2">
+              <div key={line.key} className="grid grid-cols-[1fr_6rem_7rem_8rem_2.5rem] items-start gap-2">
                 <Select
                   name="lineItemId"
                   required
                   value={line.itemId}
-                  onChange={(e) => update(line.key, { itemId: e.target.value, price: priceFor(e.target.value, type) })}
+                  onChange={(e) => update(line.key, { itemId: e.target.value, price: priceFor(e.target.value, type), vat: vatFor(e.target.value) })}
                 >
                   <option value="" disabled>
                     Изберете артикул…
@@ -145,6 +159,13 @@ export function OrderForm({
                 </Select>
                 <Input name="lineQuantity" type="number" min={stepFor(line.itemId)} step={stepFor(line.itemId)} required value={line.quantity} onChange={(e) => update(line.key, { quantity: e.target.value })} aria-label="Количество" />
                 <Input name="linePrice" type="number" min={0} step="0.01" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label={`Цена за ${chosen?.unit ?? "единица"}`} />
+                <Select name="lineVatRateId" value={line.vat} onChange={(e) => update(line.key, { vat: e.target.value })} aria-label="ДДС">
+                  {vatRates.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </Select>
                 <Button variant="ghost" onClick={() => removeLine(line.key)} disabled={lines.length === 1} aria-label="Премахни реда">
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -152,10 +173,11 @@ export function OrderForm({
             );
           })}
         </div>
-        <div className="mt-1 grid grid-cols-[1fr_6rem_7rem_2.5rem] gap-2 text-[11px] text-muted">
+        <div className="mt-1 grid grid-cols-[1fr_6rem_7rem_8rem_2.5rem] gap-2 text-[11px] text-muted">
           <span>Артикул</span>
           <span>Количество</span>
-          <span>Ед. цена</span>
+          <span>Ед. цена {pricesIncludeVat ? "с ДДС" : "без ДДС"}</span>
+          <span>ДДС</span>
           <span />
         </div>
         <Button variant="secondary" size="sm" className="mt-3" onClick={addLine}>

@@ -9,6 +9,7 @@ import { UserError } from "./errors";
 import { getDefaultLocation } from "./queries";
 import { getCompanyDetails, setSetting } from "./settings";
 import { applyMovement, type Actor } from "./stock";
+import { assignVat } from "./vat-rates";
 
 /** Стъпки за нова организация: показват се на таблото, докато не са изпълнени или скрити. */
 export async function onboardingState(db: TenantDb, organizationId: number) {
@@ -101,10 +102,12 @@ export async function loadDemoData(db: TenantDb, actor: Actor & object) {
       .values({ type: "purchase", number: "ДЕМО-ПЗ-001", partnerId: ids.partners[0], locationId: location.id, status: "confirmed", expectedDate: format(addDays(new Date(), 5), "yyyy-MM-dd"), notes: "Примерна поръчка за доставка.", createdBy: actor.id })
       .$returningId();
     ids.orders.push(po);
-    await tx.insert(orderLines).values([
-      { orderId: po, itemId: ids.items[2], quantity: 20, unitPrice: 19 },
-      { orderId: po, itemId: ids.items[5], quantity: 6, unitPrice: 41 },
-    ]);
+    await tx.insert(orderLines).values(
+      await assignVat(tx, [
+        { orderId: po, itemId: ids.items[2], quantity: 20, unitPrice: 19 },
+        { orderId: po, itemId: ids.items[5], quantity: 6, unitPrice: 41 },
+      ]),
+    );
     await tx.insert(settings).values({ key: "demo.ids", value: JSON.stringify(ids) }).onDuplicateKeyUpdate({ set: { value: JSON.stringify(ids) } });
   });
   return { items: ids.items.length };

@@ -13,7 +13,7 @@ import { can } from "@/lib/permissions";
 import { getPartner } from "@/lib/queries";
 import { formatDate, formatMoney, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
-import { sumLines } from "@/lib/money";
+import { orderVat } from "@/lib/vat";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -80,7 +80,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
                         <Badge tone={statusTone[o.status]}>{label(o.status)}</Badge>
                       </td>
                       <td className="text-muted">{formatDate(o.orderDate)}</td>
-                      <td className="text-right tabular-nums">{formatMoney(sumLines(o.lines, (l) => l.quantity, (l) => l.unitPrice), ctx.org.currency)}</td>
+                      <td className="text-right tabular-nums">{formatMoney(orderVat(o, o.lines).gross, ctx.org.currency)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -137,7 +137,9 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
                   ["Имейл", partner.email],
                   ["Телефон", partner.phone],
                   ["Адрес", partner.address],
-                  ["ЕИК / ДДС", partner.vatNumber],
+                  ["ЕИК", partner.eik],
+                  ["ДДС №", partner.vatNumber ?? (partner.vatRegistered ? "регистриран" : "нерегистриран")],
+                  ["Държава", partner.country],
                 ].map(([k, v]) => (
                   <div key={k}>
                     <dt className="text-xs uppercase tracking-wide text-muted">{k}</dt>

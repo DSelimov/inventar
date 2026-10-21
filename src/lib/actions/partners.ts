@@ -5,8 +5,9 @@ import { revalidatePath } from "next/cache";
 import { PARTNER_TYPES, partners } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
-import { oneOf, optional, optionalInt, required, str } from "@/lib/forms";
+import { bool, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { act, redirectWith } from "@/lib/action";
+import { readTaxFields } from "@/lib/tax-ids";
 
 function read(fd: FormData) {
   return {
@@ -16,7 +17,7 @@ function read(fd: FormData) {
     email: optional(fd, "email"),
     phone: optional(fd, "phone"),
     address: optional(fd, "address"),
-    vatNumber: optional(fd, "vatNumber"),
+    ...readTaxFields({ eik: str(fd, "eik"), vatNumber: str(fd, "vatNumber"), vatRegistered: bool(fd, "vatRegistered"), country: str(fd, "country") }),
     leadTimeDays: optionalInt(fd, "leadTimeDays"),
     notes: optional(fd, "notes"),
   };

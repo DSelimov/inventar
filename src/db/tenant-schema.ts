@@ -60,12 +60,27 @@ export const locations = mysqlTable("locations", {
   createdAt: createdAt(),
 });
 
+// ------------------------------------------------------------------- vat rates
+/** Ставки ДДС на организацията (по подразбиране 20 %, 9 %, 0 % и без ДДС); основанието се печата при 0 %. */
+export const vatRates = mysqlTable("vat_rates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  rate: decimal("rate", { precision: 5, scale: 2, mode: "number" }).notNull(),
+  /** Правно основание за неначисляване (чл. от ЗДДС) — задължително при 0 %. */
+  legalBasis: varchar("legal_basis", { length: 255 }),
+  isDefault: boolean("is_default").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  sortOrder: int("sort_order").notNull().default(0),
+});
+
 // ------------------------------------------------------------------ categories
 export const categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   description: text("description"),
   color: varchar("color", { length: 16 }).notNull().default("#6366f1"),
+  /** ДДС по подразбиране за артикулите в категорията; празно = ставката по подразбиране. */
+  vatRateId: int("vat_rate_id").references(() => vatRates.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 });
 
@@ -90,6 +105,8 @@ export const items = mysqlTable(
     name: varchar("name", { length: 300 }).notNull(),
     description: text("description"),
     categoryId: int("category_id").references(() => categories.id, { onDelete: "set null" }),
+    /** ДДС на артикула; празно = от категорията, после ставката по подразбиране. */
+    vatRateId: int("vat_rate_id").references(() => vatRates.id, { onDelete: "set null" }),
     parentId: int("parent_id"),
     variantLabel: varchar("variant_label", { length: 120 }),
     tracking: mysqlEnum("tracking", TRACKING_MODES).notNull().default("none"),
@@ -194,7 +211,13 @@ export const partners = mysqlTable("partners", {
   email: varchar("email", { length: 255 }),
   phone: varchar("phone", { length: 64 }),
   address: varchar("address", { length: 500 }),
+  /** ЕИК (9 цифри) или ЕГН/БУЛСТАТ (10 или 13 цифри). */
+  eik: varchar("eik", { length: 13 }),
+  /** ДДС номер (BG + ЕИК за български регистрирани лица, иначе с кода на държавата). */
   vatNumber: varchar("vat_number", { length: 32 }),
+  vatRegistered: boolean("vat_registered").notNull().default(false),
+  /** Държава по ISO 3166-1 alpha-2; ЕС/извън ЕС определя 0 % и обратното начисляване. */
+  country: varchar("country", { length: 2 }).notNull().default("BG"),
   leadTimeDays: int("lead_time_days"),
   notes: text("notes"),
   createdAt: createdAt(),
@@ -211,6 +234,8 @@ export const orders = mysqlTable("orders", {
   orderDate: date("order_date", { mode: "string" }),
   expectedDate: date("expected_date", { mode: "string" }),
   notes: text("notes"),
+  /** Цените на редовете са с ДДС (снимка на настройката при създаване). */
+  pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
   /** Валутата, в която е издадена поръчката, ако е превалутирана (напр. BGN → EUR от 1.1.2026). */
   originalCurrency: varchar("original_currency", { length: 3 }),
   createdBy: int("created_by"),
@@ -228,6 +253,9 @@ export const orderLines = mysqlTable("order_lines", {
   unitPrice: money("unit_price").notNull().default(0),
   /** Цената в originalCurrency на поръчката преди превалутирането. */
   originalUnitPrice: money("original_unit_price"),
+  /** ДДС към момента на записа (снимка на ставката); сумите се смятат с lineAmounts от src/lib/vat.ts. */
+  vatRateId: int("vat_rate_id").references(() => vatRates.id, { onDelete: "set null" }),
+  vatRate: decimal("vat_rate", { precision: 5, scale: 2, mode: "number" }).notNull().default(20),
 });
 
 // ------------------------------------------------------------------- shipments
@@ -409,13 +437,19 @@ export const auditLog = mysqlTable(
 
 // ------------------------------------------------------------------- relations
 export const locationsRelations = relations(locations, ({ many }) => ({ stockLevels: many(stockLevels) }));
-export const categoriesRelations = relations(categories, ({ many }) => ({ fields: many(fieldDefinitions), items: many(items) }));
+export const vatRatesRelations = relations(vatRates, ({ many }) => ({ items: many(items), categories: many(categories) }));
+export const categoriesRelations = relations(categories, ({ one, many }) => ({
+  fields: many(fieldDefinitions),
+  items: many(items),
+  vatRate: one(vatRates, { fields: [categories.vatRateId], references: [vatRates.id] }),
+}));
 export const fieldDefinitionsRelations = relations(fieldDefinitions, ({ one, many }) => ({
   category: one(categories, { fields: [fieldDefinitions.categoryId], references: [categories.id] }),
   values: many(itemFieldValues),
 }));
 export const itemsRelations = relations(items, ({ one, many }) => ({
   category: one(categories, { fields: [items.categoryId], references: [categories.id] }),
+  vatRate: one(vatRates, { fields: [items.vatRateId], references: [vatRates.id] }),
   parent: one(items, { fields: [items.parentId], references: [items.id], relationName: "variants" }),
   variants: many(items, { relationName: "variants" }),
   fieldValues: many(itemFieldValues),
@@ -468,6 +502,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 export const orderLinesRelations = relations(orderLines, ({ one }) => ({
   order: one(orders, { fields: [orderLines.orderId], references: [orders.id] }),
   item: one(items, { fields: [orderLines.itemId], references: [items.id] }),
+  vatRateRecord: one(vatRates, { fields: [orderLines.vatRateId], references: [vatRates.id] }),
 }));
 export const shipmentsRelations = relations(shipments, ({ one, many }) => ({
   lines: many(shipmentLines),
@@ -502,6 +537,7 @@ export type StockMovement = typeof stockMovements.$inferSelect;
 export type Partner = typeof partners.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type OrderLine = typeof orderLines.$inferSelect;
+export type VatRate = typeof vatRates.$inferSelect;
 export type Shipment = typeof shipments.$inferSelect;
 export type ShipmentLine = typeof shipmentLines.$inferSelect;
 export type Collection = typeof collections.$inferSelect;

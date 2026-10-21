@@ -62,4 +62,5 @@ export const ENTITY_LABELS: Record<string, string> = {
   organization: "Организация",
   lot: "Партида",
   stock_count: "Инвентаризация",
+  vat_rate: "Ставка ДДС",
 };

@@ -3,6 +3,8 @@ import { settings } from "@/db/tenant-schema";
 
 export type AppSettings = {
   lowStockAlerts: boolean;
+  /** Цените в поръчките се въвеждат с ДДС (иначе — без ДДС). */
+  pricesIncludeVat: boolean;
   windowDays: number;
   deadStockDays: number;
   leadTimeDays: number;
@@ -12,6 +14,7 @@ export type AppSettings = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   lowStockAlerts: true,
+  pricesIncludeVat: false,
   windowDays: 30,
   deadStockDays: 90,
   leadTimeDays: 7,
@@ -28,6 +31,7 @@ export async function getSettings(db: Db): Promise<AppSettings> {
   };
   return {
     lowStockAlerts: (map.lowStockAlerts ?? String(DEFAULT_SETTINGS.lowStockAlerts)) === "true",
+    pricesIncludeVat: map.pricesIncludeVat === "true",
     windowDays: num("windowDays"),
     deadStockDays: num("deadStockDays"),
     leadTimeDays: num("leadTimeDays"),

@@ -2,10 +2,12 @@ import { eq } from "drizzle-orm";
 import { orderLines } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { createDoc, documentHeader, mm, pageNumbers, pdfResponse, table } from "@/lib/pdf";
-import { getShipment } from "@/lib/queries";
-import { getCompanyDetails } from "@/lib/settings";
+import { getShipment, listVatRates } from "@/lib/queries";
+import { getCompanyDetails, getSettings } from "@/lib/settings";
 import { formatDate, formatMoney, formatNumber } from "@/lib/utils";
-import { lineTotal, sumLines, sumMoney } from "@/lib/money";
+import { sumLines } from "@/lib/money";
+import { orderVat } from "@/lib/vat";
+import { assignVat } from "@/lib/vat-rates";
 import { BGN_PER_EUR } from "@/lib/currency";
 
 /** Стокова разписка (изходяща) / приемателен протокол (входяща) за пратка. */
@@ -18,12 +20,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const inbound = shipment.direction === "inbound";
   const prices = new Map<number, number>();
   const originalPrices = new Map<number, number>();
+  const vatOf = new Map<number, { rate: number; legalBasis: string | null }>();
   if (shipment.orderId) {
-    for (const l of await ctx.db.select().from(orderLines).where(eq(orderLines.orderId, shipment.orderId))) {
+    for (const l of await ctx.db.query.orderLines.findMany({ where: eq(orderLines.orderId, shipment.orderId), with: { vatRateRecord: true } })) {
       prices.set(l.itemId, l.unitPrice);
+      vatOf.set(l.itemId, { rate: l.vatRate, legalBasis: l.vatRateRecord?.legalBasis ?? null });
       if (l.originalUnitPrice !== null) originalPrices.set(l.itemId, l.originalUnitPrice);
     }
   }
+  // без поръчка: ДДС на артикула/категорията; продажните цени следват настройката „с ДДС“, доставните са без ДДС
+  const missing = shipment.lines.filter((l) => !vatOf.has(l.itemId));
+  if (missing.length) {
+    const rates = new Map((await listVatRates(ctx.db, false)).map((r) => [r.id, r]));
+    for (const l of await assignVat(ctx.db, missing.map((m) => ({ itemId: m.itemId })))) vatOf.set(l.itemId, { rate: l.vatRate, legalBasis: rates.get(l.vatRateId)?.legalBasis ?? null });
+  }
+  const pricesIncludeVat = shipment.order ? shipment.order.pricesIncludeVat : !inbound && (await getSettings(ctx.db)).pricesIncludeVat;
   const originalTotal = originalPrices.size ? sumLines(shipment.lines, (l) => l.quantity, (l) => originalPrices.get(l.itemId) ?? 0) : null;
 
   const title = shipment.isReturn ? (inbound ? "Протокол за връщане от клиент" : "Протокол за връщане към доставчик") : inbound ? "Приемателен протокол" : "Стокова разписка";
@@ -43,13 +54,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ],
   });
 
-  let total = 0;
-  const rows = shipment.lines.map((l, i) => {
-    const price = prices.get(l.itemId) ?? (inbound ? l.item.unitCost : l.item.unitPrice);
-    const value = lineTotal(l.quantity, price);
-    total = sumMoney([total, value]);
+  const priced = orderVat(
+    { pricesIncludeVat },
+    shipment.lines.map((l) => ({ ...l, unitPrice: prices.get(l.itemId) ?? (inbound ? l.item.unitCost : l.item.unitPrice), vatRate: vatOf.get(l.itemId)?.rate ?? 0, legalBasis: vatOf.get(l.itemId)?.legalBasis ?? null })),
+  );
+  const rows = priced.lines.map((l, i) => {
+    const price = l.unitPrice;
+    const value = pricesIncludeVat ? l.grossAmount : l.netAmount;
     const lot = l.lot?.lotNumber ?? l.lotNumber ?? "";
-    return [String(i + 1), l.item.sku, l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name, lot, formatNumber(l.quantity), l.item.unit, formatMoney(price, ctx.org.currency), formatMoney(value, ctx.org.currency)];
+    return [String(i + 1), l.item.sku, l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name, lot, formatNumber(l.quantity), l.item.unit, formatMoney(price, ctx.org.currency), `${formatNumber(l.vatRate)} %`, formatMoney(value, ctx.org.currency)];
   });
   table(
     doc,
@@ -57,17 +70,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       { header: "№", width: 20, align: "right" },
       { header: "Код", width: 70 },
       { header: "Артикул", width: 150 },
-      { header: "Партида / сер. №", width: 70 },
-      { header: "К-во", width: 40, align: "right" },
-      { header: "М.е.", width: 30 },
-      { header: inbound ? "Доставна цена" : "Ед. цена", width: 60, align: "right" },
-      { header: "Стойност", width: 60, align: "right", bold: true },
+      { header: "Партида / сер. №", width: 62 },
+      { header: "К-во", width: 38, align: "right" },
+      { header: "М.е.", width: 28 },
+      { header: inbound ? "Доставна цена" : "Ед. цена", width: 56, align: "right" },
+      { header: "ДДС", width: 26, align: "right" },
+      { header: pricesIncludeVat ? "Стойност с ДДС" : "Стойност", width: 60, align: "right", bold: true },
     ],
     rows,
     { zebra: true },
   );
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  doc.font("bold").fontSize(10).text(`Общо: ${formatMoney(total, ctx.org.currency)}`, doc.page.margins.left, doc.y, { width, align: "right" });
+  // данъчна основа и ДДС по ставка, после общо
+  doc.font("regular").fontSize(9);
+  for (const r of priced.rows) {
+    const basis = r.rate === 0 && r.legalBasis ? ` (${r.legalBasis})` : "";
+    doc.text(`Данъчна основа ${formatNumber(r.rate)} %: ${formatMoney(r.net, ctx.org.currency)} · ДДС: ${formatMoney(r.vat, ctx.org.currency)}${basis}`, doc.page.margins.left, doc.y, { width, align: "right" });
+  }
+  doc.font("bold").fontSize(10).text(`Общо с ДДС: ${formatMoney(priced.gross, ctx.org.currency)}`, doc.page.margins.left, doc.y, { width, align: "right" });
   if (originalTotal !== null && shipment.order?.originalCurrency) {
     // документ отпреди превалутирането: сумата, с която е издаден
     const rate = shipment.order.originalCurrency === "BGN" ? ` (по курс ${BGN_PER_EUR})` : "";

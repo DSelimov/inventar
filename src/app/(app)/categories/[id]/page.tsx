@@ -12,7 +12,7 @@ import { addField, deleteCategory, deleteField, updateCategory } from "@/lib/act
 import { FIELD_TYPES } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { getCategory, listItems } from "@/lib/queries";
+import { getCategory, listItems, listVatRates } from "@/lib/queries";
 import { label, plural } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 
@@ -27,7 +27,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
   if (!Number.isInteger(id)) notFound();
   const ctx = await requireContext();
   const manage = can(ctx.role, "manage");
-  const [category, items] = await Promise.all([getCategory(ctx.db, id), listItems(ctx.db, { categoryId: id, status: "all" })]);
+  const [category, items, vatRates] = await Promise.all([getCategory(ctx.db, id), listItems(ctx.db, { categoryId: id, status: "all" }), listVatRates(ctx.db)]);
   if (!category) notFound();
 
   return (
@@ -105,6 +105,16 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
                 </Field>
                 <Field label="Цвят">
                   <Input name="color" type="color" defaultValue={category.color} className="h-10 w-20 p-1" />
+                </Field>
+                <Field label="ДДС за артикулите" className="sm:col-span-2" hint="Артикул без собствена ставка взема тази.">
+                  <Select name="vatRateId" defaultValue={category.vatRateId ?? ""}>
+                    <option value="">Ставката по подразбиране</option>
+                    {vatRates.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </Select>
                 </Field>
                 <Field label="Описание" className="sm:col-span-2">
                   <Textarea name="description" defaultValue={category.description ?? ""} className="min-h-16" />

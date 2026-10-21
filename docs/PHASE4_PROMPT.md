@@ -79,13 +79,18 @@ tenant, default `EUR`.
 - Not yet: specific identification per lot, changing the method for a tenant with history.
 
 ### A5. VAT on lines
-- VAT rates table per tenant seeded with the current Bulgarian rates (verify them; at the time of writing
-  20 % standard, 9 % reduced, 0 % and exempt with a legal basis text). Default rate per item and per
-  category; override per order line. Prices entered with or without VAT per tenant setting.
-- Order and shipment lines store net, VAT rate, VAT amount and gross (decimal, rounded per line).
-  Totals by rate on screen, in PDFs and in the API.
-- Partner: ЕИК and ДДС № as separate fields (today one `vat_number` field), VAT-registered flag, country
-  (EU / non-EU affects 0 % and reverse charge).
+- **Done.** `vat_rates` per tenant, seeded by migration 0008 with 20 % (default), 9 %, 0 % intra-EU
+  (чл. 53, ал. 1 ЗДДС), 0 % export (чл. 28 ЗДДС) and "без ДДС" for non-registered sellers (чл. 113, ал. 9
+  ЗДДС) — names, rates and legal bases are editable in Настройки › ДДС; 0 % requires a legal basis. Rates
+  checked in October 2026: 20 % standard, 9 % reduced (accommodation, certain books, baby products);
+  restaurants and bread are back at 20 % since 2025.
+- Default rate per item and per category (`vat_rate_id`); `assignVat` (`src/lib/vat-rates.ts`) resolves
+  line → item → category → default. Order lines keep a snapshot (`vat_rate`); amounts are computed with
+  `lineAmounts` / `orderVat` (`src/lib/vat.ts`, rounded per line) so they never go stale; each order keeps
+  `prices_include_vat` from the tenant setting at creation. Order form has a VAT column and live totals;
+  order page and delivery-note PDF show base, VAT per rate (with legal basis at 0 %) and total with VAT.
+- Partners: `eik`, `vat_number`, `vat_registered`, `country` (migration splits old values);
+  format checks in `src/lib/tax-ids.ts` (checksum and VIES come with B2).
 
 ### A6. Missing warehouse documents
 - **Протокол за брак** (write-off): reason, commission members, items with cost; issues stock with type

@@ -52,6 +52,7 @@ function readItem(fd: FormData) {
     categoryId: optionalInt(fd, "categoryId"),
     tracking,
     quantityDecimals,
+    vatRateId: optionalInt(fd, "vatRateId"),
     minQuantity: parseQuantity(str(fd, "minQuantity"), quantityDecimals, "Минимално количество"),
     unit: str(fd, "unit", "бр.") || "бр.",
     unitCost: parseMoney(str(fd, "unitCost"), "Доставна цена"),
