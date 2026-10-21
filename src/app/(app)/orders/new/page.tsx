@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { createOrder } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
 import { peekNumber } from "@/lib/numbering";
-import { listItemOptions, listItemSuppliers, listLocations, listPartners, listSupplierPrices, listVatRates } from "@/lib/queries";
+import { listAllItemUnits, listItemOptions, listItemSuppliers, listLocations, listPartners, listSupplierPrices, listVatRates } from "@/lib/queries";
 import { getSettings } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Нова поръчка" };
@@ -14,6 +14,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const type = sp.type === "sales" ? "sales" : "purchase";
   const [items, locations, partnersList, number, vatRates, settings, supplierPrices] = await Promise.all([listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), peekNumber(ctx.db, type), listVatRates(ctx.db), getSettings(ctx.db), listSupplierPrices(ctx.db)]);
+  const packUnits = await listAllItemUnits(ctx.db);
   const itemId = Number(sp.item);
   const initialLines = Number.isInteger(itemId) && itemId > 0 ? [{ itemId, quantity: 1 }] : undefined;
   // „Поръчай от доставчик“ от артикула: предпочитаният доставчик и неговото минимално количество
@@ -24,7 +25,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Нова поръчка" back={{ href: "/orders", label: "Поръчки" }} />
-      <OrderForm items={items} locations={locations} partners={partners} initialType={type} initialLines={initialLines} numberPlaceholder={number} vatRates={vatRates} pricesIncludeVat={settings.pricesIncludeVat} supplierPrices={supplierPrices} initialPartnerId={preferred?.partnerId} action={createOrder} cancelHref="/orders" />
+      <OrderForm packUnits={packUnits} items={items} locations={locations} partners={partners} initialType={type} initialLines={initialLines} numberPlaceholder={number} vatRates={vatRates} pricesIncludeVat={settings.pricesIncludeVat} supplierPrices={supplierPrices} initialPartnerId={preferred?.partnerId} action={createOrder} cancelHref="/orders" />
     </div>
   );
 }

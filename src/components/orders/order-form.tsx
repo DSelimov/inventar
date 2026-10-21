@@ -8,13 +8,14 @@ import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/fie
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
-import { itemDecimals, quantityStep } from "@/lib/quantity";
+import { PackQuantity, type PackOption } from "@/components/items/pack-quantity";
+import { itemDecimals, mulQty, quantityStep } from "@/lib/quantity";
 import { orderVat } from "@/lib/vat";
 
 export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; quantityDecimals: number; tracking: string; vatRateId: number | null };
 export type VatRateOption = { id: number; name: string; rate: number; isDefault: boolean };
 export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null };
-type Line = { key: number; itemId: string; quantity: string; price: string; vat: string };
+type Line = { key: number; itemId: string; quantity: string; price: string; vat: string; packId: string };
 
 export function OrderForm({
   items,
@@ -28,6 +29,7 @@ export function OrderForm({
   pricesIncludeVat,
   supplierPrices = [],
   initialPartnerId,
+  packUnits = [],
   action,
   cancelHref,
 }: {
@@ -42,6 +44,7 @@ export function OrderForm({
   /** Цени при доставчиците (поръчка за доставка): при избран доставчик се попълва неговата цена. */
   supplierPrices?: Array<{ itemId: number; partnerId: number; price: number | null }>;
   initialPartnerId?: number | null;
+  packUnits?: PackOption[];
   /** Цените на редовете са с ДДС (за нова поръчка — от настройките, за съществуваща — от нея). */
   pricesIncludeVat: boolean;
   action: (fd: FormData) => Promise<ActionResult>;
@@ -65,9 +68,10 @@ export function OrderForm({
       quantity: String(l.quantity),
       price: l.unitPrice !== undefined ? String(l.unitPrice) : l.itemId ? priceFor(String(l.itemId), order?.type ?? initialType) : "0",
       vat: l.vatRateId ? String(l.vatRateId) : l.itemId ? vatFor(String(l.itemId)) : defaultVat,
+      packId: "",
     })),
   );
-  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", price: "0", vat: defaultVat }]);
+  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", price: "0", vat: defaultVat, packId: "" }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
   const stepFor = (itemId: string) => {
     const it = items.find((i) => String(i.id) === itemId);
@@ -77,9 +81,14 @@ export function OrderForm({
 
   const purchase = type === "purchase";
   const partnerList = partners.filter((p) => p.type === "both" || p.type === (purchase ? "supplier" : "customer"));
-  const totals = orderVat(
+  const baseQuantity = (l: Line) => {
+    const q = Number(l.quantity.replace(",", ".")) || 0;
+    const pack = packUnits.find((p) => String(p.id) === l.packId);
+    return pack ? mulQty(q, pack.factor) : q;
+  };
+    const totals = orderVat(
     { pricesIncludeVat },
-    lines.map((l) => ({ quantity: Number(l.quantity) || 0, unitPrice: Number(String(l.price).replace(",", ".")) || 0, vatRate: vatRates.find((r) => String(r.id) === l.vat)?.rate ?? 0 })),
+    lines.map((l) => ({ quantity: baseQuantity(l), unitPrice: Number(String(l.price).replace(",", ".")) || 0, vatRate: vatRates.find((r) => String(r.id) === l.vat)?.rate ?? 0 })),
   );
 
   return (
@@ -163,7 +172,7 @@ export function OrderForm({
                   name="lineItemId"
                   required
                   value={line.itemId}
-                  onChange={(e) => update(line.key, { itemId: e.target.value, price: priceFor(e.target.value, type), vat: vatFor(e.target.value) })}
+                  onChange={(e) => update(line.key, { itemId: e.target.value, price: priceFor(e.target.value, type), vat: vatFor(e.target.value), packId: "" })}
                 >
                   <option value="" disabled>
                     Изберете артикул…
@@ -175,7 +184,15 @@ export function OrderForm({
                     </option>
                   ))}
                 </Select>
-                <Input name="lineQuantity" type="number" min={stepFor(line.itemId)} step={stepFor(line.itemId)} required value={line.quantity} onChange={(e) => update(line.key, { quantity: e.target.value })} aria-label="Количество" />
+                <PackQuantity
+                  name="lineQuantity"
+                  quantity={line.quantity}
+                  packId={line.packId}
+                  packs={packUnits.filter((p) => String(p.itemId) === line.itemId)}
+                  unit={chosen?.unit ?? "бр."}
+                  step={stepFor(line.itemId)}
+                  onChange={(patch) => update(line.key, patch)}
+                />
                 <Input name="linePrice" type="number" min={0} step="0.01" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label={`Цена за ${chosen?.unit ?? "единица"}`} />
                 <Select name="lineVatRateId" value={line.vat} onChange={(e) => update(line.key, { vat: e.target.value })} aria-label="ДДС">
                   {vatRates.map((r) => (

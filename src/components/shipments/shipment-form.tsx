@@ -8,12 +8,13 @@ import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/fie
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
-import { itemDecimals, quantityStep, sumQty } from "@/lib/quantity";
+import { PackQuantity, type PackOption } from "@/components/items/pack-quantity";
+import { itemDecimals, mulQty, quantityStep, sumQty } from "@/lib/quantity";
 
 export type ItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; tracking: TrackingMode; variantLabel: string | null; quantityDecimals: number; unitCost: number };
 export type LotOption = { id: number; itemId: number; locationId: number; lotNumber: string; quantity: number; expiryDate: string | null };
 export type PartnerOption = { id: number; name: string; type: string };
-type Line = { key: number; itemId: string; quantity: string; lotNumber: string; expiryDate: string; lotId: string; unitCost: string };
+type Line = { key: number; itemId: string; quantity: string; lotNumber: string; expiryDate: string; lotId: string; unitCost: string; packId: string };
 
 export function ShipmentForm({
   items,
@@ -25,6 +26,7 @@ export function ShipmentForm({
   initialDirection = "inbound",
   linesEditable = true,
   orderId,
+  packUnits = [],
   action,
   cancelHref,
 }: {
@@ -37,6 +39,7 @@ export function ShipmentForm({
   initialDirection?: ShipmentDirection;
   linesEditable?: boolean;
   orderId?: number | null;
+  packUnits?: PackOption[];
   action: (fd: FormData) => Promise<ActionResult>;
   cancelHref: string;
 }) {
@@ -51,10 +54,11 @@ export function ShipmentForm({
       expiryDate: l.expiryDate ?? "",
       lotId: l.lotId ? String(l.lotId) : "",
       unitCost: l.unitCost != null ? String(l.unitCost) : "",
+      packId: "",
     })),
   );
 
-  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", lotNumber: "", expiryDate: "", lotId: "", unitCost: "" }]);
+  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", lotNumber: "", expiryDate: "", lotId: "", unitCost: "", packId: "" }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
   const stepFor = (itemId: string) => {
     const it = items.find((i) => String(i.id) === itemId);
@@ -62,7 +66,11 @@ export function ShipmentForm({
   };
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
-  const totalUnits = sumQty(lines, (l) => Number(l.quantity) || 0);
+  const totalUnits = sumQty(lines, (l) => {
+    const q = Number(l.quantity.replace(",", ".")) || 0;
+    const pack = packUnits.find((p) => String(p.id) === l.packId);
+    return pack ? mulQty(q, pack.factor) : q;
+  });
   const inbound = direction === "inbound";
   // доставна цена само при приход (не при връщане от клиент — то е по себестойността при продажбата)
   const withCost = inbound && !shipment?.isReturn;
@@ -142,7 +150,7 @@ export function ShipmentForm({
               <div key={line.key} className="rounded-xl border border-line p-3">
                 <div className={withCost ? "grid grid-cols-[1fr_6rem_7rem_2.5rem] items-start gap-2" : "grid grid-cols-[1fr_7rem_2.5rem] items-start gap-2"}>
                   <div>
-                    <Select name="lineItemId" required value={line.itemId} disabled={!linesEditable} onChange={(e) => update(line.key, { itemId: e.target.value, lotId: "" })}>
+                    <Select name="lineItemId" required value={line.itemId} disabled={!linesEditable} onChange={(e) => update(line.key, { itemId: e.target.value, lotId: "", packId: "" })}>
                       <option value="" disabled>
                         Изберете артикул…
                       </option>
@@ -158,7 +166,16 @@ export function ShipmentForm({
                       </p>
                     )}
                   </div>
-                  <Input name="lineQuantity" type="number" min={stepFor(line.itemId)} step={stepFor(line.itemId)} required value={line.quantity} disabled={!linesEditable} onChange={(e) => update(line.key, { quantity: e.target.value })} />
+                  <PackQuantity
+                    name="lineQuantity"
+                    quantity={line.quantity}
+                    packId={line.packId}
+                    packs={packUnits.filter((p) => String(p.itemId) === line.itemId)}
+                    unit={chosen?.unit ?? "бр."}
+                    step={stepFor(line.itemId)}
+                    disabled={!linesEditable}
+                    onChange={(patch) => update(line.key, patch)}
+                  />
                   {withCost ? (
                     <Input
                       name="lineUnitCost"

@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { items, lots, stockCountLines, stockCounts, stockLevels, stockMovements } from "@/db/tenant-schema";
+import { itemUnits, items, lots, stockCountLines, stockCounts, stockLevels, stockMovements } from "@/db/tenant-schema";
+import { findItemByCode } from "@/lib/queries";
 import { applyMovement, type MovementInput } from "@/lib/stock";
 import { addLotLine, applyStockCount, cancelStockCount, createStockCount, recordCount, saveCountedValues } from "@/lib/stock-count";
 import { closeConnectionsAfterAll, createItem, createTenant, type TestTenant } from "../support/fixtures";
@@ -163,5 +164,17 @@ describe("инвентаризация", () => {
     await move({ itemId: b, locationId: t.main, type: "in", quantity: 2, lot: { lotNumber: lot } });
     const c = await createStockCount(t.db, { locationId: t.main, createdBy: "Тест" });
     await expect(recordCount(t.db, c.id, lot, 1)).rejects.toThrow("при няколко артикула");
+  });
+
+  it("опаковка: сканиран баркод на кашон добавя фактора към реда на артикула", async () => {
+    const a = await createItem(t.db, "none", { barcode: `EA${Date.now()}` });
+    await move({ itemId: a, locationId: t.main, type: "in", quantity: 30 });
+    const box = `BOX${Date.now()}`;
+    await t.db.insert(itemUnits).values({ itemId: a, name: "кашон", factor: 12, barcode: box });
+    const c = await createStockCount(t.db, { locationId: t.main, createdBy: "Тест" });
+    await recordCount(t.db, c.id, box, 2); // 2 кашона
+    const r = await recordCount(t.db, c.id, (await t.db.select().from(items).where(eq(items.id, a)))[0].barcode!, 3); // + 3 бр.
+    expect(r.line.counted).toBe(27);
+    expect((await findItemByCode(t.db, box))?.pack?.factor).toBe(12);
   });
 });

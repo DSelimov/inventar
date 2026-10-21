@@ -14,7 +14,8 @@ import { adjustStock, createVariant, deleteItem, transfer } from "@/lib/actions/
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
-import { getItem, listItemSuppliers, listLocations, listPartners } from "@/lib/queries";
+import { getItem, listItemSuppliers, listItemUnits, listLocations, listPartners } from "@/lib/queries";
+import { addItemUnit, removeItemUnit } from "@/lib/actions/item-units";
 import { removeItemSupplier, saveItemSupplier } from "@/lib/actions/item-suppliers";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
@@ -31,7 +32,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [item, locations, ownImages, suppliers, partnerOptions] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier")]);
+  const [item, locations, ownImages, suppliers, partnerOptions, packUnits] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier"), listItemUnits(ctx.db, id)]);
   if (!item) notFound();
   const images = ownImages.length || !item.parentId ? ownImages : await listItemImages(ctx.db, item.parentId);
 
@@ -522,6 +523,37 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   </label>
                   <SubmitButton variant="secondary" size="sm" className="col-span-2">
                     Запази доставчика
+                  </SubmitButton>
+                </Form>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Опаковки" description="Кашон, стек, палет — с колко единици и със собствен баркод. Сканирането на опаковката добавя целия брой." />
+            <CardBody className="space-y-2 text-sm">
+              {packUnits.map((u) => (
+                <div key={u.id} className="flex items-center justify-between gap-2">
+                  <span>
+                    <span className="font-medium">{u.name}</span> = {formatNumber(u.factor)} {item.unit}
+                    {u.barcode && <span className="ml-2 font-mono text-xs text-muted">▮ {u.barcode}</span>}
+                  </span>
+                  {writable && (
+                    <Form action={removeItemUnit.bind(null, u.id)}>
+                      <ConfirmButton variant="ghost" size="sm" message={`Да премахна ли опаковката „${u.name}“?`} aria-label="Премахни">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </ConfirmButton>
+                    </Form>
+                  )}
+                </div>
+              ))}
+              {writable && (
+                <Form action={addItemUnit.bind(null, id)} className="grid grid-cols-3 gap-2 pt-1">
+                  <Input name="name" required placeholder="кашон" aria-label="Име на опаковката" />
+                  <Input name="factor" type="number" min={0} step="any" required placeholder={`× ${item.unit}`} aria-label="Брой в опаковката" />
+                  <Input name="barcode" placeholder="Баркод" className="font-mono" aria-label="Баркод на опаковката" />
+                  <SubmitButton variant="secondary" size="sm" className="col-span-3">
+                    Добави опаковка
                   </SubmitButton>
                 </Form>
               )}

@@ -92,6 +92,13 @@
       "when": 1792615080620,
       "tag": "0012_item_suppliers",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1792615250772,
+      "tag": "0013_item_units",
+      "breakpoints": true
     }
   ]
 }

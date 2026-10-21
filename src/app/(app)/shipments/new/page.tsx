@@ -3,7 +3,7 @@ import { ShipmentForm } from "@/components/shipments/shipment-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { createShipment } from "@/lib/actions/shipments";
 import { requireContext } from "@/lib/auth";
-import { listAvailableLots, listItemOptions, listLocations, listPartners } from "@/lib/queries";
+import { listAllItemUnits, listAvailableLots, listItemOptions, listLocations, listPartners } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Нова пратка" };
 
@@ -11,6 +11,7 @@ export default async function NewShipmentPage({ searchParams }: { searchParams: 
   const ctx = await requireContext("write");
   const sp = await searchParams;
   const [items, locations, partners, lots] = await Promise.all([listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), listAvailableLots(ctx.db)]);
+  const packUnits = await listAllItemUnits(ctx.db);
   const direction = sp.direction === "outbound" ? "outbound" : "inbound";
   const itemId = Number(sp.item);
   const initialLines = Number.isInteger(itemId) && itemId > 0 ? [{ itemId, quantity: 1 }] : undefined;
@@ -18,7 +19,7 @@ export default async function NewShipmentPage({ searchParams }: { searchParams: 
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Нова пратка" back={{ href: "/shipments", label: "Пратки" }} />
-      <ShipmentForm items={items} locations={locations} partners={partners} lots={lots} initialDirection={direction} initialLines={initialLines} action={createShipment} cancelHref="/shipments" />
+      <ShipmentForm packUnits={packUnits} items={items} locations={locations} partners={partners} lots={lots} initialDirection={direction} initialLines={initialLines} action={createShipment} cancelHref="/shipments" />
     </div>
   );
 }

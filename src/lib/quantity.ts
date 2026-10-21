@@ -28,6 +28,15 @@ export function subQty(a: number, b: number) {
   return (units(a) - units(b)) / SCALE;
 }
 
+/** a × b за количества (напр. брой опаковки × фактор), закръглено до хилядни. */
+export function mulQty(a: number, b: number) {
+  const product = BigInt(units(a)) * BigInt(units(b)); // милионни
+  const negative = product < BigInt(0);
+  const abs = negative ? -product : product;
+  const r = (abs + BigInt(500)) / BigInt(1000);
+  return Number(negative ? -r : r) / SCALE;
+}
+
 /** Точна сума по редове. */
 export function sumQty<T>(rows: Iterable<T>, quantity: (row: T) => number) {
   let total = 0;

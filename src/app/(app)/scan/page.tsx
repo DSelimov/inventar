@@ -70,6 +70,7 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                     {item.barcode && <span className="font-mono">▮ {item.barcode}</span>}
                     {item.category && <ColorBadge color={item.category.color}>{item.category.name}</ColorBadge>}
                     {isLowStock(item) && <Badge tone="danger">Ниска наличност</Badge>}
+                    {item.pack && <Badge tone="accent">сканирана опаковка: {item.pack.name} = {formatNumber(item.pack.factor)} {item.unit}</Badge>}
                   </span>
                 }
                 actions={<ButtonLink href={`/items/${item.id}`} variant="secondary" size="sm">Отвори</ButtonLink>}
@@ -114,7 +115,7 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                         </Select>
                       </Field>
                       <Field label="Количество">
-                        <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} defaultValue={1} required />
+                        <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} defaultValue={item.pack ? item.pack.factor : 1} required />
                       </Field>
                     </div>
                     <Field label="Причина">

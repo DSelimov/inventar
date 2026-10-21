@@ -208,8 +208,11 @@ tenant, default `EUR`.
   preferred supplier and its minimum quantity.
 
 ### D4. Packaging units
-- Per item: alternative units with a factor (кашон = 12 бр., палет = 48 кашона) and their own barcodes.
-  Scanning a box barcode adds 12; orders and documents can use any unit and store the base quantity.
+- **Done.** `item_units` (migration 0013): name, factor in the base unit, own barcode (unique among items and
+  packs); card "Опаковки" on the item page. `findItemByCode` resolves pack barcodes (scan page shows the
+  pack and prefills its factor); counting a pack barcode adds factor × quantity. Order and shipment lines
+  can be entered in packs (`PackQuantity`): the form shows "= N бр." and submits the base quantity, which
+  is what is stored and printed.
 
 ### D5. Help and onboarding content
 - Help centre in Bulgarian (`/help` on the root domain): short articles and videos per workflow, context

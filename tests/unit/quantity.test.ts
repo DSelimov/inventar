@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addQty, decimalsOf, itemDecimals, parseQuantity, quantityStep, subQty, sumQty } from "@/lib/quantity";
+import { addQty, decimalsOf, itemDecimals, mulQty, parseQuantity, quantityStep, subQty, sumQty } from "@/lib/quantity";
 
 describe("количества", () => {
   it("точно събиране и изваждане на хилядни", () => {
@@ -32,5 +32,11 @@ describe("количества", () => {
     expect(itemDecimals({ tracking: "lot", quantityDecimals: 2 })).toBe(2);
     expect(quantityStep(0)).toBe("1");
     expect(quantityStep(3)).toBe("0.001");
+  });
+
+  it("mulQty: опаковки × фактор, точно", () => {
+    expect(mulQty(3, 12)).toBe(36);
+    expect(mulQty(0.5, 0.75)).toBe(0.375);
+    expect(mulQty(1.1, 3)).toBe(3.3);
   });
 });

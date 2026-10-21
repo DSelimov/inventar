@@ -4,7 +4,7 @@ import { ShipmentForm } from "@/components/shipments/shipment-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateShipment } from "@/lib/actions/shipments";
 import { requireContext } from "@/lib/auth";
-import { getShipment, listAvailableLots, listItemOptions, listLocations, listPartners } from "@/lib/queries";
+import { getShipment, listAllItemUnits, listAvailableLots, listItemOptions, listLocations, listPartners } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Редакция на пратка" };
 
@@ -19,13 +19,14 @@ export default async function EditShipmentPage({ params }: { params: Promise<{ i
     listPartners(ctx.db),
     listAvailableLots(ctx.db),
   ]);
+  const packUnits = await listAllItemUnits(ctx.db);
   if (!shipment) notFound();
   const editable = shipment.status === "pending" || shipment.status === "in_transit";
 
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title={`Редакция: ${shipment.reference}`} back={{ href: `/shipments/${id}`, label: shipment.reference }} description={shipment.order ? `Пратка по поръчка ${shipment.order.number}. Допълнете партиди/серийни номера, ако е нужно.` : undefined} />
-      <ShipmentForm
+      <ShipmentForm packUnits={packUnits}
         items={items}
         locations={locations}
         partners={partners}

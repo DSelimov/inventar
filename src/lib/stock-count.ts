@@ -1,12 +1,12 @@
 import "server-only";
 import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import type { Db, TenantDb } from "@/db/tenant";
-import { items, lots, stockCountLines, stockCounts, stockLevels, type StockCountLine } from "@/db/tenant-schema";
+import { itemUnits, items, lots, stockCountLines, stockCounts, stockLevels, type StockCountLine } from "@/db/tenant-schema";
 import { UserError } from "./errors";
 import { nextNumber } from "./numbering";
 import { applyMovement, type Actor } from "./stock";
 import { lineTotal, sumMoney } from "@/lib/money";
-import { addQty, assertQuantity, itemDecimals, subQty } from "./quantity";
+import { addQty, assertQuantity, itemDecimals, mulQty, subQty } from "./quantity";
 
 /**
  * Инвентаризация: при създаване се записва снимка на очакваните количества в локацията (по артикул,
@@ -63,9 +63,12 @@ export async function recordCount(db: TenantDb, countId: number, code: string, q
   // един и същ номер на партида при няколко артикула: сканирането не може да избере реда
   if (new Set(byLot.map((l) => l.line.itemId)).size > 1) throw new UserError(`Партида „${code}“ е при няколко артикула — въведете количеството в таблицата.`);
   let match = byLot[0];
+  // баркод на опаковка (кашон = 12 бр.): брои се артикулът, количеството се умножава по фактора
+  const [pack] = match ? [] : await db.select().from(itemUnits).where(eq(itemUnits.barcode, code));
+  if (pack) quantity = mulQty(quantity, pack.factor);
   if (!match) {
     // MySQL сравнява без значение на регистъра — същото и тук, иначе резервното търсене добавя дублиран ред
-    const forItem = lines.filter((l) => l.item.barcode?.toLowerCase() === key || l.item.sku.toLowerCase() === key);
+    const forItem = lines.filter((l) => (pack ? l.item.id === pack.itemId : l.item.barcode?.toLowerCase() === key || l.item.sku.toLowerCase() === key));
     if (forItem.length > 1) throw new UserError(`„${forItem[0].item.name}“ е с партиди/серийни номера — сканирайте номера на партидата.`);
     match = forItem[0];
   }
@@ -75,7 +78,7 @@ export async function recordCount(db: TenantDb, countId: number, code: string, q
     ({ line, item } = match);
   } else {
     // артикул, който не е в списъка (напр. намерен на място без наличност в системата)
-    item = await db.query.items.findFirst({ where: or(eq(items.barcode, code), eq(items.sku, code)) });
+    item = await db.query.items.findFirst({ where: pack ? eq(items.id, pack.itemId) : or(eq(items.barcode, code), eq(items.sku, code)) });
     if (!item) throw new UserError(`Няма артикул с код „${code}“.`);
     if (item.tracking !== "none") throw new UserError(`„${item.name}“ е с партиди/серийни номера — добавете партидата от формата „Нова партида“.`);
     assertQuantity(quantity, itemDecimals(item), `„${item.name}“`); // преди да добавим ред

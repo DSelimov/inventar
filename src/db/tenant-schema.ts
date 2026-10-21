@@ -228,6 +228,19 @@ export const partners = mysqlTable("partners", {
   createdAt: createdAt(),
 });
 
+/** Опаковки на артикул (кашон = 12 бр., палет = 48 кашона в бр.): фактор в основната мерна единица и баркод. */
+export const itemUnits = mysqlTable(
+  "item_units",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 64 }).notNull(),
+    factor: qty("factor").notNull(),
+    barcode: varchar("barcode", { length: 64 }),
+  },
+  (t) => [uniqueIndex("item_units_barcode").on(t.barcode)],
+);
+
 /** Доставчици на артикул: код и цена при доставчика, минимално количество, срок; един е предпочитан. */
 export const itemSuppliers = mysqlTable(
   "item_suppliers",
@@ -625,6 +638,7 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   shipmentLines: many(shipmentLines),
   orderLines: many(orderLines),
   suppliers: many(itemSuppliers),
+  packUnits: many(itemUnits),
 }));
 export const itemImagesRelations = relations(itemImages, ({ one }) => ({
   item: one(items, { fields: [itemImages.itemId], references: [items.id] }),
@@ -657,6 +671,7 @@ export const invoiceLinesRelations = relations(invoiceLines, ({ one }) => ({
 export const invoicePaymentsRelations = relations(invoicePayments, ({ one }) => ({
   invoice: one(invoices, { fields: [invoicePayments.invoiceId], references: [invoices.id] }),
 }));
+export const itemUnitsRelations = relations(itemUnits, ({ one }) => ({ item: one(items, { fields: [itemUnits.itemId], references: [items.id] }) }));
 export const itemSuppliersRelations = relations(itemSuppliers, ({ one }) => ({
   item: one(items, { fields: [itemSuppliers.itemId], references: [items.id] }),
   partner: one(partners, { fields: [itemSuppliers.partnerId], references: [partners.id] }),
@@ -732,6 +747,7 @@ export type Order = typeof orders.$inferSelect;
 export type OrderLine = typeof orderLines.$inferSelect;
 export type VatRate = typeof vatRates.$inferSelect;
 export type ItemSupplier = typeof itemSuppliers.$inferSelect;
+export type ItemUnit = typeof itemUnits.$inferSelect;
 export type WriteOff = typeof writeOffs.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type InvoiceLine = typeof invoiceLines.$inferSelect;
