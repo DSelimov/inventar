@@ -9,8 +9,9 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
 import { sumLines } from "@/lib/money";
+import { itemDecimals, quantityStep } from "@/lib/quantity";
 
-export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number };
+export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; quantityDecimals: number; tracking: string };
 export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null };
 type Line = { key: number; itemId: string; quantity: string; price: string };
 
@@ -50,6 +51,10 @@ export function OrderForm({
   );
   const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", price: "0" }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
+  const stepFor = (itemId: string) => {
+    const it = items.find((i) => String(i.id) === itemId);
+    return quantityStep(it ? itemDecimals(it) : 0);
+  };
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   const purchase = type === "purchase";
@@ -138,7 +143,7 @@ export function OrderForm({
                     </option>
                   ))}
                 </Select>
-                <Input name="lineQuantity" type="number" min={1} step={1} required value={line.quantity} onChange={(e) => update(line.key, { quantity: e.target.value })} aria-label="Количество" />
+                <Input name="lineQuantity" type="number" min={stepFor(line.itemId)} step={stepFor(line.itemId)} required value={line.quantity} onChange={(e) => update(line.key, { quantity: e.target.value })} aria-label="Количество" />
                 <Input name="linePrice" type="number" min={0} step="0.01" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label={`Цена за ${chosen?.unit ?? "единица"}`} />
                 <Button variant="ghost" onClick={() => removeLine(line.key)} disabled={lines.length === 1} aria-label="Премахни реда">
                   <Trash2 className="h-4 w-4" />

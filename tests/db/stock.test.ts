@@ -72,8 +72,8 @@ describe("applyMovement — без проследяване", () => {
 
   it("отрицателно, дробно количество и непознат артикул се отказват", async () => {
     const id = await createItem(t.db);
-    await expect(move({ itemId: id, locationId: t.main, type: "in", quantity: -1 })).rejects.toThrow("валидно количество");
-    await expect(move({ itemId: id, locationId: t.main, type: "in", quantity: 1.5 })).rejects.toThrow("валидно количество");
+    await expect(move({ itemId: id, locationId: t.main, type: "in", quantity: -1 })).rejects.toThrow("не може да е отрицателно");
+    await expect(move({ itemId: id, locationId: t.main, type: "in", quantity: 1.5 })).rejects.toThrow("въведете цяло число");
     await expect(move({ itemId: 999_999, locationId: t.main, type: "in", quantity: 1 })).rejects.toThrow("Артикулът не е намерен");
   });
 
@@ -208,5 +208,36 @@ describe("transferStock", () => {
     expect(rows.find((l) => l.serialNumber === "A1")).toMatchObject({ locationId: t.shop, quantity: 1 });
     expect(await level(id, t.main)).toBe(1);
     expect(await level(id, t.shop)).toBe(1);
+  });
+});
+
+describe("дробни количества (кг, л)", () => {
+  it("приход, разход, корекция и трансфер с хилядни — точно, без плаваща запетая", async () => {
+    const id = await createItem(t.db, "none", { unit: "кг", quantityDecimals: 3 });
+    await move({ itemId: id, locationId: t.main, type: "in", quantity: 0.1 });
+    await move({ itemId: id, locationId: t.main, type: "in", quantity: 0.2 });
+    const [after] = await t.db.select().from(items).where(eq(items.id, id));
+    expect(after.quantity).toBe(0.3);
+    await move({ itemId: id, locationId: t.main, type: "out", quantity: 0.125 });
+    await transferStock(t.db, { actor, itemId: id, fromLocationId: t.main, toLocationId: t.shop, quantity: 0.075 });
+    expect((await t.db.select().from(items).where(eq(items.id, id)))[0].quantity).toBe(0.175);
+    await move({ itemId: id, locationId: t.shop, type: "adjust", quantity: 1.5 });
+    expect((await t.db.select().from(items).where(eq(items.id, id)))[0].quantity).toBe(1.6);
+    await expect(move({ itemId: id, locationId: t.main, type: "in", quantity: 0.0005 })).rejects.toThrow("най-много 3 знака");
+  });
+
+  it("брой знаци според артикула; партиди с дробно количество; серийните номера остават цели", async () => {
+    const oneDecimal = await createItem(t.db, "none", { unit: "л", quantityDecimals: 1 });
+    await expect(move({ itemId: oneDecimal, locationId: t.main, type: "in", quantity: 2.25 })).rejects.toThrow("най-много 1 знак");
+    await move({ itemId: oneDecimal, locationId: t.main, type: "in", quantity: 2.5 });
+
+    const lotted = await createItem(t.db, "lot", { unit: "кг", quantityDecimals: 3 });
+    await move({ itemId: lotted, locationId: t.main, type: "in", quantity: 12.5, lot: { lotNumber: "КГ-1" } });
+    const [lot] = await t.db.select().from(lots).where(eq(lots.itemId, lotted));
+    await move({ itemId: lotted, locationId: t.main, type: "out", quantity: 0.75, lot: { lotId: lot.id } });
+    expect((await t.db.select().from(lots).where(eq(lots.id, lot.id)))[0].quantity).toBe(11.75);
+
+    const serial = await createItem(t.db, "serial", { quantityDecimals: 3 }); // настройката се пренебрегва
+    await expect(move({ itemId: serial, locationId: t.main, type: "in", quantity: 0.5, lot: { lotNumber: "SN-X" } })).rejects.toThrow("въведете цяло число");
   });
 });

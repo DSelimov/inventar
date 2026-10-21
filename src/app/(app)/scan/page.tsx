@@ -14,6 +14,7 @@ import { can } from "@/lib/permissions";
 import { findItemByCode, listLocations } from "@/lib/queries";
 import { formatMoney, formatNumber, isLowStock } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
+import { itemDecimals, quantityStep } from "@/lib/quantity";
 
 export const metadata: Metadata = { title: "Сканиране" };
 
@@ -113,7 +114,7 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                         </Select>
                       </Field>
                       <Field label="Количество">
-                        <Input name="quantity" type="number" min={0} step={1} defaultValue={1} required />
+                        <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} defaultValue={1} required />
                       </Field>
                     </div>
                     <Field label="Причина">

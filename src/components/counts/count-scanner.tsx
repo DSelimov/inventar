@@ -37,7 +37,7 @@ export function CountScanner({ action }: { action: (fd: FormData) => Promise<Act
         <div className="min-w-52 flex-1">
           <Input ref={codeRef} name="code" placeholder="Сканирайте баркод, код или партида…" className="font-mono" autoFocus autoComplete="off" required />
         </div>
-        <Input name="quantity" type="number" min={0} defaultValue={1} className="w-20" aria-label="Количество" />
+        <Input name="quantity" type="number" min={0} step="any" defaultValue={1} className="w-20" aria-label="Количество" />
         <Select name="mode" defaultValue="add" className="w-auto" aria-label="Режим">
           <option value="add">+ прибави</option>
           <option value="set">= задай</option>

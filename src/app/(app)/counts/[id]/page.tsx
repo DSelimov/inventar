@@ -18,6 +18,7 @@ import { can } from "@/lib/permissions";
 import { getStockCount } from "@/lib/queries";
 import { cn, formatDateTime, formatMoney, formatNumber } from "@/lib/utils";
 import { lineTotal, sumLines } from "@/lib/money";
+import { itemDecimals, quantityStep } from "@/lib/quantity";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -151,7 +152,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
                         </td>
                         <td className="text-right">
                           {writable ? (
-                            <Input name={`counted_${l.id}`} type="number" min={0} max={l.item.tracking === "serial" ? 1 : undefined} defaultValue={l.counted ?? ""} placeholder="—" className="ml-auto w-24 text-right tabular-nums" aria-label={`Преброено: ${l.item.name}`} />
+                            <Input name={`counted_${l.id}`} type="number" min={0} step={quantityStep(itemDecimals(l.item))} max={l.item.tracking === "serial" ? 1 : undefined} defaultValue={l.counted ?? ""} placeholder="—" className="ml-auto w-24 text-right tabular-nums" aria-label={`Преброено: ${l.item.name}`} />
                           ) : (
                             <span className="tabular-nums">{l.counted ?? "—"}</span>
                           )}
@@ -237,7 +238,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
                       <Input name="lotNumber" required className="font-mono" />
                     </Field>
                     <Field label="К-во">
-                      <Input name="quantity" type="number" min={0} defaultValue={1} />
+                      <Input name="quantity" type="number" min={0} step="any" defaultValue={1} />
                     </Field>
                   </div>
                   <SubmitButton variant="secondary" className="w-full">

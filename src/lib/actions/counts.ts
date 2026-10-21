@@ -10,6 +10,7 @@ import { UserError } from "@/lib/errors";
 import { bool, int, oneOf, optional, optionalInt, str } from "@/lib/forms";
 import { addLotLine, applyStockCount, cancelStockCount, createStockCount, recordCount, saveCountedValues } from "@/lib/stock-count";
 import { formatMoney } from "@/lib/utils";
+import { MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
 
 const revalidate = (id?: number) => {
   revalidatePath("/counts");
@@ -31,7 +32,7 @@ export const startStockCount = act(async (fd: FormData) => {
 export const scanCount = act(async (countId: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const mode = oneOf(fd, "mode", ["add", "set"] as const, "add");
-  const { item, line } = await recordCount(ctx.db, countId, str(fd, "code"), int(fd, "quantity", 1), mode);
+  const { item, line } = await recordCount(ctx.db, countId, str(fd, "code"), parseQuantity(str(fd, "quantity"), MAX_DECIMALS, "Количество", 1), mode);
   revalidate(countId);
   const name = item.variantLabel ? `${item.name} · ${item.variantLabel}` : item.name;
   return `${name}${line.lotNumber ? ` (${line.lotNumber})` : ""}: преброени ${line.counted} ${item.unit}`;
@@ -57,7 +58,7 @@ export const addCountLot = act(async (countId: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const itemId = int(fd, "itemId", 0);
   const lotNumber = str(fd, "lotNumber");
-  await addLotLine(ctx.db, countId, itemId, lotNumber, Math.max(0, int(fd, "quantity", 1)));
+  await addLotLine(ctx.db, countId, itemId, lotNumber, parseQuantity(str(fd, "quantity"), MAX_DECIMALS, "Количество", 1));
   await audit(ctx, "update", "stock_count", countId, { itemId, lotNumber: lotNumber.trim() });
   revalidate(countId);
   return "Партидата е добавена към броенето.";

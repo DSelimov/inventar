@@ -6,6 +6,7 @@ import { categories, items, lots, partners, stockMovements, type Item } from "@/
 import { incomingQuantities } from "./queries";
 import type { AppSettings } from "./settings";
 import { lineTotal, sumLines, sumMoney } from "@/lib/money";
+import { sumQty } from "./quantity";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 
@@ -55,7 +56,7 @@ export async function buildReports(db: Db, s: AppSettings) {
   const turnover = [...catMap.values()]
     .map((c) => ({ ...c, margin: sumMoney([c.revenue, -c.cost]), marginPct: c.revenue > 0 ? ((c.revenue - c.cost) / c.revenue) * 100 : 0 }))
     .sort((a, b) => b.revenue - a.revenue);
-  const totals = turnover.reduce((acc, c) => ({ units: acc.units + c.units, revenue: acc.revenue + c.revenue, cost: acc.cost + c.cost }), { units: 0, revenue: 0, cost: 0 });
+  const totals = { units: sumQty(turnover, (c) => c.units), revenue: sumMoney(turnover.map((c) => c.revenue)), cost: sumMoney(turnover.map((c) => c.cost)) };
 
   // ---- top movers
   const topMovers = activeItems

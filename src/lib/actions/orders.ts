@@ -12,6 +12,8 @@ import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
+import { MAX_DECIMALS, addQty, parseQuantity, subQty } from "@/lib/quantity";
+import { assertItemQuantities } from "@/lib/stock";
 
 function revalidate(id?: number) {
   revalidatePath("/");
@@ -27,11 +29,11 @@ function readLines(fd: FormData) {
   const merged = new Map<number, { quantity: number; unitPrice: number }>();
   ids.forEach((id, i) => {
     const itemId = Number(id);
-    const quantity = Math.trunc(Number(qtys[i] ?? 0));
+    const quantity = parseQuantity(qtys[i], MAX_DECIMALS, `Ред ${i + 1}: количество`);
     const unitPrice = parseMoney(prices[i], `Ред ${i + 1}: цена`);
     if (Number.isInteger(itemId) && itemId > 0 && quantity > 0) {
       const prev = merged.get(itemId);
-      merged.set(itemId, { quantity: (prev?.quantity ?? 0) + quantity, unitPrice });
+      merged.set(itemId, { quantity: addQty(prev?.quantity ?? 0, quantity), unitPrice });
     }
   });
   return [...merged].map(([itemId, v]) => ({ itemId, ...v }));
@@ -47,6 +49,7 @@ export const createOrder = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const type = oneOf(fd, "type", ORDER_TYPES, "purchase");
   const lines = readLines(fd);
+  await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   const number = str(fd, "number") || (await nextOrderNumber(ctx.db, type));
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
@@ -79,6 +82,7 @@ export const updateOrder = act(async (id: number, fd: FormData) => {
   const existing = await own(ctx.db, id);
   if (existing.status !== "draft") throw new UserError("Само чернови могат да се редактират. Създайте пратка за промени в изпълнението.");
   const lines = readLines(fd);
+  await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   await ctx.db.transaction(async (tx) => {
     await tx
@@ -118,8 +122,8 @@ export const createShipmentForRemaining = act(async (id: number) => {
   if (o.status !== "confirmed" && o.status !== "partial") throw new UserError("Потвърдете поръчката, преди да създадете пратка.");
   const openShipments = await ctx.db.query.shipments.findMany({ where: eq(shipments.orderId, id), with: { lines: true } });
   const reserved = new Map<number, number>();
-  for (const s of openShipments) if (!s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) reserved.set(l.itemId, (reserved.get(l.itemId) ?? 0) + l.quantity);
-  const remaining = o.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity - l.fulfilledQuantity - (reserved.get(l.itemId) ?? 0) })).filter((l) => l.quantity > 0);
+  for (const s of openShipments) if (!s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) reserved.set(l.itemId, addQty(reserved.get(l.itemId) ?? 0, l.quantity));
+  const remaining = o.lines.map((l) => ({ itemId: l.itemId, quantity: subQty(subQty(l.quantity, l.fulfilledQuantity), reserved.get(l.itemId) ?? 0) })).filter((l) => l.quantity > 0);
   if (!remaining.length) throw new UserError("Няма оставащи количества: всичко е доставено или вече е в пратка.");
 
   const count = openShipments.length + 1;
@@ -166,14 +170,14 @@ export const createReturnForOrder = act(async (id: number) => {
   const o = await own(ctx.db, id);
   const related = await ctx.db.query.shipments.findMany({ where: eq(shipments.orderId, id), with: { lines: { with: { lot: true } } } });
   const pendingReturns = new Map<number, number>();
-  for (const s of related) if (s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) pendingReturns.set(l.itemId, (pendingReturns.get(l.itemId) ?? 0) + l.quantity);
+  for (const s of related) if (s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) pendingReturns.set(l.itemId, addQty(pendingReturns.get(l.itemId) ?? 0, l.quantity));
   // отворените връщания се приспадат по редовете на артикула поред, а не от всеки ред поотделно
   const lines = o.lines
     .map((l) => {
-      const open = l.fulfilledQuantity - l.returnedQuantity;
+      const open = subQty(l.fulfilledQuantity, l.returnedQuantity);
       const pending = Math.min(open, pendingReturns.get(l.itemId) ?? 0);
-      pendingReturns.set(l.itemId, (pendingReturns.get(l.itemId) ?? 0) - pending);
-      return { line: l, quantity: open - pending };
+      pendingReturns.set(l.itemId, subQty(pendingReturns.get(l.itemId) ?? 0, pending));
+      return { line: l, quantity: subQty(open, pending) };
     })
     .filter((x) => x.quantity > 0);
   if (!lines.length) throw new UserError("Няма количества за връщане: нищо не е доставено или всичко вече е върнато.");

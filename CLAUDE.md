@@ -22,6 +22,9 @@ Tailwind CSS 4 · lucide-react · date-fns (bg) · html5-qrcode. Package manager
   read < write < delete < manage < owner (`src/lib/permissions.ts`). Use `ctx.db` for all tenant data.
 - Reads live in `src/lib/queries.ts` (first argument is the tenant db). Writes live in `src/lib/actions/*`
   and call `audit(ctx, …)`; events go through `emit(ctx.db, event, payload)` (`src/lib/webhooks.ts`).
+- Money and quantities are `decimal` columns (`money()` / `qty()` helpers in `tenant-schema.ts`) read as JS
+  numbers; never add or multiply them with plain `+`/`*` — use `src/lib/money.ts` and `src/lib/quantity.ts`
+  (a test fails on `… * unitCost/unitPrice`). Quantity inputs follow the item's `quantityDecimals`.
 - All stock changes go through `applyMovement` in `src/lib/stock.ts` (locations, lots, serials, cached
   item total). Shipment delivery shared by UI and API: `src/lib/shipment-service.ts`.
 - REST API `/api/v1/*` uses `handler(scope, fn)` from `src/lib/api.ts`; the API key lives in the tenant DB.
@@ -29,6 +32,8 @@ Tailwind CSS 4 · lucide-react · date-fns (bg) · html5-qrcode. Package manager
   `/docs/api/swagger` (Swagger UI) and `/docs/api`. Update it whenever an endpoint changes.
 - MySQL: no `.returning()` — use `.$returningId()`; upserts with `onDuplicateKeyUpdate`; `like` is
   case-insensitive. After a schema change: `pnpm db:generate` then `pnpm db:migrate`.
+  Check the generated SQL: drizzle-kit's `MODIFY COLUMN` drops `DEFAULT` — add it back by hand, and give the
+  file a descriptive name (rename the tag in `meta/_journal.json` too).
 - Enum labels: `STATUS_LABELS` in `src/lib/utils.ts`; badge tones in `src/components/ui/badge.tsx`.
 - Keep the design: tokens in `src/app/globals.css`, components in `src/components/ui`.
 

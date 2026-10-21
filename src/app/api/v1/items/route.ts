@@ -4,6 +4,7 @@ import { ApiError, handler, json, readJson } from "@/lib/api";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
 import { parseMoney } from "@/lib/money";
+import { itemDecimals, parseQuantity, readDecimals } from "@/lib/quantity";
 
 export const GET = handler("read", async (req, ctx) => {
   const url = new URL(req.url);
@@ -18,7 +19,7 @@ export const GET = handler("read", async (req, ctx) => {
   return json({ data: rows, page, pageSize, total });
 });
 
-type Body = Partial<{ sku: string; name: string; barcode: string; description: string; categoryId: number; unit: string; unitCost: number; unitPrice: number; minQuantity: number; tracking: string }>;
+type Body = Partial<{ sku: string; name: string; barcode: string; description: string; categoryId: number; unit: string; unitCost: number; unitPrice: number; minQuantity: number; tracking: string; quantityDecimals: number }>;
 
 export const POST = handler("write", async (req, ctx) => {
   const body = await readJson<Body>(req);
@@ -26,6 +27,8 @@ export const POST = handler("write", async (req, ctx) => {
   const sku = body.sku?.trim() || slugSku(body.name);
   const dup = await ctx.db.query.items.findFirst({ where: eq(items.sku, sku) });
   if (dup) throw new ApiError(409, `Вече има артикул с код „${sku}“.`);
+  const tracking = (TRACKING_MODES as readonly string[]).includes(body.tracking ?? "") ? (body.tracking as (typeof TRACKING_MODES)[number]) : "none";
+  const quantityDecimals = itemDecimals({ tracking, quantityDecimals: readDecimals(body.quantityDecimals) });
   const [{ id }] = await ctx.db
     .insert(items)
     .values({
@@ -37,8 +40,9 @@ export const POST = handler("write", async (req, ctx) => {
       unit: body.unit ?? "бр.",
       unitCost: parseMoney(body.unitCost, "unitCost"),
       unitPrice: parseMoney(body.unitPrice, "unitPrice"),
-      minQuantity: body.minQuantity ?? 0,
-      tracking: (TRACKING_MODES as readonly string[]).includes(body.tracking ?? "") ? (body.tracking as (typeof TRACKING_MODES)[number]) : "none",
+      tracking,
+      quantityDecimals,
+      minQuantity: parseQuantity(body.minQuantity, quantityDecimals, "minQuantity"),
     })
     .$returningId();
   const row = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });

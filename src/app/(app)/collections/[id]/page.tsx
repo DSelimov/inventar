@@ -16,6 +16,7 @@ import { getCollection, listItemOptions } from "@/lib/queries";
 import { formatMoney, formatNumber } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { lineTotal, sumLines } from "@/lib/money";
+import { sumQty } from "@/lib/quantity";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -35,7 +36,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
   const members = collection.collectionItems.map((ci) => ci.item);
   const memberIds = new Set(members.map((m) => m.id));
   const available = options.filter((o) => !memberIds.has(o.id));
-  const totalUnits = members.reduce((s, m) => s + m.quantity, 0);
+  const totalUnits = sumQty(members, (m) => m.quantity);
   const totalValue = sumLines(members, (m) => m.quantity, (m) => m.unitCost);
 
   return (

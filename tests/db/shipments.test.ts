@@ -142,4 +142,15 @@ describe("changeShipmentStatus", () => {
     expect(await orderState(so)).toEqual({ status: "completed", fulfilled: [10, 5], returned: [10, 2] });
     expect(await qty(plain)).toBe(17);
   });
+
+  it("дробни количества: частична доставка 12,5 от 20 кг, после остатъкът 7,5", async () => {
+    const kg = await createItem(t.db, "none", { unit: "кг", quantityDecimals: 3 });
+    await t.db.transaction((tx) => applyMovement(tx, { actor, itemId: kg, locationId: t.main, type: "in", quantity: 30 }));
+    const so = await order("sales", [{ itemId: kg, quantity: 20 }]);
+    await changeShipmentStatus(t.db, actor, await shipment("outbound", [{ itemId: kg, quantity: 12.5 }], so), "delivered");
+    expect(await orderState(so)).toEqual({ status: "partial", fulfilled: [12.5], returned: [0] });
+    await changeShipmentStatus(t.db, actor, await shipment("outbound", [{ itemId: kg, quantity: 7.5 }], so), "delivered");
+    expect(await orderState(so)).toEqual({ status: "completed", fulfilled: [20], returned: [0] });
+    expect(await qty(kg)).toBe(10);
+  });
 });

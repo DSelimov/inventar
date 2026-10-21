@@ -1,9 +1,10 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, inArray, or, sql, type AnyColumn } from "drizzle-orm";
 import type { Db, TenantDb } from "@/db/tenant";
-import { items, lots, stockLevels, stockMovements, type MovementType } from "@/db/tenant-schema";
+import { items, lots, orderLines, stockLevels, stockMovements, type MovementType } from "@/db/tenant-schema";
 import { emit } from "./webhooks";
 import { UserError } from "@/lib/errors";
+import { addQty, assertQuantity, itemDecimals, subQty } from "./quantity";
 
 export type LotInput = { lotId: number } | { lotNumber: string; expiryDate?: string | null; serialNumber?: string | null } | null | undefined;
 export type Actor = { id: number; name: string } | null;
@@ -27,7 +28,8 @@ export type MovementInput = {
 export async function applyMovement(tx: Db, input: MovementInput) {
   const item = await tx.query.items.findFirst({ where: eq(items.id, input.itemId) });
   if (!item) throw new UserError("Артикулът не е намерен.");
-  if (input.quantity < 0 || !Number.isInteger(input.quantity)) throw new UserError("Въведете валидно количество.");
+  // цели бройки или до quantity_decimals знака (кг, л…); серийните номера — винаги цели
+  assertQuantity(input.quantity, itemDecimals(item), `„${item.name}“`);
 
   const [level] = await tx.select().from(stockLevels).where(and(eq(stockLevels.itemId, item.id), eq(stockLevels.locationId, input.locationId)));
   const before = level?.quantity ?? 0;
@@ -35,10 +37,10 @@ export async function applyMovement(tx: Db, input: MovementInput) {
   let delta: number;
   if (input.type === "in" || input.type === "transfer_in") delta = input.quantity;
   else if (input.type === "out" || input.type === "transfer_out") delta = -input.quantity;
-  else delta = input.quantity - before;
+  else delta = subQty(input.quantity, before);
 
   if (delta === 0) return { delta: 0, after: item.quantity };
-  const after = before + delta;
+  const after = addQty(before, delta);
   if (after < 0) throw new UserError(`Недостатъчна наличност в локацията (има ${before} ${item.unit}).`);
 
   let lotId: number | null = null;
@@ -49,7 +51,7 @@ export async function applyMovement(tx: Db, input: MovementInput) {
       const lot = await tx.query.lots.findFirst({ where: and(eq(lots.id, input.lot.lotId), eq(lots.itemId, item.id)) });
       if (!lot || lot.locationId !== input.locationId) throw new UserError("Партидата не е в тази локация.");
       if (lot.quantity < input.quantity) throw new UserError(`В партида ${lot.lotNumber} има само ${lot.quantity} ${item.unit}.`);
-      await tx.update(lots).set({ quantity: lot.quantity - input.quantity }).where(eq(lots.id, lot.id));
+      await tx.update(lots).set({ quantity: subQty(lot.quantity, input.quantity) }).where(eq(lots.id, lot.id));
       lotId = lot.id;
     } else {
       if (!input.lot || !("lotNumber" in input.lot) || !input.lot.lotNumber) throw new UserError(`Въведете партида/сериен номер за „${item.name}“.`);
@@ -65,7 +67,7 @@ export async function applyMovement(tx: Db, input: MovementInput) {
       } else {
         const existing = await tx.query.lots.findFirst({ where: and(eq(lots.itemId, item.id), eq(lots.locationId, input.locationId), eq(lots.lotNumber, input.lot.lotNumber)) });
         if (existing) {
-          await tx.update(lots).set({ quantity: existing.quantity + input.quantity, expiryDate: input.lot.expiryDate ?? existing.expiryDate }).where(eq(lots.id, existing.id));
+          await tx.update(lots).set({ quantity: addQty(existing.quantity, input.quantity), expiryDate: input.lot.expiryDate ?? existing.expiryDate }).where(eq(lots.id, existing.id));
           lotId = existing.id;
         } else {
           const [created] = await tx
@@ -81,7 +83,7 @@ export async function applyMovement(tx: Db, input: MovementInput) {
   if (level) await tx.update(stockLevels).set({ quantity: after }).where(and(eq(stockLevels.itemId, item.id), eq(stockLevels.locationId, input.locationId)));
   else await tx.insert(stockLevels).values({ itemId: item.id, locationId: input.locationId, quantity: after });
 
-  const totalAfter = item.quantity + delta;
+  const totalAfter = addQty(item.quantity, delta);
   await tx.update(items).set({ quantity: totalAfter, updatedAt: new Date() }).where(eq(items.id, item.id));
 
   await tx.insert(stockMovements).values({
@@ -118,4 +120,27 @@ export async function transferStock(db: TenantDb, input: { actor: Actor; itemId:
     await applyMovement(tx, { ...input, locationId: input.fromLocationId, type: "transfer_out", reason, lot: input.lotId ? { lotId: input.lotId } : null });
     await applyMovement(tx, { ...input, locationId: input.toLocationId, type: "transfer_in", reason, lot: lotForIn });
   });
+}
+
+/** Редове от форма/API: количеството трябва да отговаря на мерната единица на артикула (цели бройки или до N знака). */
+export async function assertItemQuantities(db: Db, lines: Array<{ itemId: number; quantity: number }>) {
+  if (!lines.length) return;
+  const rows = await db.query.items.findMany({ where: inArray(items.id, [...new Set(lines.map((l) => l.itemId))]) });
+  const byId = new Map(rows.map((i) => [i.id, i]));
+  for (const l of lines) {
+    const item = byId.get(l.itemId);
+    if (!item) throw new UserError("Артикулът не е намерен.");
+    assertQuantity(l.quantity, itemDecimals(item), `„${item.name}“`);
+  }
+}
+
+/** По-малко знаци след запетаята само ако никоя наличност или отворен ред на поръчка не ги използва. */
+export async function assertFitsDecimals(db: Db, itemId: number, decimals: number) {
+  const fits = (col: AnyColumn) => sql`${col} <> round(${col}, ${decimals})`;
+  const [[level], [lot], [line]] = await Promise.all([
+    db.select({ n: count() }).from(stockLevels).where(and(eq(stockLevels.itemId, itemId), fits(stockLevels.quantity))),
+    db.select({ n: count() }).from(lots).where(and(eq(lots.itemId, itemId), fits(lots.quantity))),
+    db.select({ n: count() }).from(orderLines).where(and(eq(orderLines.itemId, itemId), or(fits(orderLines.quantity), fits(orderLines.fulfilledQuantity)))),
+  ]);
+  if (level.n || lot.n || line.n) throw new UserError(`Наличността или поръчките на артикула имат повече от ${decimals} знака след запетаята — първо ги коригирайте.`);
 }

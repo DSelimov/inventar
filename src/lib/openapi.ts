@@ -14,6 +14,9 @@ const ref = (name: string): Schema => ({ $ref: `#/components/schemas/${name}` })
 const nullable = (s: Schema): Schema => ({ ...s, type: Array.isArray(s.type) ? s.type : [s.type, "null"] });
 const str = (description: string, extra: Schema = {}): Schema => ({ type: "string", description, ...extra });
 const int = (description: string, extra: Schema = {}): Schema => ({ type: "integer", description, ...extra });
+/** Количества: decimal(14,3); дробни само при quantityDecimals > 0 на артикула. */
+const qty = (description: string, extra: Schema = {}): Schema => ({ type: "number", description: `${description} (до quantityDecimals знака след запетаята)`, ...extra });
+const decimalsField = () => int("Знаци след запетаята за количествата: 0 = цели бройки, 1–3 = кг, л, м… Серийните номера са винаги 0. Намаляване само ако наличността и поръчките се побират (иначе 422).", { minimum: 0, maximum: 3, example: 0 });
 /** Суми: decimal(14,4) в базата; повече от 4 знака след запетаята се закръглят, отрицателни се отказват (422). */
 const money = (description: string, extra: Schema = {}): Schema => ({ type: "number", minimum: 0, maximum: 9_999_999_999, description: `${description} (до 4 знака след запетаята)`, ...extra });
 const bool = (description: string): Schema => ({ type: "boolean", description });
@@ -76,8 +79,8 @@ const schemas: Record<string, Schema> = {
     {
       itemId: int("Артикул"),
       locationId: int("Локация"),
-      quantity: int("Количество в локацията", { example: 40 }),
-      minQuantity: int("Минимум за локацията (0 = няма)"),
+      quantity: qty("Количество в локацията", { example: 40 }),
+      minQuantity: qty("Минимум за локацията (0 = няма)"),
       location: ref("Location"),
     },
     ["itemId", "locationId", "quantity"],
@@ -91,7 +94,7 @@ const schemas: Record<string, Schema> = {
       lotNumber: str("Номер на партида (за серийни артикули = серийният номер)", { example: "KF-2605" }),
       serialNumber: nullable(str("Сериен номер, само при tracking = serial")),
       expiryDate: nullable(date("Срок на годност")),
-      quantity: int("Налично количество в партидата (0 или 1 за серийни)"),
+      quantity: qty("Налично количество в партидата (0 или 1 за серийни)"),
       createdAt: datetime("Създадена"),
       location: ref("Location"),
     },
@@ -120,9 +123,10 @@ const schemas: Record<string, Schema> = {
       parentId: nullable(int("Родителски артикул, ако това е вариант")),
       variantLabel: nullable(str("Етикет на варианта", { example: "L / Черен" })),
       tracking: enumOf(TRACKING_MODES, "none = без проследяване; lot = партиди (срок на годност); serial = серийни номера."),
-      quantity: int("Обща наличност във всички локации (кеширана сума)", { example: 50 }),
-      minQuantity: int("Минимум; при достигане се вдига сигнал и webhook item.low_stock"),
+      quantity: qty("Обща наличност във всички локации (кеширана сума)", { example: 50 }),
+      minQuantity: qty("Минимум; при достигане се вдига сигнал и webhook item.low_stock"),
       unit: str("Мерна единица", { example: "бр." }),
+      quantityDecimals: decimalsField(),
       unitCost: money("Доставна цена за единица", { example: 12.5 }),
       unitPrice: money("Продажна цена за единица", { example: 24.9 }),
       status: enumOf(ITEM_STATUSES, "active или archived"),
@@ -131,7 +135,7 @@ const schemas: Record<string, Schema> = {
       category: nullable(ref("Category")),
       stockLevels: arr(ref("StockLevel"), "Наличност по локации."),
     },
-    ["id", "sku", "name", "tracking", "quantity", "minQuantity", "unit", "unitCost", "unitPrice", "status"],
+    ["id", "sku", "name", "tracking", "quantity", "minQuantity", "unit", "quantityDecimals", "unitCost", "unitPrice", "status"],
   ),
 
   ItemImage: obj(
@@ -168,9 +172,10 @@ const schemas: Record<string, Schema> = {
       description: str("Описание"),
       categoryId: int("Категория"),
       unit: str("Мерна единица, по подразбиране „бр.“"),
+      quantityDecimals: decimalsField(),
       unitCost: money("Доставна цена"),
       unitPrice: money("Продажна цена"),
-      minQuantity: int("Минимално количество"),
+      minQuantity: qty("Минимално количество"),
       tracking: enumOf(TRACKING_MODES, "Режим на проследяване; по подразбиране none."),
     },
     ["name"],
@@ -184,9 +189,10 @@ const schemas: Record<string, Schema> = {
       description: nullable(str("Описание")),
       categoryId: nullable(int("Категория")),
       unit: str("Мерна единица"),
+      quantityDecimals: decimalsField(),
       unitCost: money("Доставна цена"),
       unitPrice: money("Продажна цена"),
-      minQuantity: int("Минимално количество"),
+      minQuantity: qty("Минимално количество"),
       status: enumOf(ITEM_STATUSES, "active или archived"),
     },
     [],
@@ -200,8 +206,8 @@ const schemas: Record<string, Schema> = {
       name: str("Име"),
       locationId: int("Локация"),
       location: str("Име на локацията"),
-      quantity: int("Количество"),
-      minQuantity: int("Минимум за локацията"),
+      quantity: qty("Количество"),
+      minQuantity: qty("Минимум за локацията"),
       unit: str("Мерна единица"),
     },
     ["itemId", "sku", "locationId", "quantity"],
@@ -213,7 +219,7 @@ const schemas: Record<string, Schema> = {
       sku: str("Артикул по код (или itemId)", { example: "EL-USBC-2M" }),
       locationId: int("Локация (задължително)", { example: 1 }),
       type: enumOf(["in", "out", "adjust"], "in = приход (+), out = разход (−), adjust = задава точното количество в локацията. adjust не е позволен за артикули с партиди/серийни номера."),
-      quantity: int("Положително цяло число", { example: 5 }),
+      quantity: qty("Неотрицателно количество; дробно (напр. 0.75) само за артикули с quantityDecimals > 0, иначе 422", { example: 5 }),
       reason: str("Причина, записва се в историята", { example: "Онлайн поръчка №1042" }),
       lotNumber: str("При приход на артикул с партиди: номер на партидата. При серийни: серийни номера, разделени със запетая, колкото е количеството."),
       expiryDate: date("Срок на годност на партидата (при приход)"),
@@ -226,7 +232,7 @@ const schemas: Record<string, Schema> = {
     {
       itemId: int("Артикул"),
       sku: str("Код"),
-      delta: int("Приложената промяна със знак", { example: 5 }),
+      delta: qty("Приложената промяна със знак", { example: 5 }),
       after: int("Обща наличност след движението", { example: 120 }),
     },
     ["itemId", "sku", "delta", "after"],
@@ -250,7 +256,7 @@ const schemas: Record<string, Schema> = {
       id: int("Идентификатор"),
       shipmentId: int("Пратка"),
       itemId: int("Артикул"),
-      quantity: int("Количество"),
+      quantity: qty("Количество"),
       lotNumber: nullable(str("Входяща, с партиди: партидата, която ще се създаде при доставка.")),
       expiryDate: nullable(date("Срок на годност на партидата")),
       lotId: nullable(int("Изходяща, с партиди: от коя партида се взема.")),
@@ -291,9 +297,9 @@ const schemas: Record<string, Schema> = {
       id: int("Идентификатор"),
       orderId: int("Поръчка"),
       itemId: int("Артикул"),
-      quantity: int("Поръчано количество"),
-      fulfilledQuantity: int("Доставено до момента (сума от доставените пратки)"),
-      returnedQuantity: int("Върнато след доставка (сума от доставените връщания)"),
+      quantity: qty("Поръчано количество"),
+      fulfilledQuantity: qty("Доставено до момента (сума от доставените пратки)"),
+      returnedQuantity: qty("Върнато след доставка (сума от доставените връщания)"),
       unitPrice: money("Единична цена"),
       item: ref("Item"),
     },

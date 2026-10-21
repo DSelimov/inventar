@@ -11,6 +11,7 @@ import { applyMovement } from "@/lib/stock";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
+import { decimalsOf, itemDecimals, MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
 
 export type ImportRow = {
   sku: string;
@@ -57,31 +58,34 @@ export const importItems = act(async (fd: FormData) => {
           catByName.set(r.category.toLowerCase(), c.id);
         }
       }
+      const existingItem = await tx.query.items.findFirst({ where: eq(items.sku, r.sku) });
+      // нов артикул: знаците след запетаята се взимат от файла (12,5 кг → 1 знак); съществуващ запазва своите
+      const decimals = existingItem ? itemDecimals(existingItem) : Math.min(MAX_DECIMALS, Math.max(decimalsOf(r.quantity ?? 0), decimalsOf(r.minQuantity ?? 0)));
       const base = {
         name: r.name,
         barcode: r.barcode || null,
         categoryId,
-        minQuantity: Math.max(0, Math.trunc(r.minQuantity ?? 0)),
+        minQuantity: parseQuantity(r.minQuantity, decimals, `Ред „${r.sku}“: минимално количество`),
         unit: r.unit || "бр.",
         unitCost: parseMoney(r.unitCost, `Ред „${r.sku}“: доставна цена`),
         unitPrice: parseMoney(r.unitPrice, `Ред „${r.sku}“: продажна цена`),
         description: r.description || null,
       };
-      const existing = await tx.query.items.findFirst({ where: eq(items.sku, r.sku) });
+      const existing = existingItem;
       let itemId: number;
       if (existing) {
         await tx.update(items).set({ ...base, updatedAt: new Date() }).where(eq(items.id, existing.id));
         itemId = existing.id;
         updated++;
       } else {
-        const [row] = await tx.insert(items).values({ ...base, sku: r.sku }).$returningId();
+        const [row] = await tx.insert(items).values({ ...base, sku: r.sku, quantityDecimals: decimals }).$returningId();
         itemId = row.id;
         created++;
       }
       if (setQuantities && r.quantity !== undefined && Number.isFinite(r.quantity)) {
         const locationId = (r.location ? locByName.get(r.location.toLowerCase()) : undefined) ?? defaultLoc?.id;
         if (!locationId) throw new UserError("Няма локация за количествата. Създайте локация първо.");
-        await applyMovement(tx, { actor: ctx.user, itemId, locationId, type: "adjust", quantity: Math.max(0, Math.trunc(r.quantity)), reason: "Импорт от CSV" });
+        await applyMovement(tx, { actor: ctx.user, itemId, locationId, type: "adjust", quantity: parseQuantity(r.quantity, decimals, `Ред „${r.sku}“`), reason: "Импорт от CSV" });
       }
     }
   });

@@ -5,6 +5,7 @@ import { orderLines, orders, shipments, type ShipmentStatus } from "@/db/tenant-
 import { applyMovement, type Actor } from "./stock";
 import { emit } from "./webhooks";
 import { UserError } from "@/lib/errors";
+import { addQty, subQty, sumQty } from "./quantity";
 
 async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: number; quantity: number }>) {
   const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { lines: true } });
@@ -14,10 +15,10 @@ async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: n
     const forItem = order.lines.filter((l) => l.itemId === d.itemId);
     let left = d.quantity;
     for (const [i, line] of forItem.entries()) {
-      const take = i === forItem.length - 1 ? left : Math.min(left, Math.max(0, line.quantity - line.fulfilledQuantity));
+      const take = i === forItem.length - 1 ? left : Math.min(left, Math.max(0, subQty(line.quantity, line.fulfilledQuantity)));
       if (take <= 0) continue;
-      line.fulfilledQuantity += take;
-      left -= take;
+      line.fulfilledQuantity = addQty(line.fulfilledQuantity, take);
+      left = subQty(left, take);
       await tx.update(orderLines).set({ fulfilledQuantity: line.fulfilledQuantity }).where(eq(orderLines.id, line.id));
     }
   }
@@ -38,22 +39,22 @@ async function registerReturn(tx: Db, orderId: number, returned: Array<{ itemId:
   const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { lines: { with: { item: true } } } });
   if (!order) return;
   const byItem = new Map<number, number>();
-  for (const r of returned) byItem.set(r.itemId, (byItem.get(r.itemId) ?? 0) + r.quantity);
+  for (const r of returned) byItem.set(r.itemId, addQty(byItem.get(r.itemId) ?? 0, r.quantity));
   for (const [itemId, qty] of byItem) {
     const forItem = order.lines.filter((l) => l.itemId === itemId);
     if (!forItem.length) throw new UserError("Връщането съдържа артикул, който не е в поръчката.");
-    const fulfilled = forItem.reduce((sum, l) => sum + l.fulfilledQuantity, 0);
-    const alreadyReturned = forItem.reduce((sum, l) => sum + l.returnedQuantity, 0);
-    const returnable = fulfilled - alreadyReturned;
+    const fulfilled = sumQty(forItem, (l) => l.fulfilledQuantity);
+    const alreadyReturned = sumQty(forItem, (l) => l.returnedQuantity);
+    const returnable = subQty(fulfilled, alreadyReturned);
     const { item } = forItem[0];
     if (qty > returnable) throw new UserError(`„${item.name}“: може да се върнат най-много ${returnable} ${item.unit} (доставени ${fulfilled}, вече върнати ${alreadyReturned}).`);
     // разпределя върнатото по редовете на артикула
     let left = qty;
     for (const line of forItem) {
-      const take = Math.min(left, line.fulfilledQuantity - line.returnedQuantity);
+      const take = Math.min(left, subQty(line.fulfilledQuantity, line.returnedQuantity));
       if (take <= 0) continue;
-      left -= take;
-      await tx.update(orderLines).set({ returnedQuantity: line.returnedQuantity + take }).where(eq(orderLines.id, line.id));
+      left = subQty(left, take);
+      await tx.update(orderLines).set({ returnedQuantity: addQty(line.returnedQuantity, take) }).where(eq(orderLines.id, line.id));
     }
   }
 }

@@ -36,6 +36,13 @@
       "when": 1792593164998,
       "tag": "0004_money_decimal",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1792603869032,
+      "tag": "0005_fractional_quantities",
+      "breakpoints": true
     }
   ]
 }

@@ -123,6 +123,7 @@ export async function listItemOptions(db: Db) {
       unit: items.unit,
       quantity: items.quantity,
       tracking: items.tracking,
+      quantityDecimals: items.quantityDecimals,
       variantLabel: items.variantLabel,
       unitCost: items.unitCost,
       unitPrice: items.unitPrice,

@@ -8,8 +8,9 @@ import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/fie
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
+import { itemDecimals, quantityStep, sumQty } from "@/lib/quantity";
 
-export type ItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; tracking: TrackingMode; variantLabel: string | null };
+export type ItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; tracking: TrackingMode; variantLabel: string | null; quantityDecimals: number };
 export type LotOption = { id: number; itemId: number; locationId: number; lotNumber: string; quantity: number; expiryDate: string | null };
 export type PartnerOption = { id: number; name: string; type: string };
 type Line = { key: number; itemId: string; quantity: string; lotNumber: string; expiryDate: string; lotId: string };
@@ -54,9 +55,13 @@ export function ShipmentForm({
 
   const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", lotNumber: "", expiryDate: "", lotId: "" }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
+  const stepFor = (itemId: string) => {
+    const it = items.find((i) => String(i.id) === itemId);
+    return quantityStep(it ? itemDecimals(it) : 0);
+  };
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
-  const totalUnits = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+  const totalUnits = sumQty(lines, (l) => Number(l.quantity) || 0);
   const inbound = direction === "inbound";
   const partnerList = partners.filter((p) => p.type === "both" || p.type === (inbound ? "supplier" : "customer"));
   const itemLabel = (i: ItemOption) => `${i.name}${i.variantLabel ? ` · ${i.variantLabel}` : ""} (${i.sku}) · ${i.quantity} ${i.unit}`;
@@ -150,7 +155,7 @@ export function ShipmentForm({
                       </p>
                     )}
                   </div>
-                  <Input name="lineQuantity" type="number" min={1} step={1} required value={line.quantity} disabled={!linesEditable} onChange={(e) => update(line.key, { quantity: e.target.value })} />
+                  <Input name="lineQuantity" type="number" min={stepFor(line.itemId)} step={stepFor(line.itemId)} required value={line.quantity} disabled={!linesEditable} onChange={(e) => update(line.key, { quantity: e.target.value })} />
                   <Button variant="ghost" size="md" onClick={() => removeLine(line.key)} disabled={!linesEditable || lines.length === 1} aria-label="Премахни реда">
                     <Trash2 className="h-4 w-4" />
                   </Button>

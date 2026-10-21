@@ -18,6 +18,7 @@ import { getItem, listLocations } from "@/lib/queries";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { lineTotal } from "@/lib/money";
+import { itemDecimals, quantityStep } from "@/lib/quantity";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -337,7 +338,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                     </Select>
                   </Field>
                   <Field label="Количество">
-                    <Input name="quantity" type="number" min={0} step={1} required placeholder="0" />
+                    <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} required placeholder="0" />
                   </Field>
                   {tracked && (
                     <>
@@ -400,7 +401,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                     </Field>
                   </div>
                   <Field label="Количество">
-                    <Input name="quantity" type="number" min={1} step={1} required />
+                    <Input name="quantity" type="number" min={quantityStep(itemDecimals(item))} step={quantityStep(itemDecimals(item))} required />
                   </Field>
                   {tracked && (
                     <Field label="Партида">

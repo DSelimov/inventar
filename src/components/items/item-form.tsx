@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { ButtonLink } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
+import { quantityStep } from "@/lib/quantity";
 
 type CategoryWithFields = Category & { fields: FieldDefinition[] };
 
@@ -30,6 +31,8 @@ export function ItemForm({
   const [categoryId, setCategoryId] = useState<string>(item?.categoryId ? String(item.categoryId) : "");
   const [tracking, setTracking] = useState<string>(item?.tracking ?? "none");
   const [quantity, setQuantity] = useState<string>("0");
+  const [decimals, setDecimals] = useState<number>(item?.quantityDecimals ?? 0);
+  const step = quantityStep(tracking === "serial" ? 0 : decimals);
   const category = categories.find((c) => String(c.id) === categoryId);
   const trackingLocked = Boolean(item && item.quantity > 0);
 
@@ -82,7 +85,7 @@ export function ItemForm({
           {!item && (
             <>
               <Field label="Начално количество">
-                <Input name="quantity" type="number" min={0} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                <Input name="quantity" type="number" min={0} step={step} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
               </Field>
               <Field label="Локация за началното количество">
                 <Select name="locationId" defaultValue={locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? ""}>
@@ -106,10 +109,18 @@ export function ItemForm({
             </>
           )}
           <Field label="Минимално количество" hint="Сигнал при достигане на това ниво. 0 изключва.">
-            <Input name="minQuantity" type="number" min={0} step={1} defaultValue={item?.minQuantity ?? 0} />
+            <Input name="minQuantity" type="number" min={0} step={step} defaultValue={item?.minQuantity ?? 0} />
           </Field>
           <Field label="Мерна единица">
             <Input name="unit" defaultValue={item?.unit ?? "бр."} placeholder="бр., кг, кашон…" />
+          </Field>
+          <Field label="Количества" hint={tracking === "serial" ? "Серийните номера са винаги цели бройки." : "Цели бройки или дробни за кг, л, м."}>
+            <Select name="quantityDecimals" value={tracking === "serial" ? 0 : decimals} onChange={(e) => setDecimals(Number(e.target.value))} disabled={tracking === "serial"}>
+              <option value={0}>Цели (1, 2, 3)</option>
+              <option value={1}>1 знак (0,5)</option>
+              <option value={2}>2 знака (0,25)</option>
+              <option value={3}>3 знака (0,750)</option>
+            </Select>
           </Field>
           <Field label="Доставна цена" hint="Колко плащате за единица.">
             <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} />

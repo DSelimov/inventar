@@ -14,6 +14,7 @@ import { getShipment } from "@/lib/queries";
 import { formatDate, formatDateTime, formatMoney, formatNumber, label, plural, todayIso } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { lineTotal, sumLines } from "@/lib/money";
+import { sumQty } from "@/lib/quantity";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -32,7 +33,7 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
   const writable = can(ctx.role, "write");
   const open = shipment.status === "pending" || shipment.status === "in_transit";
   const overdue = open && shipment.expectedDate && shipment.expectedDate < todayIso();
-  const totalUnits = shipment.lines.reduce((s, l) => s + l.quantity, 0);
+  const totalUnits = sumQty(shipment.lines, (l) => l.quantity);
   const totalValue = sumLines(shipment.lines, (l) => l.quantity, (l) => l.item.unitCost);
   const inbound = shipment.direction === "inbound";
   const missingLots = shipment.lines.filter((l) => l.item.tracking !== "none" && (inbound ? !l.lotNumber : !l.lotId));

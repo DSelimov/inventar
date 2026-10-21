@@ -8,7 +8,7 @@ type Body = { itemId?: number; sku?: string; locationId: number; type: "in" | "o
 export const POST = handler("write", async (req, ctx) => {
   const b = await readJson<Body>(req);
   if (!["in", "out", "adjust"].includes(b.type)) throw new ApiError(422, "type трябва да е in, out или adjust.");
-  if (!Number.isInteger(b.quantity) || b.quantity < 0) throw new ApiError(422, "quantity трябва да е цяло неотрицателно число.");
+  if (typeof b.quantity !== "number" || !Number.isFinite(b.quantity) || b.quantity < 0) throw new ApiError(422, "quantity трябва да е неотрицателно число (дробно само за артикули с quantityDecimals > 0).");
   if (!b.locationId) throw new ApiError(422, "locationId е задължително.");
   const item = await ctx.db.query.items.findFirst({ where: b.itemId ? eq(items.id, b.itemId) : eq(items.sku, b.sku ?? "") });
   if (!item) throw new ApiError(404, "Артикулът не е намерен.");

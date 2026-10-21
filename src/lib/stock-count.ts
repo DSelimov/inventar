@@ -5,6 +5,7 @@ import { items, lots, stockCountLines, stockCounts, stockLevels, type StockCount
 import { UserError } from "./errors";
 import { applyMovement, type Actor } from "./stock";
 import { lineTotal, sumMoney } from "@/lib/money";
+import { addQty, assertQuantity, itemDecimals, subQty } from "./quantity";
 
 /**
  * Инвентаризация: при създаване се записва снимка на очакваните количества в локацията (по артикул,
@@ -60,7 +61,6 @@ export async function recordCount(db: TenantDb, countId: number, code: string, q
   const count = await openCount(db, countId);
   code = code.trim();
   if (!code) throw new UserError("Въведете или сканирайте код.");
-  if (!Number.isInteger(quantity) || quantity < 0) throw new UserError("Въведете валидно количество.");
 
   const lines = await db.select({ line: stockCountLines, item: items }).from(stockCountLines).innerJoin(items, eq(items.id, stockCountLines.itemId)).where(eq(stockCountLines.countId, countId));
   const key = code.toLowerCase();
@@ -83,10 +83,12 @@ export async function recordCount(db: TenantDb, countId: number, code: string, q
     item = await db.query.items.findFirst({ where: or(eq(items.barcode, code), eq(items.sku, code)) });
     if (!item) throw new UserError(`Няма артикул с код „${code}“.`);
     if (item.tracking !== "none") throw new UserError(`„${item.name}“ е с партиди/серийни номера — добавете партидата от формата „Нова партида“.`);
+    assertQuantity(quantity, itemDecimals(item), `„${item.name}“`); // преди да добавим ред
     const [level] = await db.select().from(stockLevels).where(and(eq(stockLevels.itemId, item.id), eq(stockLevels.locationId, count.locationId)));
     const [{ id }] = await db.insert(stockCountLines).values({ countId, itemId: item.id, expected: level?.quantity ?? 0 }).$returningId();
     [line] = await db.select().from(stockCountLines).where(eq(stockCountLines.id, id));
   }
+  assertQuantity(quantity, itemDecimals(item), `„${item.name}“`);
   // "add" се изчислява в SQL: паралелни сканирания (камера + скенер, двама броячи) не губят бройки
   const next = mode === "add" ? sql`coalesce(${stockCountLines.counted}, 0) + ${quantity}` : sql`${quantity}`;
   await db
@@ -107,6 +109,7 @@ export async function addLotLine(db: TenantDb, countId: number, itemId: number, 
   if (!lotNumber) throw new UserError("Въведете номер на партида / сериен номер.");
   const [dup] = await db.select({ id: stockCountLines.id }).from(stockCountLines).where(and(eq(stockCountLines.countId, countId), eq(stockCountLines.itemId, itemId), eq(stockCountLines.lotNumber, lotNumber)));
   if (dup) throw new UserError(`Партида „${lotNumber}“ вече е в списъка.`);
+  assertQuantity(counted, itemDecimals(item), `„${item.name}“`);
   const value = item.tracking === "serial" ? Math.min(1, counted) : counted;
   await db.insert(stockCountLines).values({ countId, itemId, lotNumber, expected: 0, counted: value, countedAt: new Date() });
 }
@@ -114,13 +117,17 @@ export async function addLotLine(db: TenantDb, countId: number, itemId: number, 
 /** Ръчно въведени количества от таблицата: празно = неброено. */
 export async function saveCountedValues(db: TenantDb, countId: number, values: Map<number, number | null>) {
   await openCount(db, countId);
-  const lines = await db.select({ id: stockCountLines.id, counted: stockCountLines.counted }).from(stockCountLines).where(eq(stockCountLines.countId, countId));
+  const lines = await db.select({ id: stockCountLines.id, counted: stockCountLines.counted, item: items }).from(stockCountLines).innerJoin(items, eq(items.id, stockCountLines.itemId)).where(eq(stockCountLines.countId, countId));
   const own = new Map(lines.map((l) => [l.id, l.counted]));
+  const itemOf = new Map(lines.map((l) => [l.id, l.item]));
   let changed = 0;
   await db.transaction(async (tx) => {
     for (const [id, value] of values) {
       if (!own.has(id) || own.get(id) === value) continue;
-      if (value !== null && (!Number.isInteger(value) || value < 0)) throw new UserError("Количествата трябва да са цели неотрицателни числа.");
+      if (value !== null) {
+        const item = itemOf.get(id)!;
+        assertQuantity(value, itemDecimals(item), `„${item.name}“`);
+      }
       await tx.update(stockCountLines).set({ counted: value, countedAt: value === null ? null : new Date() }).where(eq(stockCountLines.id, id));
       changed++;
     }
@@ -143,11 +150,11 @@ export async function applyStockCount(db: TenantDb, countId: number, actor: Acto
     for (const l of lines) {
       const counted = l.counted ?? (o.uncountedAsZero ? 0 : null);
       if (counted === null) continue;
-      const delta = counted - l.expected;
+      const delta = subQty(counted, l.expected);
       if (delta === 0) continue;
       if (l.item.tracking === "none") {
         const [level] = await tx.select().from(stockLevels).where(and(eq(stockLevels.itemId, l.itemId), eq(stockLevels.locationId, count.locationId)));
-        await applyMovement(tx, { actor, itemId: l.itemId, locationId: count.locationId, type: "adjust", quantity: Math.max(0, (level?.quantity ?? 0) + delta), reason });
+        await applyMovement(tx, { actor, itemId: l.itemId, locationId: count.locationId, type: "adjust", quantity: Math.max(0, addQty(level?.quantity ?? 0, delta)), reason });
       } else if (delta > 0) {
         await applyMovement(tx, { actor, itemId: l.itemId, locationId: count.locationId, type: "in", quantity: delta, reason, lot: { lotNumber: l.lotNumber ?? l.lot?.lotNumber ?? "", expiryDate: l.lot?.expiryDate ?? null } });
       } else {

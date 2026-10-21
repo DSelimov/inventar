@@ -12,6 +12,8 @@ import { changeShipmentStatus } from "@/lib/shipment-service";
 import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
+import { assertItemQuantities } from "@/lib/stock";
 
 function revalidate(id?: number) {
   revalidatePath("/");
@@ -33,7 +35,7 @@ function readLines(fd: FormData): LineInput[] {
   const lines: LineInput[] = [];
   ids.forEach((id, i) => {
     const itemId = Number(id);
-    const quantity = Math.trunc(Number(qtys[i] ?? 0));
+    const quantity = parseQuantity(qtys[i], MAX_DECIMALS, `Ред ${i + 1}: количество`);
     if (Number.isInteger(itemId) && itemId > 0 && quantity > 0) {
       lines.push({ itemId, quantity, lotNumber: lotNumbers[i]?.trim() || null, expiryDate: expiries[i]?.trim() || null, lotId: Number(lotIds[i]) > 0 ? Number(lotIds[i]) : null });
     }
@@ -69,6 +71,7 @@ export const createShipment = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const data = await readShipment(ctx.db, fd);
   const lines = readLines(fd);
+  await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към пратката.");
   if (!data.locationId) throw new UserError("Изберете локация.");
   await assertLotsBelong(ctx.db, lines);
@@ -89,6 +92,7 @@ export const updateShipment = act(async (id: number, fd: FormData) => {
   if (!existing) throw new UserError("Пратката не е намерена.");
   const data = await readShipment(ctx.db, fd);
   const lines = readLines(fd);
+  await assertItemQuantities(ctx.db, lines);
   const editable = existing.status === "pending" || existing.status === "in_transit";
   if (editable && !lines.length) throw new UserError("Добавете поне един ред към пратката.");
   if (editable) await assertLotsBelong(ctx.db, lines);

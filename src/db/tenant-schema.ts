@@ -3,7 +3,7 @@
  * Потребителите живеят в контролната база, затова тук се пазят само user_id + име (снимка).
  */
 import { relations, sql } from "drizzle-orm";
-import { boolean, date, datetime, decimal, index, int, json, mysqlEnum, mysqlTable, primaryKey, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, date, datetime, decimal, index, int, json, mysqlEnum, mysqlTable, primaryKey, text, tinyint, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 // ---------------------------------------------------------------- enumerations
 export const FIELD_TYPES = ["text", "number", "date", "select", "boolean"] as const;
@@ -42,6 +42,8 @@ export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 /** Пари: точно в базата (decimal), число в TypeScript; аритметиката е в src/lib/money.ts. */
 const money = (name: string) => decimal(name, { precision: 14, scale: 4, mode: "number" });
+/** Количества: до 3 знака (кг, л, м), точно в базата; аритметиката е в src/lib/quantity.ts. */
+const qty = (name: string) => decimal(name, { precision: 14, scale: 3, mode: "number" });
 const createdAt = () => datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`);
 const ts = (name: string) => datetime(name, { fsp: 3 });
 
@@ -90,9 +92,11 @@ export const items = mysqlTable(
     variantLabel: varchar("variant_label", { length: 120 }),
     tracking: mysqlEnum("tracking", TRACKING_MODES).notNull().default("none"),
     /** Кеширана обща наличност във всички локации; поддържа се от applyMovement. */
-    quantity: int("quantity").notNull().default(0),
-    minQuantity: int("min_quantity").notNull().default(0),
+    quantity: qty("quantity").notNull().default(0),
+    minQuantity: qty("min_quantity").notNull().default(0),
     unit: varchar("unit", { length: 32 }).notNull().default("бр."),
+    /** Знаци след запетаята за количествата: 0 = бройки, 1–3 = кг/л/м… Серийните номера са винаги 0. */
+    quantityDecimals: tinyint("quantity_decimals").notNull().default(0),
     unitCost: money("unit_cost").notNull().default(0),
     unitPrice: money("unit_price").notNull().default(0),
     status: mysqlEnum("status", ITEM_STATUSES).notNull().default("active"),
@@ -135,8 +139,8 @@ export const stockLevels = mysqlTable(
   {
     itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
     locationId: int("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-    quantity: int("quantity").notNull().default(0),
-    minQuantity: int("min_quantity").notNull().default(0),
+    quantity: qty("quantity").notNull().default(0),
+    minQuantity: qty("min_quantity").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.itemId, t.locationId] })],
 );
@@ -150,7 +154,7 @@ export const lots = mysqlTable(
     lotNumber: varchar("lot_number", { length: 120 }).notNull(),
     serialNumber: varchar("serial_number", { length: 120 }),
     expiryDate: date("expiry_date", { mode: "string" }),
-    quantity: int("quantity").notNull().default(0),
+    quantity: qty("quantity").notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [index("lots_item_loc").on(t.itemId, t.locationId)],
@@ -167,8 +171,8 @@ export const stockMovements = mysqlTable(
     userId: int("user_id"),
     userName: varchar("user_name", { length: 200 }),
     type: mysqlEnum("type", MOVEMENT_TYPES).notNull(),
-    delta: int("delta").notNull(),
-    quantityAfter: int("quantity_after").notNull(),
+    delta: qty("delta").notNull(),
+    quantityAfter: qty("quantity_after").notNull(),
     reason: varchar("reason", { length: 500 }),
     shipmentId: int("shipment_id").references(() => shipments.id, { onDelete: "set null" }),
     createdAt: createdAt(),
@@ -210,10 +214,10 @@ export const orderLines = mysqlTable("order_lines", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
-  quantity: int("quantity").notNull(),
-  fulfilledQuantity: int("fulfilled_quantity").notNull().default(0),
+  quantity: qty("quantity").notNull(),
+  fulfilledQuantity: qty("fulfilled_quantity").notNull().default(0),
   /** Върнато от клиента (продажба) или към доставчика (доставка) след изпълнение. */
-  returnedQuantity: int("returned_quantity").notNull().default(0),
+  returnedQuantity: qty("returned_quantity").notNull().default(0),
   unitPrice: money("unit_price").notNull().default(0),
 });
 
@@ -242,7 +246,7 @@ export const shipmentLines = mysqlTable("shipment_lines", {
   id: int("id").autoincrement().primaryKey(),
   shipmentId: int("shipment_id").notNull().references(() => shipments.id, { onDelete: "cascade" }),
   itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
-  quantity: int("quantity").notNull(),
+  quantity: qty("quantity").notNull(),
   lotNumber: text("lot_number"),
   expiryDate: date("expiry_date", { mode: "string" }),
   lotId: int("lot_id").references(() => lots.id, { onDelete: "set null" }),
@@ -351,9 +355,9 @@ export const stockCountLines = mysqlTable(
     lotId: int("lot_id").references(() => lots.id, { onDelete: "set null" }),
     /** Номер на партидата към момента (и за нови партиди, открити при броенето). */
     lotNumber: varchar("lot_number", { length: 120 }),
-    expected: int("expected").notNull().default(0),
+    expected: qty("expected").notNull().default(0),
     /** null = още не е броено */
-    counted: int("counted"),
+    counted: qty("counted"),
     countedAt: ts("counted_at"),
   },
   (t) => [index("count_lines_count").on(t.countId)],

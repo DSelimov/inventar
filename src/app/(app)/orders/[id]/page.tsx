@@ -14,6 +14,7 @@ import { getOrder } from "@/lib/queries";
 import { formatDate, formatDateTime, formatMoney, formatNumber, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { lineTotal, sumLines } from "@/lib/money";
+import { addQty, subQty, sumQty } from "@/lib/quantity";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -32,14 +33,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const writable = can(ctx.role, "write");
   const purchase = order.type === "purchase";
   const total = sumLines(order.lines, (l) => l.quantity, (l) => l.unitPrice);
-  const ordered = order.lines.reduce((s, l) => s + l.quantity, 0);
-  const fulfilled = order.lines.reduce((s, l) => s + Math.min(l.quantity, l.fulfilledQuantity), 0);
+  const ordered = sumQty(order.lines, (l) => l.quantity);
+  const fulfilled = sumQty(order.lines, (l) => Math.min(l.quantity, l.fulfilledQuantity));
   const reserved = new Map<number, number>();
-  for (const s of order.shipments) if (!s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) reserved.set(l.itemId, (reserved.get(l.itemId) ?? 0) + l.quantity);
-  const remainingToShip = order.lines.reduce((s, l) => s + Math.max(0, l.quantity - l.fulfilledQuantity - (reserved.get(l.itemId) ?? 0)), 0);
+  for (const s of order.shipments) if (!s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) reserved.set(l.itemId, addQty(reserved.get(l.itemId) ?? 0, l.quantity));
+  const remainingToShip = sumQty(order.lines, (l) => Math.max(0, subQty(subQty(l.quantity, l.fulfilledQuantity), reserved.get(l.itemId) ?? 0)));
   const active = order.status === "confirmed" || order.status === "partial";
-  const returned = order.lines.reduce((s, l) => s + l.returnedQuantity, 0);
-  const returnable = order.lines.reduce((s, l) => s + l.fulfilledQuantity - l.returnedQuantity, 0);
+  const returned = sumQty(order.lines, (l) => l.returnedQuantity);
+  const returnable = sumQty(order.lines, (l) => subQty(l.fulfilledQuantity, l.returnedQuantity));
 
   return (
     <>
@@ -104,7 +105,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </thead>
               <tbody>
                 {order.lines.map((l) => {
-                  const rest = Math.max(0, l.quantity - l.fulfilledQuantity);
+                  const rest = Math.max(0, subQty(l.quantity, l.fulfilledQuantity));
                   return (
                     <tr key={l.id}>
                       <td>
@@ -160,7 +161,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                         <Badge tone={statusTone[s.status]}>{label(s.status)}</Badge>
                       </td>
                       <td className="text-muted">{formatDate(s.expectedDate)}</td>
-                      <td className="text-right tabular-nums">{formatNumber(s.lines.reduce((a, l) => a + l.quantity, 0))}</td>
+                      <td className="text-right tabular-nums">{formatNumber(sumQty(s.lines, (l) => l.quantity))}</td>
                     </tr>
                   ))}
                 </tbody>

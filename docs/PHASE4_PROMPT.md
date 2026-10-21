@@ -42,9 +42,13 @@ tenant, default `EUR`.
 - Acceptance: 0.1 + 0.2 style sums are exact in reports, PDFs and API; the existing test suite passes.
 
 ### A2. Fractional quantities and units of measure
-- Quantities `decimal(14,3)` (items, stock levels, lots, movements, order/shipment/count lines). Per item
-  `unit` + `decimals` (0 for бр., 3 for кг/л/м). Serial-tracked items stay integer.
-- Inputs, scanner (+1 only for integer units), CSV import, PDFs and API respect the item's decimals.
+- **Done.** Quantities are `decimal(14,3)` via the `qty()` column helper (items, stock levels, lots,
+  movements, order/shipment/count lines); `items.quantity_decimals` (0–3) per item, serial items always 0.
+  Arithmetic and validation in `src/lib/quantity.ts` (`addQty`, `subQty`, `sumQty`, `parseQuantity`,
+  `itemDecimals`); `applyMovement` and `assertItemQuantities` reject quantities with more decimals than the
+  item allows. Lowering an item's decimals is refused while stock or order lines use them
+  (`assertFitsDecimals`). CSV import infers decimals for new items from the file. Scanning still adds the
+  entered quantity (default 1).
 - Acceptance: receive 12.5 кг, sell 0.750 кг, count 11.750 кг — all exact; tests in `tests/db/stock.test.ts`.
 
 ### A3. Euro and the лев history

@@ -9,12 +9,13 @@ import { requireContext } from "@/lib/auth";
 import { deleteItemFiles } from "@/lib/item-images";
 import { int, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { getDefaultLocation } from "@/lib/queries";
-import { applyMovement, transferStock } from "@/lib/stock";
+import { applyMovement, assertFitsDecimals, transferStock } from "@/lib/stock";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
+import { itemDecimals, MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
 
 function revalidateItems(id?: number) {
   revalidatePath("/");
@@ -41,14 +42,17 @@ async function saveFieldValues(db: Db, itemId: number, categoryId: number | null
 
 function readItem(fd: FormData) {
   const name = required(str(fd, "name"), "Име");
+  const tracking = oneOf(fd, "tracking", TRACKING_MODES, "none");
+  const quantityDecimals = itemDecimals({ tracking, quantityDecimals: int(fd, "quantityDecimals", 0) });
   return {
     name,
     sku: str(fd, "sku") || slugSku(name),
     barcode: optional(fd, "barcode"),
     description: optional(fd, "description"),
     categoryId: optionalInt(fd, "categoryId"),
-    tracking: oneOf(fd, "tracking", TRACKING_MODES, "none"),
-    minQuantity: Math.max(0, int(fd, "minQuantity", 0)),
+    tracking,
+    quantityDecimals,
+    minQuantity: parseQuantity(str(fd, "minQuantity"), quantityDecimals, "Минимално количество"),
     unit: str(fd, "unit", "бр.") || "бр.",
     unitCost: parseMoney(str(fd, "unitCost"), "Доставна цена"),
     unitPrice: parseMoney(str(fd, "unitPrice"), "Продажна цена"),
@@ -67,7 +71,7 @@ export const createItem = act(async (fd: FormData) => {
   const data = readItem(fd);
   await assertUniqueSku(ctx.db, data.sku);
   const parentId = optionalInt(fd, "parentId");
-  const quantity = Math.max(0, int(fd, "quantity", 0));
+  const quantity = parseQuantity(str(fd, "quantity"), data.quantityDecimals, "Начална наличност");
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
   const lotNumber = optional(fd, "lotNumber");
   const expiryDate = optional(fd, "expiryDate");
@@ -102,6 +106,7 @@ export const updateItem = act(async (id: number, fd: FormData) => {
   const existing = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
   if (!existing) throw new UserError("Артикулът не е намерен.");
   if (existing.tracking !== data.tracking && existing.quantity > 0) throw new UserError("Режимът на проследяване може да се смени само при нулева наличност.");
+  if (data.quantityDecimals < existing.quantityDecimals) await assertFitsDecimals(ctx.db, id, data.quantityDecimals);
   await ctx.db.update(items).set({ ...data, updatedAt: new Date() }).where(eq(items.id, id));
   await saveFieldValues(ctx.db, id, data.categoryId, fd);
   await audit(ctx, "update", "item", id, { name: data.name });
@@ -141,6 +146,7 @@ export const createVariant = act(async (parentId: number, fd: FormData) => {
       tracking: parent.tracking,
       minQuantity: parent.minQuantity,
       unit: parent.unit,
+      quantityDecimals: parent.quantityDecimals,
       unitCost: parseMoney(str(fd, "unitCost"), "Доставна цена", parent.unitCost),
       unitPrice: parseMoney(str(fd, "unitPrice"), "Продажна цена", parent.unitPrice),
     })
@@ -155,7 +161,7 @@ export const createVariant = act(async (parentId: number, fd: FormData) => {
 export const adjustStock = act(async (itemId: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const type = oneOf(fd, "type", ["in", "out", "adjust"] as const, "in") as MovementType;
-  const quantity = int(fd, "quantity", 0);
+  const quantity = parseQuantity(str(fd, "quantity"), MAX_DECIMALS);
   const locationId = int(fd, "locationId", 0) || (await getDefaultLocation(ctx.db))?.id;
   if (!locationId) throw new UserError("Изберете локация.");
   if (quantity < 0 || (type !== "adjust" && quantity === 0)) throw new UserError("Въведете валидно количество.");
@@ -172,7 +178,7 @@ export const adjustStock = act(async (itemId: number, fd: FormData) => {
 
 export const transfer = act(async (itemId: number, fd: FormData) => {
   const ctx = await requireContext("write");
-  const quantity = int(fd, "quantity", 0);
+  const quantity = parseQuantity(str(fd, "quantity"), MAX_DECIMALS);
   if (quantity <= 0) throw new UserError("Въведете валидно количество.");
   await transferStock(ctx.db, {
     actor: ctx.user,
