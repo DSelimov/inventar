@@ -54,6 +54,9 @@ export const organizations = mysqlTable("organizations", {
   subscriptionStatus: mysqlEnum("subscription_status", SUBSCRIPTION_STATUSES).notNull().default("trial"),
   trialEndsAt: datetime("trial_ends_at", { fsp: 3 }),
   paidUntil: datetime("paid_until", { fsp: 3 }),
+  /** Заявено изтриване от собственика: данните се изтриват след DELETION_GRACE_DAYS (pnpm orgs:purge). */
+  deletionRequestedAt: datetime("deletion_requested_at", { fsp: 3 }),
+  deletionRequestedBy: varchar("deletion_requested_by", { length: 255 }),
   createdAt: createdAt(),
 });
 
@@ -75,6 +78,9 @@ export const users = mysqlTable("users", {
   totpLastStep: int("totp_last_step"),
   /** sha256 на неизползваните кодове за възстановяване. */
   totpRecoveryHashes: json("totp_recovery_hashes").$type<string[]>(),
+  /** Версия и дата на приетите Общи условия и Политика за поверителност (при регистрация). */
+  termsVersion: varchar("terms_version", { length: 32 }),
+  termsAcceptedAt: datetime("terms_accepted_at", { fsp: 3 }),
   createdAt: createdAt(),
 });
 

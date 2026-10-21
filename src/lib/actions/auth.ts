@@ -17,6 +17,7 @@ import { clear, clientIp, hit, minutes, retryAfter } from "@/lib/rate-limit";
 import { currentTenant, isValidSubdomain, rootUrl, tenantUrl } from "@/lib/tenant";
 import { log } from "@/lib/log";
 import { TRIAL_DAYS } from "@/lib/plans";
+import { LEGAL_VERSION } from "@/lib/legal";
 
 /** Вход: до 5 грешни опита за имейл и 20 за IP адрес на 15 минути. */
 const loginLimits = (email: string, ip: string) => ({
@@ -114,12 +115,13 @@ export async function register(_prev: string | undefined, fd: FormData): Promise
   const password = str(fd, "password");
   if (!orgName || !name || !email) return "Попълнете всички полета.";
   if (password.length < 8) return "Паролата трябва да е поне 8 знака.";
+  if (fd.get("acceptTerms") !== "on") return "Приемете Общите условия и Политиката за поверителност.";
   const [existing] = await controlDb.select().from(users).where(eq(users.email, email)).limit(1);
   if (existing) return "Вече има акаунт с този имейл. Влезте и създайте организацията от портала.";
 
   let org;
   try {
-    const [{ id: userId }] = await controlDb.insert(users).values({ email, name, passwordHash: hashPassword(password) }).$returningId();
+    const [{ id: userId }] = await controlDb.insert(users).values({ email, name, passwordHash: hashPassword(password), termsVersion: LEGAL_VERSION, termsAcceptedAt: new Date() }).$returningId();
     org = await createOrganizationFor(userId, orgName, subdomain);
     await createSession(userId, org.id);
   } catch (e) {

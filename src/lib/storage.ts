@@ -8,11 +8,11 @@ import path from "node:path";
  * Всички операции минават оттук, за да може по-късно да се добави S3-съвместим вариант.
  */
 // turbopackIgnore: пътищата са по време на изпълнение, не бива да се проследяват при build.
-const ROOT = path.resolve(/* turbopackIgnore: true */ process.env.STORAGE_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), "storage"));
+export const STORAGE_ROOT = path.resolve(/* turbopackIgnore: true */ process.env.STORAGE_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), "storage"));
 
 function resolve(key: string) {
   if (!/^[A-Za-z0-9_\-./]+$/.test(key) || key.split("/").some((p) => p === "" || p === "." || p === "..")) throw new Error(`Невалиден ключ: ${key}`);
-  return path.join(/* turbopackIgnore: true */ ROOT, key);
+  return path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key);
 }
 
 export async function putFile(key: string, data: Buffer) {

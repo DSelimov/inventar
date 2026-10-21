@@ -35,6 +35,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   movement: "Складово движение",
   transfer: "Трансфер",
   import: "Импорт",
+  export: "Експорт",
   login: "Вход",
   invite: "Добавен потребител",
   role: "Смяна на роля",

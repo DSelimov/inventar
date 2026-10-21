@@ -174,10 +174,17 @@ tenant, default `EUR`.
   company), emailed automatically after each payment.
 
 ### C3. Legal pages and data protection
-- Общи условия, политика за поверителност, договор за обработване на лични данни (GDPR art. 28) and a
-  cookie notice: pages on the root domain, acceptance recorded with version and date on registration.
-- Hosting inside the EU stated on the site; organization deletion and full data export (ZIP with CSV + PDFs
-  + photos) self-service for the owner, with a grace period before the database is dropped.
+- **Done (texts are templates with placeholders).** `/terms`, `/privacy`, `/dpa` (чл. 28 GDPR),
+  `/cookies` on every host; operator details from `LEGAL_*` env (`src/lib/legal.ts`), "чернова" notice
+  while any is missing. `LEGAL_VERSION` is stored with the acceptance date on the user at registration
+  (required checkbox). Only strictly necessary cookies (session, 2FA challenge, flash) — documented, no
+  consent banner needed. Links in the auth pages' footer.
+- Owner self-service in Настройки: full export ZIP (`/api/export/organization`: one CSV per tenant table,
+  item photos, README; without API key hashes and webhook secrets — works in read-only too) and
+  deletion request (type the subdomain) with a 30-day grace period, banner and "Откажи".
+  `pnpm orgs:purge [--dry-run] [--now <subdomain>]` (daily cron) drops the database (or clears a pooled one
+  and returns it to the pool), the files, the organization and users left without any organization.
+- Before launch: fill `LEGAL_*`, have a lawyer review the texts, schedule `orgs:purge`.
 
 ---
 

@@ -16,6 +16,8 @@ import { isCurrency } from "@/lib/currency";
 import { convertTenantToEuro } from "@/lib/euro";
 import { getValuationMethod, VALUATION_KEY, VALUATION_METHODS } from "@/lib/valuation";
 import { normalizeEik, normalizeVatNumber } from "@/lib/tax-ids";
+import { DELETION_GRACE_DAYS } from "@/lib/legal";
+import { log } from "@/lib/log";
 
 export const saveOrganization = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
@@ -87,3 +89,22 @@ export const saveCompanyDetails = act(async (fd: FormData) => {
   revalidatePath("/settings");
   return "Данните за документите са запазени.";
 });
+
+/** Заявка за изтриване: собственикът потвърждава с поддомейна; изтриването е след гратисния период. */
+export const requestOrganizationDeletion = act(async (fd: FormData) => {
+  const ctx = await requireContext("owner");
+  if (str(fd, "confirm").toLowerCase() !== ctx.org.subdomain) throw new UserError(`Въведете „${ctx.org.subdomain}“, за да потвърдите.`);
+  await controlDb.update(organizations).set({ deletionRequestedAt: new Date(), deletionRequestedBy: ctx.user.email }).where(eq(organizations.id, ctx.org.id));
+  await audit(ctx, "delete", "organization", ctx.org.id, { requested: true });
+  log.warn("org.deletion_requested", { org: ctx.org.subdomain, by: ctx.user.email });
+  revalidatePath("/", "layout");
+  return `Организацията ще бъде изтрита окончателно след ${DELETION_GRACE_DAYS} дни. Дотогава можете да откажете и да изтеглите експорт.`;
+}, { allowReadOnly: true });
+
+export const cancelOrganizationDeletion = act(async () => {
+  const ctx = await requireContext("owner");
+  await controlDb.update(organizations).set({ deletionRequestedAt: null, deletionRequestedBy: null }).where(eq(organizations.id, ctx.org.id));
+  await audit(ctx, "update", "organization", ctx.org.id, { deletionCancelled: true });
+  revalidatePath("/", "layout");
+  return "Изтриването е отказано.";
+}, { allowReadOnly: true });

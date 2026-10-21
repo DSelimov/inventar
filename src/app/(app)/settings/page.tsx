@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Checkbox, Field, Input, Select } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { ButtonLink } from "@/components/ui/button";
-import { convertToEuro, saveCompanyDetails, saveOrganization, saveReportParameters } from "@/lib/actions/settings";
+import { buttonClasses, ButtonLink } from "@/components/ui/button";
+import { cancelOrganizationDeletion, convertToEuro, requestOrganizationDeletion, saveCompanyDetails, saveOrganization, saveReportParameters } from "@/lib/actions/settings";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getCompanyDetails, getSettings } from "@/lib/settings";
@@ -14,6 +14,9 @@ import { CURRENCIES } from "@/lib/currency";
 import { count } from "drizzle-orm";
 import { stockMovements } from "@/db/tenant-schema";
 import { getValuationMethod } from "@/lib/valuation";
+import { Download, Trash2 } from "lucide-react";
+import { DELETION_GRACE_DAYS } from "@/lib/legal";
+import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Настройки" };
 
@@ -158,6 +161,41 @@ export default async function SettingsPage() {
           </a>
         </CardBody>
       </Card>
+
+      {ctx.role === "owner" && (
+        <Card className="lg:col-span-2">
+          <CardHeader title="Данни и изтриване" description="Пълен експорт (всички таблици като CSV и снимките) и окончателно изтриване на организацията." />
+          <CardBody className="flex flex-wrap items-start justify-between gap-6 text-sm">
+            <div className="space-y-2">
+              {/* файл за изтегляне от route handler — не страница, затова не <Link> */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/api/export/organization" className={buttonClasses("secondary", "sm")}>
+                <Download className="h-4 w-4" /> Изтегли пълен експорт (ZIP)
+              </a>
+              <p className="max-w-sm text-muted">Без тайните (API ключове, webhooks). Работи и когато абонаментът е само за преглед.</p>
+            </div>
+            {ctx.org.deletionRequestedAt ? (
+              <Form action={cancelOrganizationDeletion} className="max-w-sm space-y-2">
+                <p className="font-medium text-danger">Заявено изтриване на {formatDate(ctx.org.deletionRequestedAt)} от {ctx.org.deletionRequestedBy}.</p>
+                <p className="text-muted">Данните се изтриват окончателно на {formatDate(new Date(ctx.org.deletionRequestedAt.getTime() + DELETION_GRACE_DAYS * 86_400_000))}.</p>
+                <SubmitButton variant="secondary" size="sm">
+                  Откажи изтриването
+                </SubmitButton>
+              </Form>
+            ) : (
+              <Form action={requestOrganizationDeletion} className="max-w-sm space-y-2">
+                <p className="text-muted">
+                  След {DELETION_GRACE_DAYS} дни базата, снимките и членствата се изтриват окончателно. Въведете <code>{ctx.org.subdomain}</code>, за да потвърдите.
+                </p>
+                <Input name="confirm" required placeholder={ctx.org.subdomain} className="font-mono" />
+                <ConfirmButton variant="danger" size="sm" message="Да заявя ли окончателно изтриване на организацията?">
+                  <Trash2 className="h-4 w-4" /> Изтрий организацията
+                </ConfirmButton>
+              </Form>
+            )}
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }

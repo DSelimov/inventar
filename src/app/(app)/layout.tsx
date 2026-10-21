@@ -3,7 +3,8 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { alertCounts } from "@/lib/alerts";
 import { requireContext } from "@/lib/auth";
 import { subscriptionState } from "@/lib/plans";
-import { todayIso } from "@/lib/utils";
+import { formatDate, todayIso } from "@/lib/utils";
+import { DELETION_GRACE_DAYS } from "@/lib/legal";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         alertCount={alerts.total}
       />
       <main className="min-w-0 flex-1">
+        {ctx.org.deletionRequestedAt && (
+          <div className="bg-danger px-4 py-2 text-center text-sm text-white md:px-8">
+            Организацията ще бъде изтрита окончателно на {formatDate(new Date(ctx.org.deletionRequestedAt.getTime() + DELETION_GRACE_DAYS * 86_400_000))}.{" "}
+            <Link href="/settings" className="font-medium underline">
+              Откажи
+            </Link>
+          </div>
+        )}
         {(sub.message || sub.warning) && (
           <div className={`px-4 py-2 text-center text-sm md:px-8 ${sub.readOnly ? "bg-danger text-white" : "bg-warning-soft text-warning"}`}>
             {sub.message ?? sub.warning}{" "}

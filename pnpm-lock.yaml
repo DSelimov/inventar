@@ -17,6 +17,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@libsql/client@0.18.0)(@types/pg@8.23.1)(mysql2@3.24.6(@types/node@20.19.43))(pg@8.23.1)
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       html5-qrcode:
         specifier: ^2.3.8
         version: 2.3.8

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Boxes } from "lucide-react";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -10,6 +11,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="text-lg font-semibold">Инвентар</div>
       </div>
       <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-sm">{children}</div>
+      <nav className="mt-6 flex flex-wrap justify-center gap-4 text-xs text-muted">
+        <Link href="/terms" className="hover:text-accent">
+          Общи условия
+        </Link>
+        <Link href="/privacy" className="hover:text-accent">
+          Поверителност
+        </Link>
+        <Link href="/cookies" className="hover:text-accent">
+          Само необходими бисквитки
+        </Link>
+      </nav>
     </div>
   );
 }

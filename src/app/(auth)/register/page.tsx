@@ -26,7 +26,26 @@ export default async function RegisterPage() {
           { name: "email", label: "Имейл", type: "email", autoComplete: "email" },
           { name: "password", label: "Парола (мин. 8 знака)", type: "password", autoComplete: "new-password" },
         ]}
-      />
+      >
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="acceptTerms" required className="mt-0.5" />
+          <span>
+            Приемам{" "}
+            <Link href="/terms" target="_blank" className="text-accent hover:underline">
+              Общите условия
+            </Link>
+            , включително{" "}
+            <Link href="/dpa" target="_blank" className="text-accent hover:underline">
+              договора за обработване на данни
+            </Link>
+            , и съм запознат с{" "}
+            <Link href="/privacy" target="_blank" className="text-accent hover:underline">
+              Политиката за поверителност
+            </Link>
+            .
+          </span>
+        </label>
+      </AuthForm>
       <p className="mt-6 text-center text-sm text-muted">
         Вече имате акаунт?{" "}
         <Link href="/login" className="font-medium text-accent hover:underline">
