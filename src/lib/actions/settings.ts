@@ -5,15 +5,16 @@ import { controlDb } from "@/db/control";
 import { organizations } from "@/db/control-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
-import { bool, int, str } from "@/lib/forms";
+import { bool, int, oneOf, str } from "@/lib/forms";
 import { COMPANY_FIELDS, setSetting } from "@/lib/settings";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { count, eq, ne, or } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
-import { items, orders } from "@/db/tenant-schema";
+import { items, orders, stockMovements } from "@/db/tenant-schema";
 import { isCurrency } from "@/lib/currency";
 import { convertTenantToEuro } from "@/lib/euro";
+import { getValuationMethod, VALUATION_KEY, VALUATION_METHODS } from "@/lib/valuation";
 
 export const saveOrganization = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
@@ -24,9 +25,16 @@ export const saveOrganization = act(async (fd: FormData) => {
     // смяната само преименува сумите — позволена е само преди да има цени или поръчки
     if (await hasAmounts(ctx.db)) throw new UserError("Валутата не може да се смени, след като има цени или поръчки: сумите няма да бъдат преизчислени.");
   }
+  const method = oneOf(fd, "valuationMethod", VALUATION_METHODS, await getValuationMethod(ctx.db));
+  if (method !== (await getValuationMethod(ctx.db))) {
+    // методът важи за цялата история: смяна само преди първото движение
+    const [moved] = await ctx.db.select({ n: count() }).from(stockMovements);
+    if (moved.n) throw new UserError("Методът на оценка се избира преди първото складово движение и после не се сменя.");
+    await setSetting(ctx.db, VALUATION_KEY, method);
+  }
   await controlDb.update(organizations).set({ name, currency }).where(eq(organizations.id, ctx.org.id));
   await setSetting(ctx.db, "lowStockAlerts", String(bool(fd, "lowStockAlerts")));
-  await audit(ctx, "update", "organization", ctx.org.id, { name, currency });
+  await audit(ctx, "update", "organization", ctx.org.id, { name, currency, valuationMethod: method });
   revalidatePath("/", "layout");
   return "Настройките са запазени.";
 });

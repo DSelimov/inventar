@@ -11,12 +11,16 @@ import { rootUrl, tenantUrl } from "@/lib/tenant";
 import { Form } from "@/components/ui/form";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { CURRENCIES } from "@/lib/currency";
+import { count } from "drizzle-orm";
+import { stockMovements } from "@/db/tenant-schema";
+import { getValuationMethod } from "@/lib/valuation";
 
 export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const [s, company] = await Promise.all([getSettings(ctx.db), getCompanyDetails(ctx.db)]);
+  const [s, company, method, [moved]] = await Promise.all([getSettings(ctx.db), getCompanyDetails(ctx.db), getValuationMethod(ctx.db), ctx.db.select({ n: count() }).from(stockMovements)]);
+  const methodLocked = moved.n > 0;
   const manage = can(ctx.role, "manage");
 
   return (
@@ -36,6 +40,12 @@ export default async function SettingsPage() {
                     {c.code} · {c.label}
                   </option>
                 ))}
+              </Select>
+            </Field>
+            <Field label="Оценка на наличността" hint={methodLocked ? "Избира се преди първото движение и после не се сменя." : "Как се определя себестойността на изписаното."}>
+              <Select name="valuationMethod" defaultValue={method} className="w-64" disabled={!manage || methodLocked}>
+                <option value="average">Средно претеглена цена</option>
+                <option value="fifo">FIFO — първа входяща, първа изходяща</option>
               </Select>
             </Field>
             <Checkbox name="lowStockAlerts" defaultChecked={s.lowStockAlerts} label="Показвай артикулите с ниска наличност на таблото" disabled={!manage} />

@@ -32,7 +32,7 @@ export default async function EditShipmentPage({ params }: { params: Promise<{ i
         lots={lots}
         shipment={shipment}
         orderId={shipment.orderId}
-        initialLines={shipment.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, lotNumber: l.lotNumber, expiryDate: l.expiryDate, lotId: l.lotId }))}
+        initialLines={shipment.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, lotNumber: l.lotNumber, expiryDate: l.expiryDate, lotId: l.lotId, unitCost: l.unitCost }))}
         linesEditable={editable}
         action={updateShipment.bind(null, id)}
         cancelHref={`/shipments/${id}`}

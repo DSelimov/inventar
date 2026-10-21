@@ -340,6 +340,9 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   <Field label="Количество">
                     <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} required placeholder="0" />
                   </Field>
+                  <Field label="Доставна цена (при приход)" hint={`Празно = текущата средна (${formatMoney(item.unitCost, currency)}).`}>
+                    <Input name="unitCost" type="number" min={0} step="0.0001" placeholder={String(item.unitCost)} />
+                  </Field>
                   {tracked && (
                     <>
                       <Field label={item.tracking === "serial" ? "Серийни номера (при приход)" : "Партида № (при приход)"} hint={item.tracking === "serial" ? "Разделени със запетая." : undefined}>

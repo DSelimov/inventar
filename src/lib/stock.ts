@@ -5,6 +5,7 @@ import { items, lots, orderLines, stockLevels, stockMovements, type MovementType
 import { emit } from "./webhooks";
 import { UserError } from "@/lib/errors";
 import { addQty, assertQuantity, itemDecimals, subQty } from "./quantity";
+import { costMovement, recordLayer } from "./valuation";
 
 export type LotInput = { lotId: number } | { lotNumber: string; expiryDate?: string | null; serialNumber?: string | null } | null | undefined;
 export type Actor = { id: number; name: string } | null;
@@ -19,6 +20,10 @@ export type MovementInput = {
   reason?: string | null;
   shipmentId?: number | null;
   lot?: LotInput;
+  /** Цена за единица при приход (доставка) или връщане по оригиналната цена; иначе — по метода на оценка. */
+  unitCost?: number | null;
+  /** Поръчката на движението (fifo слоеве; връщане към доставчик изписва първо от нейните слоеве). */
+  orderId?: number | null;
 };
 
 /**
@@ -26,7 +31,8 @@ export type MovementInput = {
  * наличност и ред в историята. Извиква се в транзакция.
  */
 export async function applyMovement(tx: Db, input: MovementInput) {
-  const item = await tx.query.items.findFirst({ where: eq(items.id, input.itemId) });
+  // редът на артикула се заключва: паралелни движения не губят обща наличност или средна цена
+  const [item] = await tx.select().from(items).where(eq(items.id, input.itemId)).for("update");
   if (!item) throw new UserError("Артикулът не е намерен.");
   // цели бройки или до quantity_decimals знака (кг, л…); серийните номера — винаги цели
   assertQuantity(input.quantity, itemDecimals(item), `„${item.name}“`);
@@ -84,9 +90,10 @@ export async function applyMovement(tx: Db, input: MovementInput) {
   else await tx.insert(stockLevels).values({ itemId: item.id, locationId: input.locationId, quantity: after });
 
   const totalAfter = addQty(item.quantity, delta);
-  await tx.update(items).set({ quantity: totalAfter, updatedAt: new Date() }).where(eq(items.id, item.id));
+  const cost = await costMovement(tx, item, { type: input.type, delta, unitCost: input.unitCost, orderId: input.orderId });
+  await tx.update(items).set({ quantity: totalAfter, unitCost: cost.itemCost, updatedAt: new Date() }).where(eq(items.id, item.id));
 
-  await tx.insert(stockMovements).values({
+  const [movement] = await tx.insert(stockMovements).values({
     itemId: item.id,
     locationId: input.locationId,
     lotId,
@@ -95,15 +102,18 @@ export async function applyMovement(tx: Db, input: MovementInput) {
     type: input.type,
     delta,
     quantityAfter: totalAfter,
+    unitCost: cost.unitCost,
+    value: cost.value,
     reason: input.reason ?? null,
     shipmentId: input.shipmentId ?? null,
-  });
+  }).$returningId();
+  if (cost.layer) await recordLayer(tx, item.id, movement.id, cost.layer);
 
   emit(tx, "movement.created", { itemId: item.id, sku: item.sku, locationId: input.locationId, type: input.type, delta, quantityAfter: totalAfter });
   if (item.minQuantity > 0 && totalAfter <= item.minQuantity && item.quantity > item.minQuantity) {
     emit(tx, "item.low_stock", { itemId: item.id, sku: item.sku, name: item.name, quantity: totalAfter, minQuantity: item.minQuantity });
   }
-  return { delta, after: totalAfter };
+  return { delta, after: totalAfter, unitCost: cost.unitCost, value: cost.value };
 }
 
 /** Трансфер между две локации като двойка движения. */

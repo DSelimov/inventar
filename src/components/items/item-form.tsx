@@ -122,8 +122,8 @@ export function ItemForm({
               <option value={3}>3 знака (0,750)</option>
             </Select>
           </Field>
-          <Field label="Доставна цена" hint="Колко плащате за единица.">
-            <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} />
+          <Field label="Доставна цена" hint={item && item.quantity > 0 ? "Средна от доставките — изчислява се автоматично при всеки приход." : "Колко плащате за единица."}>
+            <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} readOnly={Boolean(item && item.quantity > 0)} />
           </Field>
           <Field label="Продажна цена" hint="На каква цена продавате (по избор).">
             <Input name="unitPrice" type="number" min={0} step="0.01" defaultValue={item?.unitPrice ?? 0} />

@@ -26,7 +26,7 @@ Tailwind CSS 4 · lucide-react · date-fns (bg) · html5-qrcode. Package manager
   numbers; never add or multiply them with plain `+`/`*` — use `src/lib/money.ts` and `src/lib/quantity.ts`
   (a test fails on `… * unitCost/unitPrice`). Quantity inputs follow the item's `quantityDecimals`.
 - All stock changes go through `applyMovement` in `src/lib/stock.ts` (locations, lots, serials, cached
-  item total). Shipment delivery shared by UI and API: `src/lib/shipment-service.ts`.
+  item total, cost and value via `src/lib/valuation.ts` — average or FIFO). Shipment delivery shared by UI and API: `src/lib/shipment-service.ts`.
 - REST API `/api/v1/*` uses `handler(scope, fn)` from `src/lib/api.ts`; the API key lives in the tenant DB.
   The OpenAPI spec in `src/lib/openapi.ts` is the single source for `/api/v1/openapi.json`,
   `/docs/api/swagger` (Swagger UI) and `/docs/api`. Update it whenever an endpoint changes.
@@ -36,6 +36,8 @@ Tailwind CSS 4 · lucide-react · date-fns (bg) · html5-qrcode. Package manager
   file a descriptive name (rename the tag in `meta/_journal.json` too).
   Restart `pnpm dev` after a tenant schema change: the cached tenant Drizzle instances keep the old schema
   and relational queries silently miss the new columns.
+  Don't run `pnpm build` while `pnpm dev` is running: the dev server goes stale and browsers reload in a
+  loop. If it happens, stop dev, `rm -rf .next/dev`, start again.
 - Enum labels: `STATUS_LABELS` in `src/lib/utils.ts`; badge tones in `src/components/ui/badge.tsx`.
 - Keep the design: tokens in `src/app/globals.css`, components in `src/components/ui`.
 

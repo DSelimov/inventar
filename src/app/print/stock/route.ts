@@ -4,15 +4,23 @@ import { requireContext } from "@/lib/auth";
 import { createDoc, documentHeader, pageNumbers, pdfResponse, table } from "@/lib/pdf";
 import { getCompanyDetails } from "@/lib/settings";
 import { formatDate, formatMoney, formatNumber } from "@/lib/utils";
-import { lineTotal, sumMoney } from "@/lib/money";
+import { endOfLocalDay } from "@/lib/dates";
+import { lineTotal, sumMoney, unitCostOf } from "@/lib/money";
+import { addQty } from "@/lib/quantity";
+import { stockValueAt } from "@/lib/valuation-reports";
 
-/** Справка за наличност към момента. ?location=ID — само в тази локация; ?category=ID; ?zero=1 — и нулевите. */
+/**
+ * Справка за наличност. Без ?date — към момента (наличност × текущата цена); с ?date=ГГГГ-ММ-ДД — към края на
+ * този ден, от складовите движения (количество и стойност по метода на оценка).
+ * ?location=ID — само в тази локация; ?category=ID; ?zero=1 — и нулевите (само без date).
+ */
 export async function GET(req: Request) {
   const ctx = await requireContext("read");
   const sp = new URL(req.url).searchParams;
   const locationId = Number(sp.get("location")) || null;
   const categoryId = Number(sp.get("category")) || null;
   const withZero = sp.get("zero") === "1";
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.get("date") ?? "") ? sp.get("date")! : null;
   const [company, location, category] = await Promise.all([
     getCompanyDetails(ctx.db),
     locationId ? ctx.db.query.locations.findFirst({ where: eq(locations.id, locationId) }) : null,
@@ -21,7 +29,10 @@ export async function GET(req: Request) {
 
   const conds = [eq(items.status, "active")];
   if (categoryId) conds.push(eq(items.categoryId, categoryId));
-  const rows = locationId
+  type Row = { sku: string; name: string; variant: string | null; unit: string; category: string | null; qty: number; cost: number; value?: number };
+  const rows: Row[] = date
+    ? (await stockValueAt(ctx.db, date, { locationId, categoryId })).rows.map((r) => ({ ...r, qty: r.quantity, cost: unitCostOf(r.value, r.quantity) }))
+    : locationId
     ? await ctx.db
         .select({ sku: items.sku, name: items.name, variant: items.variantLabel, unit: items.unit, cost: items.unitCost, category: categories.name, qty: stockLevels.quantity })
         .from(stockLevels)
@@ -36,13 +47,13 @@ export async function GET(req: Request) {
         .where(and(...conds, withZero ? undefined : gt(items.quantity, 0)))
         .orderBy(asc(items.name), asc(items.variantLabel));
 
-  const now = new Date();
+  const now = date ? endOfLocalDay(date) : new Date();
   const doc = createDoc({ title: "Справка за наличност" });
   documentHeader(doc, {
     company,
     orgName: ctx.org.name,
     title: "Справка за наличност",
-    subtitle: [`към ${formatDate(now, "dd.MM.yyyy HH:mm")}`, location ? `локация „${location.name}“` : "всички локации", category ? `категория „${category.name}“` : null].filter(Boolean).join(" · "),
+    subtitle: [date ? `към края на ${formatDate(date, "dd.MM.yyyy")}` : `към ${formatDate(now, "dd.MM.yyyy HH:mm")}`, location ? `локация „${location.name}“` : "всички локации", category ? `категория „${category.name}“` : null].filter(Boolean).join(" · "),
     right: [`Отпечатано от: ${ctx.user.name}`],
   });
   let units = 0;
@@ -59,8 +70,8 @@ export async function GET(req: Request) {
       { header: "Стойност", width: 60, align: "right", bold: true },
     ],
     rows.map((r) => {
-      units += r.qty;
-      const rowValue = lineTotal(r.qty, r.cost);
+      units = addQty(units, r.qty);
+      const rowValue = r.value ?? lineTotal(r.qty, r.cost);
       value = sumMoney([value, rowValue]);
       return [r.sku, r.variant ? `${r.name} · ${r.variant}` : r.name, r.category ?? "—", formatNumber(r.qty), r.unit, formatMoney(r.cost, ctx.org.currency), formatMoney(rowValue, ctx.org.currency)];
     }),
@@ -68,6 +79,7 @@ export async function GET(req: Request) {
   );
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   doc.font("bold").fontSize(10).text(`${rows.length} артикула · ${formatNumber(units)} единици · обща стойност ${formatMoney(value, ctx.org.currency)}`, doc.page.margins.left, doc.y, { width, align: "right" });
-  pageNumbers(doc, `${ctx.org.name} · наличност към ${formatDate(now, "dd.MM.yyyy")}`);
-  return pdfResponse(doc, `nalichnost-${formatDate(now, "yyyy-MM-dd")}.pdf`);
+  const day = date ?? formatDate(now, "yyyy-MM-dd");
+  pageNumbers(doc, `${ctx.org.name} · наличност към ${formatDate(day, "dd.MM.yyyy")}`);
+  return pdfResponse(doc, `nalichnost-${day}.pdf`);
 }

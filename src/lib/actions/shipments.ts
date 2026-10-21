@@ -14,6 +14,7 @@ import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
 import { assertItemQuantities } from "@/lib/stock";
+import { parseMoney } from "@/lib/money";
 
 function revalidate(id?: number) {
   revalidatePath("/");
@@ -24,7 +25,7 @@ function revalidate(id?: number) {
   if (id) revalidatePath(`/shipments/${id}`);
 }
 
-type LineInput = { itemId: number; quantity: number; lotNumber: string | null; expiryDate: string | null; lotId: number | null };
+type LineInput = { itemId: number; quantity: number; lotNumber: string | null; expiryDate: string | null; lotId: number | null; unitCost: number | null };
 
 function readLines(fd: FormData): LineInput[] {
   const ids = fd.getAll("lineItemId").map(String);
@@ -32,12 +33,13 @@ function readLines(fd: FormData): LineInput[] {
   const lotNumbers = fd.getAll("lineLotNumber").map(String);
   const expiries = fd.getAll("lineExpiryDate").map(String);
   const lotIds = fd.getAll("lineLotId").map(String);
+  const costs = fd.getAll("lineUnitCost").map(String);
   const lines: LineInput[] = [];
   ids.forEach((id, i) => {
     const itemId = Number(id);
     const quantity = parseQuantity(qtys[i], MAX_DECIMALS, `Ред ${i + 1}: количество`);
     if (Number.isInteger(itemId) && itemId > 0 && quantity > 0) {
-      lines.push({ itemId, quantity, lotNumber: lotNumbers[i]?.trim() || null, expiryDate: expiries[i]?.trim() || null, lotId: Number(lotIds[i]) > 0 ? Number(lotIds[i]) : null });
+      lines.push({ itemId, quantity, lotNumber: lotNumbers[i]?.trim() || null, expiryDate: expiries[i]?.trim() || null, lotId: Number(lotIds[i]) > 0 ? Number(lotIds[i]) : null, unitCost: parseMoney(costs[i], `Ред ${i + 1}: доставна цена`, null) });
     }
   });
   return lines;

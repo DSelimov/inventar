@@ -30,6 +30,7 @@ export const PATCH = handler("write", async (req, ctx, { params }: Params) => {
   const patch: Record<string, unknown> = {};
   for (const k of EDITABLE) if (k in body) patch[k] = body[k];
   for (const k of ["unitCost", "unitPrice"] as const) if (k in patch) patch[k] = parseMoney(patch[k], k, existing[k]);
+  if ("unitCost" in patch && existing.quantity > 0 && patch.unitCost !== existing.unitCost) throw new ApiError(422, "unitCost е средната от движенията и не се променя при наличност; подайте цената с прихода (POST /movements).");
   const decimals = "quantityDecimals" in patch ? itemDecimals({ tracking: existing.tracking, quantityDecimals: readDecimals(patch.quantityDecimals) }) : existing.quantityDecimals;
   if ("quantityDecimals" in patch) {
     if (decimals < existing.quantityDecimals) await assertFitsDecimals(ctx.db, id, decimals);

@@ -19,6 +19,7 @@ const qty = (description: string, extra: Schema = {}): Schema => ({ type: "numbe
 const decimalsField = () => int("Знаци след запетаята за количествата: 0 = цели бройки, 1–3 = кг, л, м… Серийните номера са винаги 0. Намаляване само ако наличността и поръчките се побират (иначе 422).", { minimum: 0, maximum: 3, example: 0 });
 /** Суми: decimal(14,4) в базата; повече от 4 знака след запетаята се закръглят, отрицателни се отказват (422). */
 const money = (description: string, extra: Schema = {}): Schema => ({ type: "number", minimum: 0, maximum: 9_999_999_999, description: `${description} (до 4 знака след запетаята)`, ...extra });
+const num = (description: string, extra: Schema = {}): Schema => ({ type: "number", description, ...extra });
 const bool = (description: string): Schema => ({ type: "boolean", description });
 const date = (description: string): Schema => ({ type: "string", format: "date", description: `${description} (ГГГГ-ММ-ДД)`, example: "2026-10-20" });
 const datetime = (description: string): Schema => ({ type: "string", format: "date-time", description, example: "2026-10-20T08:00:00.000Z" });
@@ -221,6 +222,7 @@ const schemas: Record<string, Schema> = {
       type: enumOf(["in", "out", "adjust"], "in = приход (+), out = разход (−), adjust = задава точното количество в локацията. adjust не е позволен за артикули с партиди/серийни номера."),
       quantity: qty("Неотрицателно количество; дробно (напр. 0.75) само за артикули с quantityDecimals > 0, иначе 422", { example: 5 }),
       reason: str("Причина, записва се в историята", { example: "Онлайн поръчка №1042" }),
+      unitCost: money("Само при in: доставна цена за единица; без нея — текущата средна. Преизчислява средната (или създава FIFO слой)."),
       lotNumber: str("При приход на артикул с партиди: номер на партидата. При серийни: серийни номера, разделени със запетая, колкото е количеството."),
       expiryDate: date("Срок на годност на партидата (при приход)"),
       lotId: int("При разход на артикул с партиди: от коя партида (вж. ItemDetail.lots)."),
@@ -233,9 +235,11 @@ const schemas: Record<string, Schema> = {
       itemId: int("Артикул"),
       sku: str("Код"),
       delta: qty("Приложената промяна със знак", { example: 5 }),
-      after: int("Обща наличност след движението", { example: 120 }),
+      after: qty("Обща наличност след движението", { example: 120 }),
+      unitCost: money("Себестойност за единица по метода на оценка (средна или FIFO)", { example: 12.5 }),
+      value: num("Стойност на движението със знак (delta × себестойност, до стотинка)", { example: 62.5 }),
     },
-    ["itemId", "sku", "delta", "after"],
+    ["itemId", "sku", "delta", "after", "unitCost", "value"],
   ),
 
   Partner: obj(

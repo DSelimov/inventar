@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import { items } from "@/db/tenant-schema";
 import { ApiError, handler, json, readJson } from "@/lib/api";
 import { applyMovement } from "@/lib/stock";
+import { parseMoney } from "@/lib/money";
 
-type Body = { itemId?: number; sku?: string; locationId: number; type: "in" | "out" | "adjust"; quantity: number; reason?: string; lotNumber?: string; expiryDate?: string; lotId?: number };
+type Body = { itemId?: number; sku?: string; locationId: number; type: "in" | "out" | "adjust"; quantity: number; reason?: string; lotNumber?: string; expiryDate?: string; lotId?: number; unitCost?: number };
 
 export const POST = handler("write", async (req, ctx) => {
   const b = await readJson<Body>(req);
@@ -20,6 +21,7 @@ export const POST = handler("write", async (req, ctx) => {
       type: b.type,
       quantity: b.quantity,
       reason: b.reason ?? "API",
+      unitCost: b.type === "in" ? parseMoney(b.unitCost, "unitCost", null) : null,
       lot: b.lotId ? { lotId: b.lotId } : b.lotNumber ? { lotNumber: b.lotNumber, expiryDate: b.expiryDate ?? null } : null,
     }),
   );

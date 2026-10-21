@@ -107,6 +107,8 @@ export const updateItem = act(async (id: number, fd: FormData) => {
   if (!existing) throw new UserError("Артикулът не е намерен.");
   if (existing.tracking !== data.tracking && existing.quantity > 0) throw new UserError("Режимът на проследяване може да се смени само при нулева наличност.");
   if (data.quantityDecimals < existing.quantityDecimals) await assertFitsDecimals(ctx.db, id, data.quantityDecimals);
+  // при наличност доставната цена е средната от движенията — ръчната промяна би разминала оценката
+  if (existing.quantity > 0) data.unitCost = existing.unitCost;
   await ctx.db.update(items).set({ ...data, updatedAt: new Date() }).where(eq(items.id, id));
   await saveFieldValues(ctx.db, id, data.categoryId, fd);
   await audit(ctx, "update", "item", id, { name: data.name });
@@ -168,7 +170,8 @@ export const adjustStock = act(async (itemId: number, fd: FormData) => {
   const lotId = optionalInt(fd, "lotId");
   const lotNumber = optional(fd, "lotNumber");
   const lot = type === "out" ? (lotId ? { lotId } : null) : lotNumber ? { lotNumber, expiryDate: optional(fd, "expiryDate") } : null;
-  await ctx.db.transaction((tx) => applyMovement(tx, { actor: ctx.user, itemId, locationId, type, quantity, reason: optional(fd, "reason"), lot }));
+  const unitCost = type === "in" ? parseMoney(str(fd, "unitCost"), "Доставна цена", null) : null;
+  await ctx.db.transaction((tx) => applyMovement(tx, { actor: ctx.user, itemId, locationId, type, quantity, reason: optional(fd, "reason"), lot, unitCost }));
   await audit(ctx, "movement", "item", itemId, { type, quantity, locationId });
   revalidateItems(itemId);
   const back = optional(fd, "redirectTo");

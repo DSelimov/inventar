@@ -65,16 +65,18 @@ tenant, default `EUR`.
   orders, because amounts are not recalculated.
 
 ### A4. Cost on every movement and stock valuation
-- `stock_movements.unit_cost` (decimal) and `value` (delta × cost). Receipts take cost from the purchase
-  order line or the shipment line (add `unit_cost` to shipment lines); issues take the cost computed by
-  the valuation method.
-- Valuation method per tenant, chosen once in settings: **weighted average** (default, most common in
-  Bulgarian SMEs) or **FIFO** (consumes lots / receipt layers in order). Implement in `src/lib/stock.ts`
-  next to `applyMovement`; `items.unit_cost` becomes the current average, not a manual field.
-- Reports: stock value at any date (per location / category), cost of goods sold for a period, gross margin
-  per item and per customer. Stock report PDF gets a "към дата" parameter.
-- Acceptance: tests for average and FIFO with receipts at different prices, partial issues, returns (back at
-  the original cost), transfers (cost travels with stock) and count corrections.
+- **Done.** `stock_movements.unit_cost` / `value` (existing rows backfilled with the item's cost);
+  `applyMovement` locks the item row and costs every movement via `costMovement` in `src/lib/valuation.ts`.
+  Methods per tenant (`settings.valuationMethod`, chosen in Настройки before the first movement):
+  weighted average (default) and FIFO (`cost_layers`). Receipts take the cost from the shipment line
+  (`shipment_lines.unit_cost`, new column in the inbound form), else the purchase-order line, else the
+  current average; manual receipts and `POST /movements` accept `unitCost`. Customer returns come back at
+  the cost they left with, supplier returns go out at the cost they came in with (FIFO: from that order's
+  layers). Transfers keep the value. `items.unit_cost` is the running average (read-only while in stock).
+- Reports: `/reports/valuation` — stock value at a date (sum of movement values to the end of the local
+  day, `src/lib/dates.ts`), cost of goods sold and gross margin per item and per customer for a period
+  (`src/lib/valuation-reports.ts`); `/print/stock?date=` prints the valuation at a date.
+- Not yet: specific identification per lot, changing the method for a tenant with history.
 
 ### A5. VAT on lines
 - VAT rates table per tenant seeded with the current Bulgarian rates (verify them; at the time of writing

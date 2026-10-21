@@ -1,9 +1,9 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { controlDb } from "@/db/control";
 import { organizations, type Organization } from "@/db/control-schema";
 import { getTenantDb, type TenantDb } from "@/db/tenant";
-import { auditLog, items, orderLines, orders, settings } from "@/db/tenant-schema";
+import { auditLog, costLayers, items, orderLines, orders, settings, shipmentLines, stockMovements } from "@/db/tenant-schema";
 import { bgnToEur, BGN_PER_EUR } from "./currency";
 
 /** Маркер в settings: превалутирането е направено (и кога). Ключът е първичен — второ изпълнение се отказва. */
@@ -16,7 +16,8 @@ export type EuroResult = { status: "converted" | "already" | "not-bgn"; items: n
  * Превалутира организация от лева в евро по фиксирания курс 1.95583:
  *  - продажните цени на артикулите и цените по клиентски поръчки → до стотинка (както изисква законът за цените);
  *  - доставните цени и цените по поръчки за доставка → до 4 знака (себестойността не губи точност);
- *  - поръчките пазят оригиналната валута и цена на всеки ред (originalCurrency, originalUnitPrice).
+ *  - поръчките пазят оригиналната валута и цена на всеки ред (originalCurrency, originalUnitPrice);
+ *  - себестойността на движенията, FIFO слоевете и доставните цени по пратки — също в евро.
  * Цялата клиентска база се променя в една транзакция; маркерът в settings прави повторното изпълнение
  * безопасно. Валутата в контролната база се сменя след това (при прекъсване повторното извикване я довършва).
  */
@@ -67,6 +68,11 @@ async function convertAmounts(db: TenantDb, org: Organization, actor: Actor, res
     }
     const [res] = await tx.update(orders).set({ originalCurrency: "BGN" }).where(isNull(orders.originalCurrency));
     result.orders = res.affectedRows;
+
+    // складовата история и FIFO слоевете (може да са много редове — направо в SQL; ROUND върху DECIMAL е половинката далеч от нулата)
+    await tx.update(stockMovements).set({ unitCost: sql`round(${stockMovements.unitCost} / ${BGN_PER_EUR}, 4)`, value: sql`round(${stockMovements.value} / ${BGN_PER_EUR}, 2)` });
+    await tx.update(costLayers).set({ unitCost: sql`round(${costLayers.unitCost} / ${BGN_PER_EUR}, 4)` });
+    await tx.update(shipmentLines).set({ unitCost: sql`round(${shipmentLines.unitCost} / ${BGN_PER_EUR}, 4)` }).where(isNotNull(shipmentLines.unitCost));
 
     await tx.insert(auditLog).values({
       userId: actor.id,

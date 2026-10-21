@@ -35,6 +35,9 @@ export default async function ReportsPage() {
         description={`Анализ за последните ${settings.windowDays} дни (от ${formatDate(r.windowStart)}). Залежала стока: без разход ${settings.deadStockDays} дни. Покритие при поръчка: ${r.coverDays} дни (доставка ${r.avgLead} + буфер ${settings.safetyDays}).`}
         actions={
           <>
+            <ButtonLink href="/reports/valuation" variant="secondary">
+              <Coins className="h-4 w-4" /> Себестойност и марж
+            </ButtonLink>
             <a href="/print/stock" target="_blank" rel="noreferrer" className={buttonClasses("secondary")}>
               <Printer className="h-4 w-4" /> Справка за наличност (PDF)
             </a>
@@ -53,11 +56,11 @@ export default async function ReportsPage() {
         <StatCard
           label="Брутен марж"
           value={`${marginPct.toFixed(1)} %`}
-          hint={`${money(r.totals.revenue - r.totals.cost)} · цел ${settings.targetMarginPct} %`}
+          hint={`${money(sumMoney([r.totals.revenue, -r.totals.cost]))} · цел ${settings.targetMarginPct} %`}
           icon={TrendingUp}
           tone={marginPct >= settings.targetMarginPct ? "success" : "warning"}
         />
-        <StatCard label="Залежала стока" value={money(r.deadStock.reduce((a, d) => a + d.value, 0))} hint={`${r.deadStock.length} артикула`} icon={PackageMinus} tone={r.deadStock.length ? "warning" : "neutral"} />
+        <StatCard label="Залежала стока" value={money(sumMoney(r.deadStock.map((d) => d.value)))} hint={`${r.deadStock.length} артикула`} icon={PackageMinus} tone={r.deadStock.length ? "warning" : "neutral"} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

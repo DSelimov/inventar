@@ -10,10 +10,10 @@ import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
 import { itemDecimals, quantityStep, sumQty } from "@/lib/quantity";
 
-export type ItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; tracking: TrackingMode; variantLabel: string | null; quantityDecimals: number };
+export type ItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; tracking: TrackingMode; variantLabel: string | null; quantityDecimals: number; unitCost: number };
 export type LotOption = { id: number; itemId: number; locationId: number; lotNumber: string; quantity: number; expiryDate: string | null };
 export type PartnerOption = { id: number; name: string; type: string };
-type Line = { key: number; itemId: string; quantity: string; lotNumber: string; expiryDate: string; lotId: string };
+type Line = { key: number; itemId: string; quantity: string; lotNumber: string; expiryDate: string; lotId: string; unitCost: string };
 
 export function ShipmentForm({
   items,
@@ -33,7 +33,7 @@ export function ShipmentForm({
   partners: PartnerOption[];
   lots: LotOption[];
   shipment?: Shipment;
-  initialLines?: { itemId: number; quantity: number; lotNumber?: string | null; expiryDate?: string | null; lotId?: number | null }[];
+  initialLines?: { itemId: number; quantity: number; lotNumber?: string | null; expiryDate?: string | null; lotId?: number | null; unitCost?: number | null }[];
   initialDirection?: ShipmentDirection;
   linesEditable?: boolean;
   orderId?: number | null;
@@ -50,10 +50,11 @@ export function ShipmentForm({
       lotNumber: l.lotNumber ?? "",
       expiryDate: l.expiryDate ?? "",
       lotId: l.lotId ? String(l.lotId) : "",
+      unitCost: l.unitCost != null ? String(l.unitCost) : "",
     })),
   );
 
-  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", lotNumber: "", expiryDate: "", lotId: "" }]);
+  const addLine = () => setLines((ls) => [...ls, { key: Date.now(), itemId: "", quantity: "1", lotNumber: "", expiryDate: "", lotId: "", unitCost: "" }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
   const stepFor = (itemId: string) => {
     const it = items.find((i) => String(i.id) === itemId);
@@ -63,6 +64,8 @@ export function ShipmentForm({
 
   const totalUnits = sumQty(lines, (l) => Number(l.quantity) || 0);
   const inbound = direction === "inbound";
+  // доставна цена само при приход (не при връщане от клиент — то е по себестойността при продажбата)
+  const withCost = inbound && !shipment?.isReturn;
   const partnerList = partners.filter((p) => p.type === "both" || p.type === (inbound ? "supplier" : "customer"));
   const itemLabel = (i: ItemOption) => `${i.name}${i.variantLabel ? ` · ${i.variantLabel}` : ""} (${i.sku}) · ${i.quantity} ${i.unit}`;
 
@@ -137,7 +140,7 @@ export function ShipmentForm({
             const lineLots = chosen ? lots.filter((l) => l.itemId === chosen.id && String(l.locationId) === locationId) : [];
             return (
               <div key={line.key} className="rounded-xl border border-line p-3">
-                <div className="grid grid-cols-[1fr_7rem_2.5rem] items-start gap-2">
+                <div className={withCost ? "grid grid-cols-[1fr_6rem_7rem_2.5rem] items-start gap-2" : "grid grid-cols-[1fr_7rem_2.5rem] items-start gap-2"}>
                   <div>
                     <Select name="lineItemId" required value={line.itemId} disabled={!linesEditable} onChange={(e) => update(line.key, { itemId: e.target.value, lotId: "" })}>
                       <option value="" disabled>
@@ -156,6 +159,22 @@ export function ShipmentForm({
                     )}
                   </div>
                   <Input name="lineQuantity" type="number" min={stepFor(line.itemId)} step={stepFor(line.itemId)} required value={line.quantity} disabled={!linesEditable} onChange={(e) => update(line.key, { quantity: e.target.value })} />
+                  {withCost ? (
+                    <Input
+                      name="lineUnitCost"
+                      type="number"
+                      min={0}
+                      step="0.0001"
+                      value={line.unitCost}
+                      disabled={!linesEditable}
+                      placeholder={orderId ? "от поръчката" : chosen ? String(chosen.unitCost) : "Цена"}
+                      aria-label="Доставна цена"
+                      title="Доставна цена за единица; празно = от поръчката или текущата средна"
+                      onChange={(e) => update(line.key, { unitCost: e.target.value })}
+                    />
+                  ) : (
+                    <input type="hidden" name="lineUnitCost" value="" />
+                  )}
                   <Button variant="ghost" size="md" onClick={() => removeLine(line.key)} disabled={!linesEditable || lines.length === 1} aria-label="Премахни реда">
                     <Trash2 className="h-4 w-4" />
                   </Button>

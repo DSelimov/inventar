@@ -1,11 +1,12 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db, TenantDb } from "@/db/tenant";
 import { orderLines, orders, shipments, type ShipmentStatus } from "@/db/tenant-schema";
 import { applyMovement, type Actor } from "./stock";
 import { emit } from "./webhooks";
 import { UserError } from "@/lib/errors";
 import { addQty, subQty, sumQty } from "./quantity";
+import { orderMovementCost } from "./valuation";
 
 async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: number; quantity: number }>) {
   const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { lines: true } });
@@ -59,6 +60,20 @@ async function registerReturn(tx: Db, orderId: number, returned: Array<{ itemId:
   }
 }
 
+/**
+ * Себестойност на ред при доставка:
+ *  - приход по доставка: цената от реда на пратката, иначе от поръчката (иначе — текущата средна);
+ *  - връщане от клиент: по себестойността, с която е изписано по поръчката;
+ *  - връщане към доставчик: по цената, на която е получено по поръчката;
+ *  - продажба: по метода на оценка (null).
+ */
+async function lineCost(tx: Db, shipment: { direction: string; isReturn: boolean; orderId: number | null }, line: { itemId: number; unitCost: number | null }, orderPrices: Map<number, number>) {
+  if (shipment.direction === "inbound" && !shipment.isReturn) return line.unitCost ?? orderPrices.get(line.itemId) ?? null;
+  if (!shipment.isReturn || !shipment.orderId) return null;
+  if (shipment.direction === "inbound") return orderMovementCost(tx, shipment.orderId, line.itemId, "out");
+  return (await orderMovementCost(tx, shipment.orderId, line.itemId, "in")) ?? orderPrices.get(line.itemId) ?? null;
+}
+
 /** Общо за UI и API. Доставката прилага наличността в една транзакция. */
 export async function changeShipmentStatus(db: TenantDb, actor: Actor, id: number, status: ShipmentStatus) {
   const shipment = await db.query.shipments.findFirst({ where: eq(shipments.id, id), with: { lines: true } });
@@ -71,8 +86,16 @@ export async function changeShipmentStatus(db: TenantDb, actor: Actor, id: numbe
       const type = shipment.direction === "inbound" ? "in" : "out";
       // проверката за връщане е преди движенията: при превишение нищо не се изписва
       if (shipment.isReturn && shipment.orderId) await registerReturn(tx, shipment.orderId, shipment.lines);
+      const orderPrices = new Map<number, number>();
+      // цените на поръчка за доставка са доставни; на клиентска — продажни и не са себестойност
+      if (shipment.orderId) {
+        const lines = await tx.select({ itemId: orderLines.itemId, unitPrice: orderLines.unitPrice }).from(orderLines).innerJoin(orders, eq(orders.id, orderLines.orderId)).where(and(eq(orderLines.orderId, shipment.orderId), eq(orders.type, "purchase")));
+        for (const l of lines) if (!orderPrices.has(l.itemId)) orderPrices.set(l.itemId, l.unitPrice);
+      }
       for (const line of shipment.lines) {
         await applyMovement(tx, {
+          unitCost: await lineCost(tx, shipment, line, orderPrices),
+          orderId: shipment.orderId,
           actor,
           itemId: line.itemId,
           locationId: shipment.locationId,

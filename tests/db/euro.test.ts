@@ -2,9 +2,10 @@ import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { controlDb } from "@/db/control";
 import { organizations } from "@/db/control-schema";
-import { auditLog, items, orderLines, orders, settings } from "@/db/tenant-schema";
+import { auditLog, items, orderLines, orders, settings, stockMovements } from "@/db/tenant-schema";
 import { bgnToEur } from "@/lib/currency";
 import { convertTenantToEuro, EURO_MARKER } from "@/lib/euro";
+import { applyMovement } from "@/lib/stock";
 import { closeConnectionsAfterAll, createItem, createTenant, type TestTenant } from "../support/fixtures";
 
 vi.mock("@/lib/webhooks", () => ({ emit: vi.fn() }));
@@ -34,6 +35,7 @@ describe("превалутиране BGN → EUR", () => {
     t = await createTenant("euro");
     await controlDb.update(organizations).set({ currency: "BGN" }).where(eq(organizations.id, t.org.id));
     item = await createItem(t.db, "none", { unitCost: 12.5, unitPrice: 24.9 });
+    await t.db.transaction((tx) => applyMovement(tx, { actor, itemId: item, locationId: t.main, type: "in", quantity: 4, unitCost: 12.5 }));
     [{ id: sale }] = await t.db.insert(orders).values({ type: "sales", number: "ПР-1", status: "confirmed" }).$returningId();
     [{ id: purchase }] = await t.db.insert(orders).values({ type: "purchase", number: "ПЗ-1", status: "confirmed" }).$returningId();
     await t.db.insert(orderLines).values([
@@ -61,6 +63,8 @@ describe("превалутиране BGN → EUR", () => {
       [9.7145, 19], // доставка: 4 знака
     ]);
     expect((await t.db.select().from(orders)).map((o) => o.originalCurrency)).toEqual(["BGN", "BGN"]);
+    const [m] = await t.db.select().from(stockMovements).where(eq(stockMovements.itemId, item));
+    expect([m.unitCost, m.value]).toEqual([6.3911, 25.56]); // 50 лв. → 25,56 €
     expect((await orgOf(t)).currency).toBe("EUR");
     expect((await t.db.select().from(settings).where(eq(settings.key, EURO_MARKER))).length).toBe(1);
     expect((await t.db.select().from(auditLog).where(eq(auditLog.action, "currency"))).length).toBe(1);

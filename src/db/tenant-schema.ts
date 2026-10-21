@@ -42,6 +42,8 @@ export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 /** Пари: точно в базата (decimal), число в TypeScript; аритметиката е в src/lib/money.ts. */
 const money = (name: string) => decimal(name, { precision: 14, scale: 4, mode: "number" });
+/** Стойност (количество × цена), закръглена до стотинка. */
+const amount = (name: string) => decimal(name, { precision: 14, scale: 2, mode: "number" });
 /** Количества: до 3 знака (кг, л, м), точно в базата; аритметиката е в src/lib/quantity.ts. */
 const qty = (name: string) => decimal(name, { precision: 14, scale: 3, mode: "number" });
 const createdAt = () => datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`);
@@ -173,6 +175,9 @@ export const stockMovements = mysqlTable(
     type: mysqlEnum("type", MOVEMENT_TYPES).notNull(),
     delta: qty("delta").notNull(),
     quantityAfter: qty("quantity_after").notNull(),
+    /** Себестойност за единица по метода на оценка (средна или FIFO) и стойността на движението (delta × цена, ±). */
+    unitCost: money("unit_cost").notNull().default(0),
+    value: amount("value").notNull().default(0),
     reason: varchar("reason", { length: 500 }),
     shipmentId: int("shipment_id").references(() => shipments.id, { onDelete: "set null" }),
     createdAt: createdAt(),
@@ -254,7 +259,27 @@ export const shipmentLines = mysqlTable("shipment_lines", {
   lotNumber: text("lot_number"),
   expiryDate: date("expiry_date", { mode: "string" }),
   lotId: int("lot_id").references(() => lots.id, { onDelete: "set null" }),
+  /** Доставна цена при входяща пратка; празно = от поръчката или от артикула. */
+  unitCost: money("unit_cost"),
 });
+
+// ----------------------------------------------------------------- cost layers
+/** FIFO: всеки приход е слой с остатък; разходите изчерпват най-старите слоеве (само при метод fifo). */
+export const costLayers = mysqlTable(
+  "cost_layers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    movementId: int("movement_id").references(() => stockMovements.id, { onDelete: "set null" }),
+    /** Поръчката на прихода — връщане към доставчик изписва първо от нейните слоеве. */
+    orderId: int("order_id"),
+    originalQuantity: qty("original_quantity").notNull(),
+    quantity: qty("quantity").notNull(),
+    unitCost: money("unit_cost").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("cost_layers_item").on(t.itemId, t.id)],
+);
 
 // ----------------------------------------------------------------- collections
 export const collections = mysqlTable("collections", {

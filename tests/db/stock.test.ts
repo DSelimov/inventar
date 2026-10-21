@@ -39,7 +39,7 @@ describe("applyMovement — без проследяване", () => {
     expect(await total(id)).toBe(12);
 
     const result = await move({ itemId: id, locationId: t.main, type: "adjust", quantity: 4 });
-    expect(result).toEqual({ delta: -3, after: 9 });
+    expect(result).toMatchObject({ delta: -3, after: 9 });
     expect(await level(id, t.main)).toBe(4);
 
     const rows = await movements(id);

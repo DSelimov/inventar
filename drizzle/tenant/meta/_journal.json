@@ -50,6 +50,13 @@
       "when": 1792604749323,
       "tag": "0006_euro_original_amounts",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1792605322677,
+      "tag": "0007_movement_costs",
+      "breakpoints": true
     }
   ]
 }
