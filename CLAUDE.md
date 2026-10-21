@@ -45,40 +45,25 @@ On localhost the session cookie is per subdomain (log in on each); on a real dom
 `pnpm typecheck`, `pnpm lint`, `pnpm build` clean; the flow verified in a browser or via curl against the
 running app, with DB state checked; commit in Bulgarian. No `Co-Authored-By` lines.
 
-## Roadmap (current state: phases 1–2 done; next = phase 3)
-Detailed acceptance criteria for every item: `docs/PHASE3_PROMPT.md`. Work top-down, one commit per item.
+## Roadmap (current state: phases 1–3 done; next = phase 4)
+Phase 3 (`docs/PHASE3_PROMPT.md`) is done, as are item photos, PDF printing, stock counts, returns,
+notifications, onboarding, profile and TOTP. Detailed acceptance criteria for phase 4:
+`docs/PHASE4_PROMPT.md`. Work in the order A → B → C → D → E, one commit per item.
 
-### Phase 3 — blocking before the first paying client
-1. **Email.** No email sending exists: no forgot-password, no invitation links, no notifications. Add SMTP
-   (Nodemailer, env-configured, console fallback in dev), password reset flow, invitation emails.
-2. **Automated tests.** None yet. Cover the stock engine (lots, serials, transfers, order fulfilment) and
-   tenant isolation (data and API keys never cross tenants) with Vitest + a real MySQL.
-3. **Pagination.** Items, movements, orders, shipments load every row. Add server-side paging (50/page) and
-   search; add a global `/movements` page with filters.
-4. **Error and success feedback.** Expected validation errors must show inline instead of the generic error
-   page; success toasts after writes; no double submits.
-5. **Security hardening.** Login rate limiting, session invalidation on password change, security headers,
-   API rate limits per key. (Password hashing, httpOnly cookies and role checks already exist.)
-6. **Operations.** Auto-migration on startup, scripted backups of every tenant database, logging and error
-   monitoring, `/api/health`. With one database per client this must be scripted, not manual.
-7. **Super-admin panel.** `/admin` on the root domain for platform admins: list/suspend/activate tenants,
-   retry failed provisioning, manage the database pool, platform stats.
-
-### Expected by most businesses soon after
-- Item photos (file storage).
-- Printing: barcode labels, delivery notes and stock reports as PDF.
-- Stock count workflow (count sheet, variance, apply differences) instead of individual adjustments.
-- Returns from customers and to suppliers.
-- Global movements page with filters, audit log search.
-- Notifications on low stock, overdue shipments and expiring lots (email or in-app).
-- Onboarding for a new organization: first category and items, import wizard, optional demo data.
-- User profile page, two-factor authentication.
-
-### Nice to have, depends on clients
-- Packaging units (box of 12), multiple suppliers per item with prices, VAT rates on documents.
-- Mobile-friendly scan mode as an installable PWA.
-- Organization deletion and full data export (GDPR).
-- Integrations with accounting software and courier APIs (Econt, Speedy).
+### Phase 4 — Bulgarian market
+- **A. Money, quantities, valuation** (blocking): money as `decimal` (A1); fractional quantities and units
+  (A2); euro switch from BGN at 1.95583 with history (A3); cost on every movement, weighted average / FIFO,
+  stock value at a date and margins (A4); VAT rates on lines, ЕИК and ДДС № separate on partners (A5);
+  write-off protocol, receipt notes, gap-free document numbering (A6).
+- **B. Invoicing** (blocking): invoices, credit/debit notes, proformas per ЗДДС with 10-digit continuous
+  numbering, from orders/shipments, PDF + email, payment status (B1); ЕИК/VIES validation and lookup (B2);
+  export for the accountant (B3). Fiscal receipts (Н-18/СУПТО) stay out of scope.
+- **C. Paid service:** plans and limits, trial, read-only on lapse (C1); Stripe billing and our own
+  invoices (C2); legal pages, GDPR, organization deletion and export (C3).
+- **D. Everyday use:** offline PWA scan mode (D1); reorder suggestions (D2); multiple suppliers per item
+  (D3); packaging units (D4); help centre (D5).
+- **E. Integrations:** Econt / Speedy / BOX NOW (E1); WooCommerce, Shopify, eMAG (E2); Microinvest, Ajur,
+  Плюс-Минус (E3); SAF-T when a client needs it (E4).
 
 ### Deployment (Hostinger)
 Target is a Hostinger Business/Cloud plan with "Node.js web app" in hPanel, or a KVM VPS. Shared hosting
