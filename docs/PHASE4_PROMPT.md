@@ -225,8 +225,10 @@ tenant, default `EUR`.
   is what is stored and printed.
 
 ### D5. Help and onboarding content
-- Help centre in Bulgarian (`/help` on the root domain): short articles and videos per workflow, context
-  links ("?") from each page to the matching article.
+- **Done.** `/help` and `/help/[slug]` on every host, no login (`src/lib/help.ts`: items and packs, orders and
+  suggestions, shipments and returns, invoices, VAT, counts, write-offs, valuation and accountant, mobile
+  mode, subscription and data). `PageHeader` takes `help="<slug>"` and shows "?" next to the title; added
+  to the main pages; "Помощ" in the sidebar. Videos are not recorded yet.
 
 ---
 

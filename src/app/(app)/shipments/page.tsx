@@ -38,7 +38,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader
+      <PageHeader help="shipments"
         title="Пратки"
         description="Входящи доставки и изходящи пратки. Отбелязването като доставена обновява наличността автоматично."
         actions={

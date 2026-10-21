@@ -7,7 +7,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   const ctx = await requireContext();
   return (
     <>
-      <PageHeader title="Настройки" description={`${ctx.org.name} · вашата роля: ${ctx.role === "owner" ? "собственик" : ctx.role}`} />
+      <PageHeader help="subscription" title="Настройки" description={`${ctx.org.name} · вашата роля: ${ctx.role === "owner" ? "собственик" : ctx.role}`} />
       <SettingsTabs manage={can(ctx.role, "manage")} />
       {children}
     </>

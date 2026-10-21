@@ -27,7 +27,7 @@ export default async function SuggestionsPage() {
 
   return (
     <>
-      <PageHeader
+      <PageHeader help="orders"
         title="Предложения за поръчка"
         description={`Продажбите за последните ${s.windowDays} дни × (срок на доставка + ${s.safetyDays} дни буфер) + минимум − наличност − очаквано. Срокът и цената са от предпочитания доставчик на артикула.`}
         back={{ href: "/orders", label: "Поръчки" }}

@@ -31,7 +31,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader
+      <PageHeader help="orders"
         title="Поръчки"
         description="Какво е договорено с доставчици и клиенти. Изпълнението се проследява чрез пратки, с частични доставки и остатъци."
         actions={

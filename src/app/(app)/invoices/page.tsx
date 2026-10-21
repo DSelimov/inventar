@@ -52,7 +52,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Фактури" description="Фактури, кредитни и дебитни известия по ЗДДС и проформи. Издаденият документ получава пореден десетразряден номер и не се променя." />
+      <PageHeader help="invoices" title="Фактури" description="Фактури, кредитни и дебитни известия по ЗДДС и проформи. Издаденият документ получава пореден десетразряден номер и не се променя." />
       <FilterBar action="/invoices" resetHref={filtered ? "/invoices" : undefined}>
         <div className="min-w-52 flex-1">
           <Input name="q" placeholder="Номер, получател или ЕИК…" defaultValue={filters.q} />

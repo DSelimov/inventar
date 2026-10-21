@@ -26,7 +26,7 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader
+      <PageHeader help="mobile"
         title="Сканиране"
         description="Намерете артикул по баркод или код и направете бърз приход или разход."
         actions={

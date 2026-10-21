@@ -50,7 +50,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   return (
     <>
-      <PageHeader
+      <PageHeader help="invoices"
         title={title}
         description={[inv.recipientName ?? inv.partner?.name, inv.issueDate && `от ${formatDate(inv.issueDate, "dd.MM.yyyy")}`, inv.order && `поръчка ${inv.order.number}`].filter(Boolean).join(" · ")}
         back={{ href: "/invoices", label: "Фактури" }}

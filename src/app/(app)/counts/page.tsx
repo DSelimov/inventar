@@ -24,7 +24,7 @@ export default async function CountsPage() {
 
   return (
     <>
-      <PageHeader title="Инвентаризация" description="Преброяване на склада: списък с очакваните количества, броене със скенер, разлики и корекция с един бутон." />
+      <PageHeader help="counts" title="Инвентаризация" description="Преброяване на склада: списък с очакваните количества, броене със скенер, разлики и корекция с един бутон." />
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader title="Броения" />

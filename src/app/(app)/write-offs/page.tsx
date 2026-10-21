@@ -20,7 +20,7 @@ export default async function WriteOffsPage() {
   const rows = await listWriteOffs(ctx.db);
   return (
     <>
-      <PageHeader
+      <PageHeader help="write-offs"
         title="Брак"
         description="Протоколи за брак: стока с изтекъл срок, повредена или липсваща — изписва се по себестойност, с комисия и подписи."
         actions={

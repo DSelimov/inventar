@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList, FileText, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Trash, Truck, Users } from "lucide-react";
+import { BarChart3, Bell, Boxes, CircleHelp, Building2, CalendarDays, ClipboardCheck, ClipboardList, FileText, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Trash, Truck, Users } from "lucide-react";
 import type { Role } from "@/db/schema";
 import { logout } from "@/lib/actions/auth";
 import { ROLE_LABELS } from "@/lib/permissions";
@@ -117,6 +117,10 @@ export function Sidebar({
         <Link href="/settings" className={linkClass("/settings")}>
           <Settings className="h-4 w-4" />
           Настройки
+        </Link>
+        <Link href="/help" target="_blank" className={linkClass("/help")}>
+          <CircleHelp className="h-4 w-4" />
+          Помощ
         </Link>
         <div className="mt-2 flex items-center gap-2.5 px-3 py-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-muted">

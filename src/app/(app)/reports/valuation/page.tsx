@@ -35,7 +35,7 @@ export default async function ValuationPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader
+      <PageHeader help="valuation"
         title="Себестойност и марж"
         description={`Оценка по ${method === "fifo" ? "FIFO (първа входяща, първа изходяща)" : "средно претеглена цена"}. Стойността е от складовите движения; приходът — по цените от поръчките.`}
         back={{ href: "/reports", label: "Отчети" }}

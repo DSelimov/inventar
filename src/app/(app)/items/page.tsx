@@ -44,7 +44,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader
+      <PageHeader help="items"
         title="Артикули"
         description="Всичко, което държите на склад, с количества и стойности."
         actions={
