@@ -4,7 +4,7 @@
  * отделна база (tenant-schema.ts).
  */
 import { relations, sql } from "drizzle-orm";
-import { boolean, date, datetime, index, int, json, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, date, datetime, decimal, index, int, json, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const ROLES = ["owner", "admin", "manager", "staff", "viewer"] as const;
 export type Role = (typeof ROLES)[number];
@@ -13,6 +13,27 @@ export const ORG_STATUSES = ["provisioning", "active", "suspended", "failed"] as
 export type OrgStatus = (typeof ORG_STATUSES)[number];
 
 const createdAt = () => datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`);
+
+export const SUBSCRIPTION_STATUSES = ["trial", "active", "past_due", "cancelled"] as const;
+export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
+
+/** Абонаментни планове: цени и лимити се редактират в /admin/plans; празен лимит = без ограничение. */
+export const plans = mysqlTable("plans", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2, mode: "number" }).notNull().default(0),
+  currency: varchar("currency", { length: 3 }).notNull().default("EUR"),
+  maxUsers: int("max_users"),
+  maxItems: int("max_items"),
+  maxLocations: int("max_locations"),
+  maxInvoicesPerMonth: int("max_invoices_per_month"),
+  apiAccess: boolean("api_access").notNull().default(false),
+  integrations: boolean("integrations").notNull().default(false),
+  description: varchar("description", { length: 500 }),
+  active: boolean("active").notNull().default(true),
+  sortOrder: int("sort_order").notNull().default(0),
+});
 
 export const organizations = mysqlTable("organizations", {
   id: int("id").autoincrement().primaryKey(),
@@ -28,6 +49,11 @@ export const organizations = mysqlTable("organizations", {
   dbUser: varchar("db_user", { length: 64 }),
   /** AES-256-GCM, ключ от APP_SECRET. */
   dbPasswordEnc: text("db_password_enc"),
+  /** Абонамент: план, статус, край на пробния период и платено до (докато няма онлайн плащане — ръчно в /admin). */
+  planId: int("plan_id").references(() => plans.id, { onDelete: "set null" }),
+  subscriptionStatus: mysqlEnum("subscription_status", SUBSCRIPTION_STATUSES).notNull().default("trial"),
+  trialEndsAt: datetime("trial_ends_at", { fsp: 3 }),
+  paidUntil: datetime("paid_until", { fsp: 3 }),
   createdAt: createdAt(),
 });
 
@@ -127,3 +153,5 @@ export type Organization = typeof organizations.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type PasswordReset = typeof passwordResets.$inferSelect;
+
+export type Plan = typeof plans.$inferSelect;

@@ -17,6 +17,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Link href="/admin" className="text-muted hover:text-text">
               Организации
             </Link>
+            <Link href="/admin/plans" className="text-muted hover:text-text">
+              Планове
+            </Link>
             <Link href="/admin/pool" className="text-muted hover:text-text">
               Пул от бази
             </Link>

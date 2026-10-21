@@ -3,7 +3,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { controlDb } from "@/db/control";
-import { memberships, organizations, passwordResets, sessions, users } from "@/db/control-schema";
+import { memberships, organizations, passwordResets, plans, sessions, users } from "@/db/control-schema";
 import { getTenantDb, provisionTenant, tenantDbName } from "@/db/tenant";
 import { locations } from "@/db/tenant-schema";
 import { clearTwoFactor, createSession, destroySession, getSession, hashPassword, readTwoFactor, startTwoFactor, suggestSubdomain, verifyPassword } from "@/lib/auth";
@@ -16,6 +16,7 @@ import { createPasswordLink, findPasswordLink, recentResetExists } from "@/lib/p
 import { clear, clientIp, hit, minutes, retryAfter } from "@/lib/rate-limit";
 import { currentTenant, isValidSubdomain, rootUrl, tenantUrl } from "@/lib/tenant";
 import { log } from "@/lib/log";
+import { TRIAL_DAYS } from "@/lib/plans";
 
 /** Вход: до 5 грешни опита за имейл и 20 за IP адрес на 15 минути. */
 const loginLimits = (email: string, ip: string) => ({
@@ -92,7 +93,12 @@ async function createOrganizationFor(userId: number, name: string, subdomainInpu
   const [taken] = await controlDb.select({ id: organizations.id }).from(organizations).where(eq(organizations.subdomain, subdomain)).limit(1);
   if (taken) throw new UserError(`Поддомейнът „${subdomain}“ вече е зает.`);
 
-  const [{ id }] = await controlDb.insert(organizations).values({ name, subdomain, dbName: tenantDbName(subdomain) }).$returningId();
+  // нова организация: пробен период на план „Бизнес“
+  const [trialPlan] = await controlDb.select({ id: plans.id }).from(plans).where(eq(plans.code, "business"));
+  const [{ id }] = await controlDb
+    .insert(organizations)
+    .values({ name, subdomain, dbName: tenantDbName(subdomain), planId: trialPlan?.id ?? null, subscriptionStatus: "trial", trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) })
+    .$returningId();
   await controlDb.insert(memberships).values({ userId, organizationId: id, role: "owner" });
   const [org] = await controlDb.select().from(organizations).where(eq(organizations.id, id));
   const active = await provisionTenant(org);

@@ -15,6 +15,7 @@ import { rootUrl, tenantUrl } from "@/lib/tenant";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { log } from "@/lib/log";
+import { assertWithinLimit } from "@/lib/plans";
 
 function assertCanAssign(actorRole: Role, target: Role) {
   if (target === "owner" && actorRole !== "owner") throw new UserError("Само собственик може да дава роля „Собственик“.");
@@ -46,6 +47,7 @@ export const addMember = act(async (fd: FormData) => {
   const name = required(str(fd, "name"), "Име");
   const role = oneOf(fd, "role", ROLES, "staff");
   assertCanAssign(ctx.role, role);
+  await assertWithinLimit(ctx, "users");
 
   let [user] = await controlDb.select().from(users).where(eq(users.email, email)).limit(1);
   const isNew = !user;
@@ -119,13 +121,13 @@ export const changeOwnPassword = act(async (fd: FormData) => {
   await destroyOtherSessions(ctx.user.id);
   revalidatePath("/profile");
   return "Паролата е сменена. Излязохте от всички други устройства.";
-});
+}, { allowReadOnly: true });
 
 export const logoutEverywhere = act(async () => {
   const ctx = await requireContext("read");
   await destroyAllSessions(ctx.user.id);
   redirect(rootUrl("/login"));
-});
+}, { allowReadOnly: true });
 
 /** Дневен имейл с известия за текущата организация (мениджър и нагоре). */
 export const setEmailDigest = act(async (fd: FormData) => {
@@ -134,4 +136,4 @@ export const setEmailDigest = act(async (fd: FormData) => {
   await controlDb.update(memberships).set({ emailDigest: on }).where(and(eq(memberships.userId, ctx.user.id), eq(memberships.organizationId, ctx.org.id)));
   revalidatePath("/profile");
   return on ? "Ще получавате дневен имейл с известия." : "Дневният имейл е изключен.";
-});
+}, { allowReadOnly: true });

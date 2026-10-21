@@ -9,6 +9,7 @@ import { dismissOnboarding, loadDemoData, quickStart, removeDemoData, type Quick
 import { slugSku } from "@/lib/utils";
 import { parseMoney } from "@/lib/money";
 import { parseQuantity } from "@/lib/quantity";
+import { assertWithinLimit } from "@/lib/plans";
 
 const revalidate = () => {
   revalidatePath("/", "layout");
@@ -25,6 +26,7 @@ export const quickStartItems = act(async (fd: FormData) => {
     const unitPrice = parseMoney(fd.get(`price_${i}`), `Ред ${i + 1}: цена`);
     rows.push({ name, quantity, unitPrice, unit: String(fd.get(`unit_${i}`) || "бр.").trim() || "бр." });
   }
+  await assertWithinLimit(ctx, "items", rows.length);
   const r = await quickStart(ctx.db, ctx.user, { category: optional(fd, "category"), items: rows }, slugSku);
   await audit(ctx, "create", "item", null, { quickStart: r.ids.length });
   revalidate();
@@ -33,6 +35,7 @@ export const quickStartItems = act(async (fd: FormData) => {
 
 export const loadDemo = act(async () => {
   const ctx = await requireContext("manage");
+  await assertWithinLimit(ctx, "items", 6);
   const r = await loadDemoData(ctx.db, ctx.user);
   await audit(ctx, "import", "item", null, { demo: r.items });
   revalidate();

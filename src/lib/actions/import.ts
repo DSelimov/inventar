@@ -12,6 +12,7 @@ import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
 import { decimalsOf, itemDecimals, MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
+import { assertWithinLimit } from "@/lib/plans";
 
 export type ImportRow = {
   sku: string;
@@ -36,6 +37,9 @@ export const importItems = act(async (fd: FormData) => {
     throw new UserError("Невалидни данни за импорт.");
   }
   if (!rows.length) throw new UserError("Няма редове за импорт.");
+  // само новите кодове заемат място в лимита на плана
+  const existingSkus = new Set((await ctx.db.select({ sku: items.sku }).from(items)).map((r) => r.sku.toLowerCase()));
+  await assertWithinLimit(ctx, "items", new Set(rows.filter((r) => r.sku && !existingSkus.has(r.sku.toLowerCase())).map((r) => r.sku.toLowerCase())).size);
   const setQuantities = str(fd, "setQuantities") === "1";
 
   const cats = await ctx.db.select().from(categories);

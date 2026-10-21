@@ -43,6 +43,13 @@
       "when": 1792590159115,
       "tag": "0005_totp",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1792613126899,
+      "tag": "0006_plans",
+      "breakpoints": true
     }
   ]
 }

@@ -8,10 +8,12 @@ import { requireContext } from "@/lib/auth";
 import { bool, optional, required, str } from "@/lib/forms";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { assertWithinLimit } from "@/lib/plans";
 
 export const createLocation = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
   const name = required(str(fd, "name"), "Име");
+  await assertWithinLimit(ctx, "locations");
   const [row] = await ctx.db.insert(locations).values({ name, code: optional(fd, "code"), address: optional(fd, "address") }).$returningId();
   await audit(ctx, "create", "location", row.id, { name });
   revalidatePath("/settings/locations");
@@ -22,6 +24,8 @@ export const createLocation = act(async (fd: FormData) => {
 export const updateLocation = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("manage");
   const name = required(str(fd, "name"), "Име");
+  const [current] = await ctx.db.select({ active: locations.active }).from(locations).where(eq(locations.id, id));
+  if (bool(fd, "active") && current && !current.active) await assertWithinLimit(ctx, "locations"); // повторно активиране
   await ctx.db.update(locations).set({ name, code: optional(fd, "code"), address: optional(fd, "address"), active: bool(fd, "active") }).where(eq(locations.id, id));
   await audit(ctx, "update", "location", id, { name });
   revalidatePath("/settings/locations");

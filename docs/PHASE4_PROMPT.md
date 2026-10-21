@@ -153,11 +153,18 @@ tenant, default `EUR`.
 ## C. Running it as a paid service (former item 4)
 
 ### C1. Plans and limits
-- Control DB: `plans` (name, monthly price, limits: users, items, locations, invoices per month, API
-  access, integrations) and `subscriptions` (organization, plan, status trial/active/past_due/cancelled,
-  period end). New organizations start with a 14-day trial.
-- Enforce limits in `requireContext` / actions with a clear Bulgarian message and a link to upgrade;
-  read-only mode (not deletion) when a subscription lapses; `/admin` shows plan and status per tenant.
+- **Done.** Control DB `plans` (migration control/0006): Старт 19 €, Бизнес 49 €, Про 99 € with limits on
+  users, items, active locations and tax invoices per month (empty = unlimited), API and integrations flags —
+  all editable in `/admin/plans`. Organizations: `plan_id`, `subscription_status` (trial / active / past_due
+  / cancelled), `trial_ends_at`, `paid_until`; existing organizations moved to Про/active, new ones get a
+  14-day trial on Бизнес. `/admin` shows plan and status and `/admin/organizations/[id]` edits them by hand.
+- `src/lib/plans.ts`: `subscriptionState` (expired trial, cancelled, or unpaid 7 days after `paid_until` →
+  read-only), `usage`, `assertWithinLimit` (items in every creation path incl. import, quick start, demo
+  data, variants and API; users; locations incl. re-activation; issued invoices). Read-only blocks every
+  server action in `act()` except account actions (`allowReadOnly`: profile, password, 2FA, digest) and
+  write API calls (402); pages stay viewable. Plans without API → 403. Banner in the app layout; page
+  Настройки › Абонамент with usage and plan comparison; contact `PLATFORM_CONTACT_EMAIL`.
+- Online payment (C2) is deferred until the provider is chosen.
 
 ### C2. Payments and our own invoices
 - Card payments with Stripe Billing (subscriptions, customer portal, webhooks → subscription status) and

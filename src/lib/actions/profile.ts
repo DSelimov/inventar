@@ -28,7 +28,7 @@ export async function readRecoveryCodesOnce() {
 export const hideRecoveryCodes = act(async () => {
   (await cookies()).set(RECOVERY_COOKIE, "", { maxAge: 0, path: "/profile" });
   revalidatePath("/profile");
-});
+}, { allowReadOnly: true });
 
 export const updateName = act(async (fd: FormData) => {
   const ctx = await requireContext("read");
@@ -36,7 +36,7 @@ export const updateName = act(async (fd: FormData) => {
   await controlDb.update(users).set({ name }).where(eq(users.id, ctx.user.id));
   revalidatePath("/", "layout");
   return "Името е запазено.";
-});
+}, { allowReadOnly: true });
 
 /** Стъпка 1: нов секрет (още не е активен), показан като QR код. */
 export const startTotpSetup = act(async () => {
@@ -44,7 +44,7 @@ export const startTotpSetup = act(async () => {
   if (ctx.user.totpEnabledAt) throw new UserError("Двуфакторната защита вече е включена.");
   await controlDb.update(users).set({ totpPendingEnc: encrypt(generateSecret()) }).where(eq(users.id, ctx.user.id));
   revalidatePath("/profile");
-});
+}, { allowReadOnly: true });
 
 /** Стъпка 2: код от приложението потвърждава, че е настроено правилно. */
 export const confirmTotpSetup = act(async (fd: FormData) => {
@@ -64,13 +64,13 @@ export const confirmTotpSetup = act(async (fd: FormData) => {
   await audit(ctx, "2fa_enabled", "user", ctx.user.id);
   revalidatePath("/profile");
   return "Двуфакторната защита е включена. Запазете кодовете за възстановяване.";
-});
+}, { allowReadOnly: true });
 
 export const cancelTotpSetup = act(async () => {
   const ctx = await requireContext("read");
   await controlDb.update(users).set({ totpPendingEnc: null }).where(eq(users.id, ctx.user.id));
   revalidatePath("/profile");
-});
+}, { allowReadOnly: true });
 
 /** Изключване: изисква парола и текущ код (или код за възстановяване не се приема тук нарочно). */
 export const disableTotp = act(async (fd: FormData) => {
@@ -83,7 +83,7 @@ export const disableTotp = act(async (fd: FormData) => {
   await audit(ctx, "2fa_disabled", "user", ctx.user.id);
   revalidatePath("/profile");
   return "Двуфакторната защита е изключена.";
-});
+}, { allowReadOnly: true });
 
 export const regenerateRecoveryCodes = act(async (fd: FormData) => {
   const ctx = await requireContext("read");
@@ -98,4 +98,4 @@ export const regenerateRecoveryCodes = act(async (fd: FormData) => {
   await audit(ctx, "2fa_recovery_codes", "user", ctx.user.id);
   revalidatePath("/profile");
   return "Нови кодове за възстановяване — старите вече не важат.";
-});
+}, { allowReadOnly: true });

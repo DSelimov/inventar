@@ -16,8 +16,10 @@ closeConnectionsAfterAll();
 
 let a: TestTenant;
 let b: TestTenant;
+let suspended: TestTenant;
+// провизирането (база + всички миграции) е бавно при паралелни тестове — в beforeAll с по-дълъг лимит
 beforeAll(async () => {
-  [a, b] = await Promise.all([createTenant("a"), createTenant("b")]);
+  [a, b, suspended] = await Promise.all([createTenant("a"), createTenant("b"), createTenant("susp")]);
 });
 
 async function apiKey(t: TestTenant, scopes: ApiScope[]) {
@@ -103,7 +105,7 @@ describe("REST API: ключове и права", () => {
 
   it("непознат поддомейн → 404; спряна организация → 503", async () => {
     expect((await listItemsApi(req("nyama-takava", "/api/v1/items", { token: "inv_x" }))).status).toBe(404);
-    const t = await createTenant("susp");
+    const t = suspended;
     const key = await apiKey(t, ["read"]);
     await controlDb.update(organizations).set({ status: "suspended" }).where(eq(organizations.id, t.org.id));
     expect((await listItemsApi(req(t, "/api/v1/items", { token: key }))).status).toBe(503);

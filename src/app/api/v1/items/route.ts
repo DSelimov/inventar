@@ -5,6 +5,7 @@ import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
 import { parseMoney } from "@/lib/money";
 import { itemDecimals, parseQuantity, readDecimals } from "@/lib/quantity";
+import { assertWithinLimit } from "@/lib/plans";
 
 export const GET = handler("read", async (req, ctx) => {
   const url = new URL(req.url);
@@ -27,6 +28,7 @@ export const POST = handler("write", async (req, ctx) => {
   const sku = body.sku?.trim() || slugSku(body.name);
   const dup = await ctx.db.query.items.findFirst({ where: eq(items.sku, sku) });
   if (dup) throw new ApiError(409, `Вече има артикул с код „${sku}“.`);
+  await assertWithinLimit(ctx, "items");
   const tracking = (TRACKING_MODES as readonly string[]).includes(body.tracking ?? "") ? (body.tracking as (typeof TRACKING_MODES)[number]) : "none";
   const quantityDecimals = itemDecimals({ tracking, quantityDecimals: readDecimals(body.quantityDecimals) });
   const [{ id }] = await ctx.db

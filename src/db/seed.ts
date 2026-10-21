@@ -7,7 +7,7 @@ import { migrate } from "drizzle-orm/mysql2/migrator";
 import path from "node:path";
 import { hashPassword } from "../lib/auth-crypto";
 import { controlDb } from "./control";
-import { memberships, organizations, users } from "./control-schema";
+import { memberships, organizations, plans, users } from "./control-schema";
 import { dropTenantDatabase, getTenantDb, provisionTenant, tenantDbName, type TenantDb } from "./tenant";
 import * as t from "./tenant-schema";
 
@@ -25,7 +25,8 @@ async function resetControl() {
 
 async function createOrg(name: string, subdomain: string) {
   await dropTenantDatabase(tenantDbName(subdomain));
-  const [{ id }] = await controlDb.insert(organizations).values({ name, subdomain, dbName: tenantDbName(subdomain) }).$returningId();
+  const [pro] = await controlDb.select({ id: plans.id }).from(plans).where(eq(plans.code, "pro"));
+  const [{ id }] = await controlDb.insert(organizations).values({ name, subdomain, dbName: tenantDbName(subdomain), planId: pro?.id ?? null, subscriptionStatus: "active" }).$returningId();
   const [org] = await controlDb.select().from(organizations).where(eq(organizations.id, id));
   return provisionTenant(org);
 }

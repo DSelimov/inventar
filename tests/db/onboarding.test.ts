@@ -58,8 +58,12 @@ describe("демо данни", () => {
     await expect(removeDemoData(t.db)).rejects.toThrow("Няма заредени демо данни");
   });
 
+  let u: TestTenant;
+  beforeAll(async () => {
+    u = await createTenant("onb2");
+  });
+
   it("демо артикул в истинска поръчка: изтриването се отказва и нищо не се губи", async () => {
-    const u = await createTenant("onb2");
     await loadDemoData(u.db, actor);
     const [demoItem] = await u.db.select().from(items).limit(1);
     const [{ id: real }] = await u.db.insert(orders).values({ type: "sales", number: "МОЯ-1", status: "confirmed" }).$returningId();

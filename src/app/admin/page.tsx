@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Building2, Database, KeyRound, Users } from "lucide-react";
 import { ORG_STATUS, OrgStatusBadge } from "@/components/admin/org-status";
@@ -13,18 +14,22 @@ import { Table, TableWrap } from "@/components/ui/table";
 import { ORG_STATUSES, type OrgStatus } from "@/db/control-schema";
 import { activateOrganization, retryProvisioning, suspendOrganization } from "@/lib/actions/admin";
 import { param, type SearchParams } from "@/lib/paging";
+import { listPlans, subscriptionState } from "@/lib/plans";
 import { listOrganizationsWithStats, platformStats, requirePlatformAdmin } from "@/lib/platform";
 import { APP_DOMAIN, tenantUrl } from "@/lib/tenant";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Платформа" };
 
+const SUB_TEXT = { trial: "пробен", active: "активен", past_due: "неплатен", cancelled: "прекратен" } as const;
+
 export default async function AdminPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await requirePlatformAdmin();
   const sp = await searchParams;
   const q = param(sp, "q").toLowerCase();
   const status = (ORG_STATUSES as readonly string[]).includes(param(sp, "status")) ? (param(sp, "status") as OrgStatus) : "";
-  const [all, stats] = await Promise.all([listOrganizationsWithStats(), platformStats()]);
+  const [all, stats, plans] = await Promise.all([listOrganizationsWithStats(), platformStats(), listPlans(false)]);
+  const planNames = new Map(plans.map((p) => [p.id, p.name]));
   const rows = all.filter((r) => (!status || r.org.status === status) && (!q || `${r.org.name} ${r.org.subdomain} ${r.owner ?? ""} ${r.org.dbName}`.toLowerCase().includes(q)));
   const attention = (stats.status.failed ?? 0) + (stats.status.provisioning ?? 0);
 
@@ -62,6 +67,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <tr>
                 <th>Организация</th>
                 <th>Статус</th>
+                <th>Абонамент</th>
                 <th>База</th>
                 <th className="text-right">Потребители</th>
                 <th>Създадена</th>
@@ -80,6 +86,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   </td>
                   <td>
                     <OrgStatusBadge status={org.status} />
+                  </td>
+                  <td className="whitespace-nowrap text-sm">
+                    <Link href={`/admin/organizations/${org.id}`} className="hover:text-accent">
+                      {planNames.get(org.planId ?? -1) ?? "без план"}
+                    </Link>
+                    <div className={`text-xs ${subscriptionState(org).readOnly ? "text-danger" : "text-muted"}`}>
+                      {SUB_TEXT[org.subscriptionStatus]}
+                      {org.subscriptionStatus === "trial" && org.trialEndsAt ? ` до ${formatDate(org.trialEndsAt)}` : ""}
+                    </div>
                   </td>
                   <td className="font-mono text-xs">
                     {org.dbName}

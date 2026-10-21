@@ -13,13 +13,14 @@ const TABS = [
   { href: "/settings/api", label: "API" },
   { href: "/settings/webhooks", label: "Webhooks" },
   { href: "/settings/audit", label: "Одит" },
+  { href: "/settings/plan", label: "Абонамент" },
 ];
 
 export function SettingsTabs({ manage }: { manage: boolean }) {
   const pathname = usePathname();
   return (
     <div className="mb-6 flex w-fit max-w-full flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
-      {TABS.filter((t) => manage || t.href === "/settings").map((t) => (
+      {TABS.filter((t) => manage || t.href === "/settings" || t.href === "/settings/plan").map((t) => (
         <Link
           key={t.href}
           href={t.href}

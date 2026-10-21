@@ -16,6 +16,7 @@ import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
 import { itemDecimals, MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
+import { assertWithinLimit } from "@/lib/plans";
 
 function revalidateItems(id?: number) {
   revalidatePath("/");
@@ -70,6 +71,7 @@ async function assertUniqueSku(db: Db, sku: string, exceptId?: number) {
 export const createItem = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
+  await assertWithinLimit(ctx, "items");
   await assertUniqueSku(ctx.db, data.sku);
   const parentId = optionalInt(fd, "parentId");
   const quantity = parseQuantity(str(fd, "quantity"), data.quantityDecimals, "Начална наличност");
@@ -133,6 +135,7 @@ export const createVariant = act(async (parentId: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const parent = await ctx.db.query.items.findFirst({ where: eq(items.id, parentId) });
   if (!parent) throw new UserError("Артикулът не е намерен.");
+  await assertWithinLimit(ctx, "items");
   const variantLabel = required(str(fd, "variantLabel"), "Вариант");
   const sku = str(fd, "sku") || `${parent.sku}-${variantLabel.toUpperCase().replace(/[^A-ZА-Я0-9]+/gi, "").slice(0, 8)}`;
   await assertUniqueSku(ctx.db, sku);

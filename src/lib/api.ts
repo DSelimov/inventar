@@ -8,6 +8,7 @@ import { sha256 } from "./auth-crypto";
 import { UserError } from "./errors";
 import { tenantFromRequest } from "./tenant";
 import { log } from "@/lib/log";
+import { planOf, subscriptionState } from "./plans";
 
 export type ApiContext = { db: TenantDb; org: Organization; scopes: ApiScope[]; keyId: number };
 
@@ -33,6 +34,12 @@ export async function authenticate(req: Request, needed: ApiScope = "read"): Pro
   const [key] = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, sha256(token))).limit(1);
   if (!key) throw new ApiError(401, "Невалиден API ключ.");
   if (!key.scopes.includes(needed)) throw new ApiError(403, `Ключът няма право „${needed}“.`);
+  const plan = await planOf(org);
+  if (plan && !plan.apiAccess) throw new ApiError(403, `Планът „${plan.name}“ не включва API. Вижте Настройки › Абонамент.`);
+  if (needed !== "read") {
+    const sub = subscriptionState(org);
+    if (sub.readOnly) throw new ApiError(402, sub.message ?? "Абонаментът позволява само четене.");
+  }
   void db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, key.id));
   return { db, org, scopes: key.scopes, keyId: key.id };
 }

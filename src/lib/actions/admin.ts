@@ -4,13 +4,14 @@ import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import mysql from "mysql2/promise";
 import { controlDb } from "@/db/control";
-import { databasePool, organizations } from "@/db/control-schema";
+import { databasePool, organizations, plans, SUBSCRIPTION_STATUSES } from "@/db/control-schema";
 import { addDatabaseToPool, getTenantDb, provisionTenant } from "@/db/tenant";
 import { locations } from "@/db/tenant-schema";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { int, required, str } from "@/lib/forms";
 import { log } from "@/lib/log";
+import { roundMoney } from "@/lib/money";
 import { assertPlatformAdmin } from "@/lib/platform";
 
 async function findOrg(id: number) {
@@ -89,4 +90,56 @@ export const removePoolDatabase = act(async (id: number) => {
   log.info("admin.pool_removed", { by: admin.user.email, id });
   revalidatePath("/admin/pool");
   return "Базата е премахната от пула.";
+});
+
+// ----------------------------------------------------------------- абонаменти
+const optLimit = (fd: FormData, key: string) => {
+  const v = str(fd, key);
+  if (!v) return null; // празно = без лимит
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) throw new UserError("Лимитът е цяло неотрицателно число или празно (без лимит).");
+  return n;
+};
+
+export const updatePlan = act(async (id: number, fd: FormData) => {
+  const admin = await assertPlatformAdmin();
+  const price = Number(str(fd, "monthlyPrice").replace(",", "."));
+  if (!Number.isFinite(price) || price < 0) throw new UserError("Невалидна цена.");
+  await controlDb
+    .update(plans)
+    .set({
+      name: required(str(fd, "name"), "Име"),
+      monthlyPrice: roundMoney(price),
+      maxUsers: optLimit(fd, "maxUsers"),
+      maxItems: optLimit(fd, "maxItems"),
+      maxLocations: optLimit(fd, "maxLocations"),
+      maxInvoicesPerMonth: optLimit(fd, "maxInvoicesPerMonth"),
+      apiAccess: str(fd, "apiAccess") === "on",
+      integrations: str(fd, "integrations") === "on",
+      active: str(fd, "active") === "on",
+      description: str(fd, "description") || null,
+    })
+    .where(eq(plans.id, id));
+  log.info("admin.plan_updated", { by: admin.user.email, plan: id });
+  revalidatePath("/admin/plans");
+  return "Планът е запазен.";
+});
+
+/** Ръчно управление на абонамента (докато няма онлайн плащане). */
+export const setSubscription = act(async (orgId: number, fd: FormData) => {
+  const admin = await assertPlatformAdmin();
+  const org = await findOrg(orgId);
+  const status = SUBSCRIPTION_STATUSES.find((s) => s === str(fd, "status"));
+  if (!status) throw new UserError("Невалиден статус.");
+  const date = (key: string) => {
+    const v = str(fd, key);
+    if (!v) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new UserError("Невалидна дата.");
+    return new Date(`${v}T23:59:59Z`);
+  };
+  const planId = int(fd, "planId", 0) || null;
+  await controlDb.update(organizations).set({ planId, subscriptionStatus: status, trialEndsAt: date("trialEndsAt"), paidUntil: date("paidUntil") }).where(eq(organizations.id, orgId));
+  log.info("admin.subscription_changed", { by: admin.user.email, org: org.subdomain, planId, status });
+  revalidatePath("/admin");
+  return `Абонаментът на „${org.name}“ е обновен.`;
 });

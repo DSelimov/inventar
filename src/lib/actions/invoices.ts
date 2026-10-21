@@ -19,6 +19,7 @@ import { formatDate, formatMoney } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { assertWithinLimit } from "@/lib/plans";
 
 function revalidate(id?: number, orderId?: number | null) {
   revalidatePath("/invoices");
@@ -90,6 +91,8 @@ export const saveInvoiceDraft = act(async (id: number, fd: FormData) => {
 
 export const issueInvoiceAction = act(async (id: number) => {
   const ctx = await requireContext("write");
+  const [draft] = await ctx.db.select({ kind: invoices.kind }).from(invoices).where(eq(invoices.id, id));
+  if (draft && draft.kind !== "proforma") await assertWithinLimit(ctx, "invoices");
   const r = await issueInvoice(ctx.db, id, ctx.user);
   await audit(ctx, "status", "invoice", id, { number: r.number, kind: r.kind, status: "issued", grossTotal: r.grossTotal });
   emit(ctx.db, "invoice.issued", { id, kind: r.kind, number: r.number, orderId: r.orderId, grossTotal: r.grossTotal, currency: ctx.org.currency });
