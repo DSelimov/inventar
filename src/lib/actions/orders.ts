@@ -1,9 +1,9 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { Db } from "@/db/tenant";
-import { ORDER_TYPES, orderLines, orders, shipmentLines, shipments, type OrderStatus } from "@/db/tenant-schema";
+import { lots, ORDER_TYPES, orderLines, orders, shipmentLines, shipments, type OrderStatus } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { oneOf, optional, optionalInt, str } from "@/lib/forms";
@@ -117,7 +117,7 @@ export const createShipmentForRemaining = act(async (id: number) => {
   if (o.status !== "confirmed" && o.status !== "partial") throw new UserError("Потвърдете поръчката, преди да създадете пратка.");
   const openShipments = await ctx.db.query.shipments.findMany({ where: eq(shipments.orderId, id), with: { lines: true } });
   const reserved = new Map<number, number>();
-  for (const s of openShipments) if (s.status === "pending" || s.status === "in_transit") for (const l of s.lines) reserved.set(l.itemId, (reserved.get(l.itemId) ?? 0) + l.quantity);
+  for (const s of openShipments) if (!s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) reserved.set(l.itemId, (reserved.get(l.itemId) ?? 0) + l.quantity);
   const remaining = o.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity - l.fulfilledQuantity - (reserved.get(l.itemId) ?? 0) })).filter((l) => l.quantity > 0);
   if (!remaining.length) throw new UserError("Няма оставащи количества: всичко е доставено или вече е в пратка.");
 
@@ -153,4 +153,63 @@ export const deleteOrder = act(async (id: number) => {
   await audit(ctx, "delete", "order", id, { number: o.number });
   revalidate();
   return redirectWith("/orders", "Поръчката е изтрита.");
+});
+
+/**
+ * Връщане по изпълнена поръчка: от клиента (продажба → входяща пратка) или към доставчика
+ * (доставка → изходяща). Предлага доставеното минус върнатото и минус отворените връщания;
+ * количествата и партидите се уточняват в редакцията на пратката.
+ */
+export const createReturnForOrder = act(async (id: number) => {
+  const ctx = await requireContext("write");
+  const o = await own(ctx.db, id);
+  const related = await ctx.db.query.shipments.findMany({ where: eq(shipments.orderId, id), with: { lines: { with: { lot: true } } } });
+  const pendingReturns = new Map<number, number>();
+  for (const s of related) if (s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) pendingReturns.set(l.itemId, (pendingReturns.get(l.itemId) ?? 0) + l.quantity);
+  const lines = o.lines.map((l) => ({ line: l, quantity: l.fulfilledQuantity - l.returnedQuantity - (pendingReturns.get(l.itemId) ?? 0) })).filter((x) => x.quantity > 0);
+  if (!lines.length) throw new UserError("Няма количества за връщане: нищо не е доставено или всичко вече е върнато.");
+
+  // партида от оригиналната доставка, ако е една-единствена
+  const delivered = related.filter((s) => !s.isReturn && s.status === "delivered");
+  const lotFor = (itemId: number) => {
+    const used = [...new Set(delivered.flatMap((s) => s.lines.filter((l) => l.itemId === itemId).map((l) => l.lot?.lotNumber ?? l.lotNumber).filter(Boolean)))] as string[];
+    return used.length === 1 ? used[0] : null;
+  };
+  const supplierReturn = o.type === "purchase";
+  const locationId = o.locationId ?? (await getDefaultLocation(ctx.db))?.id ?? null;
+  const values = await Promise.all(
+    lines.map(async ({ line, quantity }) => {
+      const lotNumber = line.item.tracking !== "none" ? lotFor(line.itemId) : null;
+      let lotId: number | null = null;
+      if (supplierReturn && lotNumber && locationId) {
+        const lot = await ctx.db.query.lots.findFirst({ where: and(eq(lots.itemId, line.itemId), eq(lots.locationId, locationId), eq(lots.lotNumber, lotNumber), gt(lots.quantity, 0)) });
+        lotId = lot?.id ?? null;
+      }
+      return { itemId: line.itemId, quantity, lotNumber: supplierReturn ? null : lotNumber, lotId };
+    }),
+  );
+
+  const n = related.filter((s) => s.isReturn).length + 1;
+  const shipmentId = await ctx.db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(shipments)
+      .values({
+        reference: `${o.number}/В${n}`,
+        direction: supplierReturn ? "outbound" : "inbound",
+        isReturn: true,
+        locationId,
+        orderId: o.id,
+        partnerId: o.partnerId,
+        partner: o.partner?.name ?? null,
+        createdBy: ctx.user.id,
+      })
+      .$returningId();
+    await tx.insert(shipmentLines).values(values.map((v) => ({ ...v, shipmentId: row.id })));
+    return row.id;
+  });
+  await audit(ctx, "create", "shipment", shipmentId, { returnForOrder: o.number });
+  emit(ctx.db, "shipment.created", { id: shipmentId, orderId: o.id, isReturn: true, lines: values });
+  revalidate(id);
+  revalidatePath("/shipments");
+  return redirectWith(`/shipments/${shipmentId}/edit`, supplierReturn ? "Връщането към доставчика е създадено — уточнете количествата." : "Връщането от клиента е създадено — уточнете количествата.");
 });

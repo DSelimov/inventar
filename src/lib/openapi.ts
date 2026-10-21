@@ -268,6 +268,7 @@ const schemas: Record<string, Schema> = {
       status: enumOf(SHIPMENT_STATUSES, "pending → in_transit → delivered | cancelled"),
       locationId: nullable(int("Локация на получаване/изпращане")),
       orderId: nullable(int("Свързана поръчка")),
+      isReturn: bool("Връщане: входяща от клиент по продажба или изходяща към доставчик по доставка. При доставка увеличава returnedQuantity на поръчката (не повече от доставеното), вместо изпълнението."),
       partnerId: nullable(int("Партньор от списъка")),
       partner: nullable(str("Партньор като свободен текст")),
       carrier: nullable(str("Куриер")),
@@ -282,7 +283,7 @@ const schemas: Record<string, Schema> = {
     ["id", "reference", "direction", "status", "lines"],
   ),
 
-  ShipmentStatusChange: obj({ status: enumOf(["in_transit", "delivered", "cancelled"], "Новият статус. delivered прилага наличността (и партидите) в една транзакция и обновява свързаната поръчка.") }, ["status"]),
+  ShipmentStatusChange: obj({ status: enumOf(["in_transit", "delivered", "cancelled"], "Новият статус. delivered прилага наличността (и партидите) в една транзакция и обновява свързаната поръчка (при връщане — върнатото количество).") }, ["status"]),
 
   OrderLine: obj(
     {
@@ -291,6 +292,7 @@ const schemas: Record<string, Schema> = {
       itemId: int("Артикул"),
       quantity: int("Поръчано количество"),
       fulfilledQuantity: int("Доставено до момента (сума от доставените пратки)"),
+      returnedQuantity: int("Върнато след доставка (сума от доставените връщания)"),
       unitPrice: num("Единична цена"),
       item: ref("Item"),
     },

@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, Pencil, Trash2, Truck, X } from "lucide-react";
+import { Check, Pencil, Trash2, Truck, Undo2, X } from "lucide-react";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
-import { createShipmentForRemaining, deleteOrder, setOrderStatus } from "@/lib/actions/orders";
+import { createReturnForOrder, createShipmentForRemaining, deleteOrder, setOrderStatus } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getOrder } from "@/lib/queries";
@@ -34,9 +34,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const ordered = order.lines.reduce((s, l) => s + l.quantity, 0);
   const fulfilled = order.lines.reduce((s, l) => s + Math.min(l.quantity, l.fulfilledQuantity), 0);
   const reserved = new Map<number, number>();
-  for (const s of order.shipments) if (s.status === "pending" || s.status === "in_transit") for (const l of s.lines) reserved.set(l.itemId, (reserved.get(l.itemId) ?? 0) + l.quantity);
+  for (const s of order.shipments) if (!s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) reserved.set(l.itemId, (reserved.get(l.itemId) ?? 0) + l.quantity);
   const remainingToShip = order.lines.reduce((s, l) => s + Math.max(0, l.quantity - l.fulfilledQuantity - (reserved.get(l.itemId) ?? 0)), 0);
   const active = order.status === "confirmed" || order.status === "partial";
+  const returned = order.lines.reduce((s, l) => s + l.returnedQuantity, 0);
+  const returnable = order.lines.reduce((s, l) => s + l.fulfilledQuantity - l.returnedQuantity, 0);
 
   return (
     <>
@@ -94,6 +96,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <th className="text-right">Поръчано</th>
                   <th className="text-right">Доставено</th>
                   <th className="text-right">Остава</th>
+                  {returned > 0 && <th className="text-right">Върнато</th>}
                   <th className="text-right">Ед. цена</th>
                   <th className="text-right">Общо</th>
                 </tr>
@@ -115,6 +118,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                       </td>
                       <td className="text-right tabular-nums text-success">{formatNumber(l.fulfilledQuantity)}</td>
                       <td className={`text-right tabular-nums ${rest > 0 ? "font-medium text-warning" : "text-muted"}`}>{formatNumber(rest)}</td>
+                      {returned > 0 && <td className={`text-right tabular-nums ${l.returnedQuantity ? "text-danger" : "text-muted"}`}>{l.returnedQuantity ? formatNumber(l.returnedQuantity) : "—"}</td>}
                       <td className="text-right tabular-nums text-muted">{formatMoney(l.unitPrice, currency)}</td>
                       <td className="text-right tabular-nums">{formatMoney(l.quantity * l.unitPrice, currency)}</td>
                     </tr>
@@ -145,6 +149,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                         <Link href={`/shipments/${s.id}`} className="font-medium hover:text-accent">
                           {s.reference}
                         </Link>
+                        {s.isReturn && (
+                          <Badge tone="warning" className="ml-2">
+                            Връщане
+                          </Badge>
+                        )}
                       </td>
                       <td>
                         <Badge tone={statusTone[s.status]}>{label(s.status)}</Badge>
@@ -182,6 +191,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <Form action={createShipmentForRemaining.bind(null, id)}>
                     <Button type="submit" className="w-full" disabled={remainingToShip === 0}>
                       <Truck className="h-4 w-4" /> Създай пратка за оставащото ({formatNumber(remainingToShip)})
+                    </Button>
+                  </Form>
+                )}
+                {returnable > 0 && (
+                  <Form action={createReturnForOrder.bind(null, id)}>
+                    <Button type="submit" variant="secondary" className="w-full">
+                      <Undo2 className="h-4 w-4" /> {purchase ? "Връщане към доставчика" : "Връщане от клиента"}
                     </Button>
                   </Form>
                 )}

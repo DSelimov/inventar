@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { items, lots, orderLines, orders, shipmentLines, shipments, type ORDER_TYPES, type ShipmentDirection } from "@/db/tenant-schema";
+import { items, lots, orderLines, orders, shipmentLines, shipments, stockMovements, type ORDER_TYPES, type ShipmentDirection } from "@/db/tenant-schema";
 import { changeShipmentStatus } from "@/lib/shipment-service";
 import { applyMovement } from "@/lib/stock";
 import { closeConnectionsAfterAll, createItem, createTenant, type TestTenant } from "../support/fixtures";
@@ -15,8 +15,8 @@ beforeAll(async () => {
 const actor = { id: 1, name: "Тест" };
 
 type Line = { itemId: number; quantity: number; lotNumber?: string; expiryDate?: string; lotId?: number };
-async function shipment(direction: ShipmentDirection, lines: Line[], orderId?: number) {
-  const [{ id }] = await t.db.insert(shipments).values({ reference: `SH-${Math.random().toString(36).slice(2, 8)}`, direction, locationId: t.main, orderId }).$returningId();
+async function shipment(direction: ShipmentDirection, lines: Line[], orderId?: number, isReturn = false) {
+  const [{ id }] = await t.db.insert(shipments).values({ reference: `SH-${Math.random().toString(36).slice(2, 8)}`, direction, locationId: t.main, orderId, isReturn }).$returningId();
   await t.db.insert(shipmentLines).values(lines.map((l) => ({ shipmentId: id, ...l })));
   return id;
 }
@@ -29,7 +29,7 @@ const qty = async (itemId: number) => (await t.db.select({ q: items.quantity }).
 const status = async (id: number) => (await t.db.select({ s: shipments.status }).from(shipments).where(eq(shipments.id, id)))[0].s;
 const orderState = async (id: number) => {
   const o = await t.db.query.orders.findFirst({ where: eq(orders.id, id), with: { lines: true } });
-  return { status: o!.status, fulfilled: o!.lines.map((l) => l.fulfilledQuantity) };
+  return { status: o!.status, fulfilled: o!.lines.map((l) => l.fulfilledQuantity), returned: o!.lines.map((l) => l.returnedQuantity) };
 };
 
 describe("changeShipmentStatus", () => {
@@ -51,11 +51,11 @@ describe("changeShipmentStatus", () => {
     expect(await qty(lotted)).toBe(2);
     const [lot] = await t.db.select().from(lots).where(eq(lots.itemId, lotted));
     expect(lot).toMatchObject({ lotNumber: "P-1", expiryDate: "2027-05-01", quantity: 2, locationId: t.main });
-    expect(await orderState(po)).toEqual({ status: "partial", fulfilled: [10, 2] });
+    expect(await orderState(po)).toEqual({ status: "partial", fulfilled: [10, 2], returned: [0, 0] });
 
     const second = await shipment("inbound", [{ itemId: lotted, quantity: 4, lotNumber: "P-2" }], po);
     await changeShipmentStatus(t.db, actor, second, "delivered");
-    expect(await orderState(po)).toEqual({ status: "completed", fulfilled: [10, 6] });
+    expect(await orderState(po)).toEqual({ status: "completed", fulfilled: [10, 6], returned: [0, 0] });
     expect(await qty(lotted)).toBe(6);
   });
 
@@ -69,7 +69,7 @@ describe("changeShipmentStatus", () => {
     await changeShipmentStatus(t.db, actor, id, "delivered");
     expect(await qty(lotted)).toBe(7);
     expect((await t.db.select().from(lots).where(eq(lots.id, lot.id)))[0].quantity).toBe(7);
-    expect(await orderState(so)).toEqual({ status: "completed", fulfilled: [3] });
+    expect(await orderState(so)).toEqual({ status: "completed", fulfilled: [3], returned: [0] });
   });
 
   it("втора доставка (и промяна след отказ) се отказва, без повторно движение", async () => {
@@ -100,5 +100,34 @@ describe("changeShipmentStatus", () => {
 
   it("непозната пратка", async () => {
     await expect(changeShipmentStatus(t.db, actor, 999_999, "delivered")).rejects.toThrow("Пратката не е намерена");
+  });
+
+  it("връщане от клиент: стоката се връща, върнатото се записва, не повече от доставеното", async () => {
+    const plain = await createItem(t.db);
+    await t.db.transaction((tx) => applyMovement(tx, { actor, itemId: plain, locationId: t.main, type: "in", quantity: 10 }));
+    const so = await order("sales", [{ itemId: plain, quantity: 3 }]);
+    await changeShipmentStatus(t.db, actor, await shipment("outbound", [{ itemId: plain, quantity: 3 }], so), "delivered");
+    expect(await qty(plain)).toBe(7);
+
+    const ret = await shipment("inbound", [{ itemId: plain, quantity: 2 }], so, true);
+    await changeShipmentStatus(t.db, actor, ret, "delivered");
+    expect(await qty(plain)).toBe(9);
+    expect(await orderState(so)).toEqual({ status: "completed", fulfilled: [3], returned: [2] });
+    const [m] = await t.db.select().from(stockMovements).where(eq(stockMovements.shipmentId, ret));
+    expect(m.reason).toMatch(/^Връщане /);
+
+    const tooMuch = await shipment("inbound", [{ itemId: plain, quantity: 2 }], so, true);
+    await expect(changeShipmentStatus(t.db, actor, tooMuch, "delivered")).rejects.toThrow("може да се върнат най-много 1");
+    expect(await qty(plain)).toBe(9);
+    expect(await status(tooMuch)).toBe("pending");
+  });
+
+  it("връщане към доставчик: изписва от склада и записва върнатото", async () => {
+    const plain = await createItem(t.db);
+    const po = await order("purchase", [{ itemId: plain, quantity: 5 }]);
+    await changeShipmentStatus(t.db, actor, await shipment("inbound", [{ itemId: plain, quantity: 5 }], po), "delivered");
+    await changeShipmentStatus(t.db, actor, await shipment("outbound", [{ itemId: plain, quantity: 2 }], po, true), "delivered");
+    expect(await qty(plain)).toBe(3);
+    expect(await orderState(po)).toEqual({ status: "completed", fulfilled: [5], returned: [2] });
   });
 });

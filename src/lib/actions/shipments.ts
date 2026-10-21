@@ -93,7 +93,9 @@ export const updateShipment = act(async (id: number, fd: FormData) => {
   if (editable && !lines.length) throw new UserError("Добавете поне един ред към пратката.");
   if (editable) await assertLotsBelong(ctx.db, lines);
   await ctx.db.transaction(async (tx) => {
-    await tx.update(shipments).set(editable ? data : { notes: data.notes, carrier: data.carrier, trackingNumber: data.trackingNumber }).where(eq(shipments.id, id));
+    // посоката на връщане следва от поръчката и не се сменя
+    const patch = existing.isReturn ? { ...data, direction: existing.direction, orderId: existing.orderId } : data;
+    await tx.update(shipments).set(editable ? patch : { notes: data.notes, carrier: data.carrier, trackingNumber: data.trackingNumber }).where(eq(shipments.id, id));
     if (editable) {
       await tx.delete(shipmentLines).where(eq(shipmentLines.shipmentId, id));
       await tx.insert(shipmentLines).values(lines.map((l) => ({ ...l, shipmentId: id })));

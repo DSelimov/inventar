@@ -100,6 +100,11 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                       <Link href={`/shipments/${s.id}`} className="font-medium hover:text-accent">
                         {s.reference}
                       </Link>
+                      {s.isReturn && (
+                        <Badge tone="warning" className="ml-2">
+                          Връщане
+                        </Badge>
+                      )}
                       <div className="text-xs text-muted">
                         {s.order && (
                           <Link href={`/orders/${s.order.id}`} className="hover:text-accent">

@@ -22,6 +22,13 @@
       "when": 1792579852090,
       "tag": "0002_stock_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1792580386397,
+      "tag": "0003_returns",
+      "breakpoints": true
     }
   ]
 }

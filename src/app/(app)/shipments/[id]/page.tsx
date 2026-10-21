@@ -41,11 +41,12 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
     <>
       <PageHeader
         back={{ href: "/shipments", label: "Пратки" }}
-        eyebrow={label(shipment.direction)}
+        eyebrow={shipment.isReturn ? (inbound ? "Връщане от клиент" : "Връщане към доставчик") : label(shipment.direction)}
         title={shipment.reference}
         description={
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={statusTone[shipment.status]}>{label(shipment.status)}</Badge>
+            {shipment.isReturn && <Badge tone="warning">Връщане</Badge>}
             {overdue && <Badge tone="danger">Закъснява</Badge>}
             {partnerName && (
               <span className="text-muted">
@@ -70,7 +71,7 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
           <>
             <a href={`/print/shipments/${id}`} target="_blank" rel="noreferrer" className={buttonClasses("secondary")}>
               <Printer className="h-4 w-4" />
-              {shipment.direction === "inbound" ? "Приемателен протокол" : "Стокова разписка"}
+              {shipment.isReturn ? "Протокол за връщане" : shipment.direction === "inbound" ? "Приемателен протокол" : "Стокова разписка"}
             </a>
             {writable && (
             <>

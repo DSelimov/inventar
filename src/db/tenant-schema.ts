@@ -210,6 +210,8 @@ export const orderLines = mysqlTable("order_lines", {
   itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
   quantity: int("quantity").notNull(),
   fulfilledQuantity: int("fulfilled_quantity").notNull().default(0),
+  /** Върнато от клиента (продажба) или към доставчика (доставка) след изпълнение. */
+  returnedQuantity: int("returned_quantity").notNull().default(0),
   unitPrice: double("unit_price").notNull().default(0),
 });
 
@@ -222,6 +224,8 @@ export const shipments = mysqlTable("shipments", {
   locationId: int("location_id").references(() => locations.id, { onDelete: "set null" }),
   orderId: int("order_id").references(() => orders.id, { onDelete: "set null" }),
   partnerId: int("partner_id").references(() => partners.id, { onDelete: "set null" }),
+  /** Връщане: входяща от клиент (към продажба) или изходяща към доставчик (към доставка). */
+  isReturn: boolean("is_return").notNull().default(false),
   partner: varchar("partner", { length: 200 }),
   carrier: varchar("carrier", { length: 120 }),
   trackingNumber: varchar("tracking_number", { length: 120 }),

@@ -17,15 +17,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const prices = new Map<number, number>();
   if (shipment.orderId) for (const l of await ctx.db.select().from(orderLines).where(eq(orderLines.orderId, shipment.orderId))) prices.set(l.itemId, l.unitPrice);
 
-  const doc = createDoc({ title: `${inbound ? "Приемателен протокол" : "Стокова разписка"} ${shipment.reference}` });
+  const title = shipment.isReturn ? (inbound ? "Протокол за връщане от клиент" : "Протокол за връщане към доставчик") : inbound ? "Приемателен протокол" : "Стокова разписка";
+  const doc = createDoc({ title: `${title} ${shipment.reference}` });
   const partner = shipment.partnerRecord?.name ?? shipment.partner ?? "—";
   documentHeader(doc, {
     company,
     orgName: ctx.org.name,
-    title: inbound ? "Приемателен протокол" : "Стокова разписка",
+    title,
     subtitle: `№ ${shipment.reference} от ${formatDate(shipment.deliveredAt ?? shipment.createdAt, "dd.MM.yyyy")}`,
     right: [
-      `${inbound ? "Доставчик" : "Получател"}: ${partner}`,
+      // обикновена входяща и връщане към доставчик → доставчик; връщане от клиент → клиент
+      `${inbound === !shipment.isReturn ? "Доставчик" : shipment.isReturn ? "Клиент" : "Получател"}: ${partner}`,
       `Склад: ${shipment.location?.name ?? "—"}`,
       ...(shipment.order ? [`Поръчка: ${shipment.order.number}`] : []),
       ...(shipment.carrier ? [`Куриер: ${shipment.carrier}${shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ""}`] : []),
