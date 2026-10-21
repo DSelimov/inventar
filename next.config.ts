@@ -31,6 +31,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // pdfkit чете собствените си файлове с данни по време на изпълнение — не се пакетира
+  serverExternalPackages: ["pdfkit", "bwip-js"],
   experimental: {
     // Качване на снимки на артикули (до 10 MB на файл); по подразбиране е 1 MB.
     serverActions: { bodySizeLimit: "40mb" },

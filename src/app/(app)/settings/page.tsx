@@ -5,10 +5,10 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { LogOut } from "lucide-react";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { changeOwnPassword, logoutEverywhere } from "@/lib/actions/members";
-import { saveOrganization, saveReportParameters } from "@/lib/actions/settings";
+import { saveCompanyDetails, saveOrganization, saveReportParameters } from "@/lib/actions/settings";
 import { countSessions, requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { getSettings } from "@/lib/settings";
+import { getCompanyDetails, getSettings } from "@/lib/settings";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
 import { Form } from "@/components/ui/form";
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const [s, sessionCount] = await Promise.all([getSettings(ctx.db), countSessions(ctx.user.id)]);
+  const [s, sessionCount, company] = await Promise.all([getSettings(ctx.db), countSessions(ctx.user.id), getCompanyDetails(ctx.db)]);
   const manage = can(ctx.role, "manage");
 
   return (
@@ -35,6 +35,37 @@ export default async function SettingsPage() {
             {manage && (
               <div className="flex justify-end border-t border-line pt-4">
                 <SubmitButton>Запази</SubmitButton>
+              </div>
+            )}
+          </Form>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Данни за документи" description="Печатат се в стоковите разписки и справките (PDF)." />
+        <CardBody>
+          <Form action={saveCompanyDetails} className="grid gap-4 sm:grid-cols-2">
+            <Field label="Фирма (юридическо име)" className="sm:col-span-2">
+              <Input name="legalName" defaultValue={company.legalName} placeholder={ctx.org.name} disabled={!manage} />
+            </Field>
+            <Field label="ЕИК">
+              <Input name="eik" defaultValue={company.eik} inputMode="numeric" disabled={!manage} />
+            </Field>
+            <Field label="ДДС №">
+              <Input name="vatNumber" defaultValue={company.vatNumber} placeholder="BG…" disabled={!manage} />
+            </Field>
+            <Field label="Адрес" className="sm:col-span-2">
+              <Input name="address" defaultValue={company.address} disabled={!manage} />
+            </Field>
+            <Field label="Телефон">
+              <Input name="phone" defaultValue={company.phone} disabled={!manage} />
+            </Field>
+            <Field label="МОЛ">
+              <Input name="mol" defaultValue={company.mol} disabled={!manage} />
+            </Field>
+            {manage && (
+              <div className="flex justify-end sm:col-span-2">
+                <SubmitButton variant="secondary">Запази</SubmitButton>
               </div>
             )}
           </Form>

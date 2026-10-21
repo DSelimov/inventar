@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, Pencil, Trash2, Truck, X } from "lucide-react";
+import { Check, Pencil, Printer, Trash2, Truck, X } from "lucide-react";
 import { Badge, statusTone } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, buttonClasses, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -67,7 +67,12 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
           </span>
         }
         actions={
-          writable && (
+          <>
+            <a href={`/print/shipments/${id}`} target="_blank" rel="noreferrer" className={buttonClasses("secondary")}>
+              <Printer className="h-4 w-4" />
+              {shipment.direction === "inbound" ? "Приемателен протокол" : "Стокова разписка"}
+            </a>
+            {writable && (
             <>
               <ButtonLink href={`/shipments/${id}/edit`} variant="secondary">
                 <Pencil className="h-4 w-4" />
@@ -82,7 +87,8 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
                 </Form>
               )}
             </>
-          )
+            )}
+          </>
         }
       />
 

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeftRight, GitBranch, Layers, Pencil, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowLeftRight, GitBranch, Layers, Pencil, Plus, Printer, SlidersHorizontal, Trash2 } from "lucide-react";
 import { ItemGallery } from "@/components/items/item-gallery";
 import { Badge, ColorBadge, statusTone } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { buttonClasses, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field, Input, Select } from "@/components/ui/fields";
@@ -462,6 +462,29 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               </CardBody>
             </Card>
           )}
+
+          <Card>
+            <CardHeader title="Етикети с баркод" description={item.barcode ? `Баркод ${item.barcode}` : `Без баркод — ще се използва кодът ${item.sku}.`} />
+            <CardBody>
+              <form action="/print/labels" method="get" target="_blank" className="grid grid-cols-2 gap-3">
+                <input type="hidden" name="item" value={id} />
+                <Field label="Брой">
+                  <Input name="copies" type="number" min={1} max={100} defaultValue={24} />
+                </Field>
+                <Field label="Пропусни" hint="Вече използвани места на листа.">
+                  <Input name="skip" type="number" min={0} max={23} defaultValue={0} />
+                </Field>
+                <label className="col-span-2 flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="price" value="0" className="h-4 w-4 rounded border-line" />
+                  Без цена
+                </label>
+                <button type="submit" className={`col-span-2 ${buttonClasses("secondary", "sm")}`}>
+                  <Printer className="h-4 w-4" />
+                  Етикети (PDF, A4 3×8)
+                </button>
+              </form>
+            </CardBody>
+          </Card>
 
           <p className="text-xs text-muted">
             Създаден {formatDate(item.createdAt)} · Обновен {formatDate(item.updatedAt)}

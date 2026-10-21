@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Download, ImageOff, Package, Plus } from "lucide-react";
+import { Download, ImageOff, Package, Plus, Printer } from "lucide-react";
 import type { Metadata } from "next";
 import { Badge, ColorBadge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { buttonClasses, ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Checkbox, Input, Select } from "@/components/ui/fields";
 import { PageHeader } from "@/components/ui/page-header";
@@ -37,6 +37,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
     listLocations(ctx.db),
   ]);
   const photos = await primaryImages(ctx.db, [...new Set(rows.flatMap((r) => (r.parentId ? [r.id, r.parentId] : [r.id])))]);
+  const labelQuery = new URLSearchParams(Object.entries({ q, category: categoryId ? String(categoryId) : "", location: locationId ? String(locationId) : "", status, low: low ? "1" : "" }).filter(([, v]) => v)).toString();
   const hasFilters = Boolean(q || categoryId || locationId || low || status !== "active");
   const multiLocation = locations.length > 1;
 
@@ -47,6 +48,10 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
         description="Всичко, което държите на склад, с количества и стойности."
         actions={
           <>
+            <a href={`/print/labels?${labelQuery}`} target="_blank" rel="noreferrer" className={buttonClasses("secondary")} title="Етикети за артикулите по текущия филтър">
+              <Printer className="h-4 w-4" />
+              Етикети
+            </a>
             <ButtonLink href="/api/export/items" variant="secondary">
               <Download className="h-4 w-4" />
               CSV

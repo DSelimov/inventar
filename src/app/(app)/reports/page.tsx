@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { format, subMonths } from "date-fns";
-import { Settings2 } from "lucide-react";
+import { Printer, Settings2 } from "lucide-react";
 import { Badge, ColorBadge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { buttonClasses, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table } from "@/components/ui/table";
@@ -33,11 +33,16 @@ export default async function ReportsPage() {
         title="Отчети"
         description={`Анализ за последните ${settings.windowDays} дни (от ${formatDate(r.windowStart)}). Залежала стока: без разход ${settings.deadStockDays} дни. Покритие при поръчка: ${r.coverDays} дни (доставка ${r.avgLead} + буфер ${settings.safetyDays}).`}
         actions={
-          can(ctx.role, "manage") && (
-            <ButtonLink href="/settings" variant="secondary">
-              <Settings2 className="h-4 w-4" /> Параметри
-            </ButtonLink>
-          )
+          <>
+            <a href="/print/stock" target="_blank" rel="noreferrer" className={buttonClasses("secondary")}>
+              <Printer className="h-4 w-4" /> Справка за наличност (PDF)
+            </a>
+            {can(ctx.role, "manage") && (
+              <ButtonLink href="/settings" variant="secondary">
+                <Settings2 className="h-4 w-4" /> Параметри
+              </ButtonLink>
+            )}
+          </>
         }
       />
 

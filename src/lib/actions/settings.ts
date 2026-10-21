@@ -7,7 +7,7 @@ import { organizations } from "@/db/control-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { bool, int, str } from "@/lib/forms";
-import { setSetting } from "@/lib/settings";
+import { COMPANY_FIELDS, setSetting } from "@/lib/settings";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 
@@ -39,4 +39,14 @@ export const saveReportParameters = act(async (fd: FormData) => {
   revalidatePath("/reports");
   revalidatePath("/settings");
   return "Параметрите на отчетите са запазени.";
+});
+
+export const saveCompanyDetails = act(async (fd: FormData) => {
+  const ctx = await requireContext("manage");
+  const details = Object.fromEntries(COMPANY_FIELDS.map((k) => [k, str(fd, k).slice(0, 300)]));
+  if (details.eik && !/^\d{9}(\d{4})?$/.test(details.eik)) throw new UserError("ЕИК трябва да е 9 или 13 цифри.");
+  for (const [k, v] of Object.entries(details)) await setSetting(ctx.db, `company.${k}`, v);
+  await audit(ctx, "update", "settings", null, { company: details.legalName });
+  revalidatePath("/settings");
+  return "Данните за документите са запазени.";
 });
