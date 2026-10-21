@@ -33,6 +33,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const writable = can(ctx.role, "write");
   const purchase = order.type === "purchase";
   const total = sumLines(order.lines, (l) => l.quantity, (l) => l.unitPrice);
+  // поръчка отпреди превалутирането: сумата, с която е издадена
+  const original = order.originalCurrency ? { currency: order.originalCurrency, total: sumLines(order.lines, (l) => l.quantity, (l) => l.originalUnitPrice ?? 0) } : null;
   const ordered = sumQty(order.lines, (l) => l.quantity);
   const fulfilled = sumQty(order.lines, (l) => Math.min(l.quantity, l.fulfilledQuantity));
   const reserved = new Map<number, number>();
@@ -82,7 +84,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Stat label="Стойност" value={formatMoney(total, currency)} />
+        <Stat label="Стойност" value={formatMoney(total, currency)} hint={original ? `издадена за ${formatMoney(original.total, original.currency)}` : undefined} />
         <Stat label="Изпълнено" value={`${formatNumber(fulfilled)} / ${formatNumber(ordered)}`} hint={ordered ? `${Math.round((fulfilled / ordered) * 100)} %` : undefined} />
         <Stat label="Очаквана дата" value={formatDate(order.expectedDate)} hint={`Поръчана на ${formatDate(order.orderDate)}`} />
       </div>
@@ -121,7 +123,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                       <td className="text-right tabular-nums text-success">{formatNumber(l.fulfilledQuantity)}</td>
                       <td className={`text-right tabular-nums ${rest > 0 ? "font-medium text-warning" : "text-muted"}`}>{formatNumber(rest)}</td>
                       {returned > 0 && <td className={`text-right tabular-nums ${l.returnedQuantity ? "text-danger" : "text-muted"}`}>{l.returnedQuantity ? formatNumber(l.returnedQuantity) : "—"}</td>}
-                      <td className="text-right tabular-nums text-muted">{formatMoney(l.unitPrice, currency)}</td>
+                      <td className="text-right tabular-nums text-muted">
+                        {formatMoney(l.unitPrice, currency)}
+                        {original && l.originalUnitPrice !== null && <div className="text-xs">{formatMoney(l.originalUnitPrice, original.currency)}</div>}
+                      </td>
                       <td className="text-right tabular-nums">{formatMoney(lineTotal(l.quantity, l.unitPrice), currency)}</td>
                     </tr>
                   );

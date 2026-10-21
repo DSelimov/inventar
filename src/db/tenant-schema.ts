@@ -206,6 +206,8 @@ export const orders = mysqlTable("orders", {
   orderDate: date("order_date", { mode: "string" }),
   expectedDate: date("expected_date", { mode: "string" }),
   notes: text("notes"),
+  /** Валутата, в която е издадена поръчката, ако е превалутирана (напр. BGN → EUR от 1.1.2026). */
+  originalCurrency: varchar("original_currency", { length: 3 }),
   createdBy: int("created_by"),
   createdAt: createdAt(),
 });
@@ -219,6 +221,8 @@ export const orderLines = mysqlTable("order_lines", {
   /** Върнато от клиента (продажба) или към доставчика (доставка) след изпълнение. */
   returnedQuantity: qty("returned_quantity").notNull().default(0),
   unitPrice: money("unit_price").notNull().default(0),
+  /** Цената в originalCurrency на поръчката преди превалутирането. */
+  originalUnitPrice: money("original_unit_price"),
 });
 
 // ------------------------------------------------------------------- shipments

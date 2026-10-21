@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Checkbox, Field, Input } from "@/components/ui/fields";
+import { Checkbox, Field, Input, Select } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ButtonLink } from "@/components/ui/button";
-import { saveCompanyDetails, saveOrganization, saveReportParameters } from "@/lib/actions/settings";
+import { convertToEuro, saveCompanyDetails, saveOrganization, saveReportParameters } from "@/lib/actions/settings";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getCompanyDetails, getSettings } from "@/lib/settings";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
 import { Form } from "@/components/ui/form";
+import { ConfirmButton } from "@/components/ui/confirm-button";
+import { CURRENCIES } from "@/lib/currency";
 
 export const metadata: Metadata = { title: "Настройки" };
 
@@ -26,8 +28,15 @@ export default async function SettingsPage() {
             <Field label="Име на фирмата">
               <Input name="name" defaultValue={ctx.org.name} required disabled={!manage} />
             </Field>
-            <Field label="Валута" hint="ISO 4217 код, напр. EUR, BGN, USD.">
-              <Input name="currency" defaultValue={ctx.org.currency} maxLength={3} className="w-28 uppercase" disabled={!manage} />
+            <Field label="Валута" hint="Сменя се само преди да има цени и поръчки — сумите не се преизчисляват.">
+              <Select name="currency" defaultValue={ctx.org.currency} className="w-64" disabled={!manage}>
+                {ctx.org.currency === "BGN" && <option value="BGN">Български лев (до превалутирането)</option>}
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} · {c.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Checkbox name="lowStockAlerts" defaultChecked={s.lowStockAlerts} label="Показвай артикулите с ниска наличност на таблото" disabled={!manage} />
             {manage && (
@@ -36,6 +45,22 @@ export default async function SettingsPage() {
               </div>
             )}
           </Form>
+          {ctx.org.currency === "BGN" && (
+            <Form action={convertToEuro} className="mt-4 space-y-2 rounded-xl bg-warning-soft p-4 text-sm">
+              <p className="font-medium text-warning">От 1 януари 2026 г. България е в еврозоната.</p>
+              <p className="text-muted">
+                Превалутирането преизчислява всички цени и поръчки по курс 1 € = 1,95583 лв. Продажните цени се закръглят до стотинка,
+                доставните пазят 4 знака; поръчките запазват и сумите в лева. Действието е еднократно.
+              </p>
+              {ctx.role === "owner" ? (
+                <ConfirmButton variant="secondary" size="sm" message="Да превалутирам ли всички цени и поръчки от лева в евро? Действието е еднократно.">
+                  Превалутирай в евро
+                </ConfirmButton>
+              ) : (
+                <p className="text-muted">Само собственикът на организацията може да го направи.</p>
+              )}
+            </Form>
+          )}
         </CardBody>
       </Card>
 

@@ -5,6 +5,8 @@ import { createDoc, documentHeader, mm, pageNumbers, pdfResponse, table } from "
 import { getShipment } from "@/lib/queries";
 import { getCompanyDetails } from "@/lib/settings";
 import { formatDate, formatMoney, formatNumber } from "@/lib/utils";
+import { lineTotal, sumLines, sumMoney } from "@/lib/money";
+import { BGN_PER_EUR } from "@/lib/currency";
 
 /** Стокова разписка (изходяща) / приемателен протокол (входяща) за пратка. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +17,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const company = await getCompanyDetails(ctx.db);
   const inbound = shipment.direction === "inbound";
   const prices = new Map<number, number>();
-  if (shipment.orderId) for (const l of await ctx.db.select().from(orderLines).where(eq(orderLines.orderId, shipment.orderId))) prices.set(l.itemId, l.unitPrice);
+  const originalPrices = new Map<number, number>();
+  if (shipment.orderId) {
+    for (const l of await ctx.db.select().from(orderLines).where(eq(orderLines.orderId, shipment.orderId))) {
+      prices.set(l.itemId, l.unitPrice);
+      if (l.originalUnitPrice !== null) originalPrices.set(l.itemId, l.originalUnitPrice);
+    }
+  }
+  const originalTotal = originalPrices.size ? sumLines(shipment.lines, (l) => l.quantity, (l) => originalPrices.get(l.itemId) ?? 0) : null;
 
   const title = shipment.isReturn ? (inbound ? "Протокол за връщане от клиент" : "Протокол за връщане към доставчик") : inbound ? "Приемателен протокол" : "Стокова разписка";
   const doc = createDoc({ title: `${title} ${shipment.reference}` });
@@ -37,9 +46,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   let total = 0;
   const rows = shipment.lines.map((l, i) => {
     const price = prices.get(l.itemId) ?? (inbound ? l.item.unitCost : l.item.unitPrice);
-    total += price * l.quantity;
+    const value = lineTotal(l.quantity, price);
+    total = sumMoney([total, value]);
     const lot = l.lot?.lotNumber ?? l.lotNumber ?? "";
-    return [String(i + 1), l.item.sku, l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name, lot, formatNumber(l.quantity), l.item.unit, formatMoney(price, ctx.org.currency), formatMoney(price * l.quantity, ctx.org.currency)];
+    return [String(i + 1), l.item.sku, l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name, lot, formatNumber(l.quantity), l.item.unit, formatMoney(price, ctx.org.currency), formatMoney(value, ctx.org.currency)];
   });
   table(
     doc,
@@ -58,6 +68,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   );
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   doc.font("bold").fontSize(10).text(`Общо: ${formatMoney(total, ctx.org.currency)}`, doc.page.margins.left, doc.y, { width, align: "right" });
+  if (originalTotal !== null && shipment.order?.originalCurrency) {
+    // документ отпреди превалутирането: сумата, с която е издаден
+    const rate = shipment.order.originalCurrency === "BGN" ? ` (по курс ${BGN_PER_EUR})` : "";
+    doc.font("regular").fontSize(8.5).fillColor("#4b5563").text(`Издаден за ${formatMoney(originalTotal, shipment.order.originalCurrency)}${rate}`, doc.page.margins.left, doc.y, { width, align: "right" }).fillColor("black");
+  }
   if (shipment.notes) doc.moveDown().font("regular").fontSize(8.5).fillColor("#4b5563").text(`Бележки: ${shipment.notes}`, { width }).fillColor("black");
 
   // подписи

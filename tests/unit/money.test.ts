@@ -54,9 +54,11 @@ describe("без float аритметика с пари в src/", () => {
     }
   };
   walk(path.resolve("src"));
-  const pattern = /(\*\s*[\w.?!]*\b(unitCost|unitPrice)\b)|(\b(unitCost|unitPrice)\b\s*\*)/;
+  // unitCost/unitPrice и всяка променлива, завършваща на price/cost (price, r.cost, originalUnitPrice…)
+  const money = String.raw`[\w.?!]*(?:[pP]rice|[cC]ost)\b`;
+  const pattern = new RegExp(String.raw`(\*\s*${money})|(\b${money}\s*\*)`);
 
-  it("няма „количество * unitCost/unitPrice“ в JS", () => {
+  it("няма „количество * цена“ в JS", () => {
     const hits = files.flatMap((f) =>
       readFileSync(f, "utf8")
         .split("\n")

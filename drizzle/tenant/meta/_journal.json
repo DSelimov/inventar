@@ -43,6 +43,13 @@
       "when": 1792603869032,
       "tag": "0005_fractional_quantities",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1792604749323,
+      "tag": "0006_euro_original_amounts",
+      "breakpoints": true
     }
   ]
 }

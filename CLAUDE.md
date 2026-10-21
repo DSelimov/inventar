@@ -34,6 +34,8 @@ Tailwind CSS 4 · lucide-react · date-fns (bg) · html5-qrcode. Package manager
   case-insensitive. After a schema change: `pnpm db:generate` then `pnpm db:migrate`.
   Check the generated SQL: drizzle-kit's `MODIFY COLUMN` drops `DEFAULT` — add it back by hand, and give the
   file a descriptive name (rename the tag in `meta/_journal.json` too).
+  Restart `pnpm dev` after a tenant schema change: the cached tenant Drizzle instances keep the old schema
+  and relational queries silently miss the new columns.
 - Enum labels: `STATUS_LABELS` in `src/lib/utils.ts`; badge tones in `src/components/ui/badge.tsx`.
 - Keep the design: tokens in `src/app/globals.css`, components in `src/components/ui`.
 

@@ -39,6 +39,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   invite: "Добавен потребител",
   role: "Смяна на роля",
   remove_member: "Премахнат потребител",
+  currency: "Превалутиране",
   "2fa_enabled": "Включена 2FA",
   "2fa_disabled": "Изключена 2FA",
   "2fa_recovery_codes": "Нови кодове за 2FA",

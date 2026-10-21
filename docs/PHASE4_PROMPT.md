@@ -52,14 +52,17 @@ tenant, default `EUR`.
 - Acceptance: receive 12.5 кг, sell 0.750 кг, count 11.750 кг — all exact; tests in `tests/db/stock.test.ts`.
 
 ### A3. Euro and the лев history
-- Bulgaria uses the euro since 1 January 2026, fixed rate **1 EUR = 1.95583 BGN**. Add a one-off,
-  idempotent per-tenant migration script `pnpm db:euro` for tenants whose currency is `BGN`: convert stored
-  amounts at the fixed rate with correct rounding, set currency to `EUR`, keep the original currency and
-  amount on historical documents (`original_currency`, `original_amount`), and record it in the audit log.
-- PDFs of documents issued before the switch show the original лева amount (and the euro equivalent).
-- Settings: currency is no longer free text — EUR default, a short list (EUR, USD, GBP, RON…) for
-  foreign-currency partners later.
-- Acceptance: a BGN test tenant converts exactly once; re-running changes nothing; totals match to the cent.
+- **Done.** `convertTenantToEuro` (`src/lib/euro.ts`) converts a BGN tenant at 1 EUR = 1.95583 BGN in one
+  transaction: selling prices and sales-order prices to the cent, costs and purchase-order prices to 4
+  decimals (`bgnToEur` in `src/lib/currency.ts`, exact BigInt arithmetic). Orders keep `original_currency`
+  and each line `original_unit_price`; the order page and the delivery-note PDF show "издадена за … лв.".
+  A primary-key marker in `settings` (`currency.euroConvertedAt`) makes it run once, also under concurrent
+  calls; the control-DB currency is switched afterwards (a rerun finishes an interrupted switch). Audit
+  entry `currency`.
+- Run it with `pnpm db:euro [--dry-run] [subdomain…]` for every BGN tenant, or by the owner from
+  Настройки (button shown only while the currency is BGN).
+- Currency is a select of `CURRENCIES` (EUR first); changing it is refused once the tenant has prices or
+  orders, because amounts are not recalculated.
 
 ### A4. Cost on every movement and stock valuation
 - `stock_movements.unit_cost` (decimal) and `value` (delta × cost). Receipts take cost from the purchase

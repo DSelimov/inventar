@@ -1,6 +1,5 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { controlDb } from "@/db/control";
 import { organizations } from "@/db/control-schema";
@@ -10,16 +9,44 @@ import { bool, int, str } from "@/lib/forms";
 import { COMPANY_FIELDS, setSetting } from "@/lib/settings";
 import { act } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { count, eq, ne, or } from "drizzle-orm";
+import type { Db } from "@/db/tenant";
+import { items, orders } from "@/db/tenant-schema";
+import { isCurrency } from "@/lib/currency";
+import { convertTenantToEuro } from "@/lib/euro";
 
 export const saveOrganization = act(async (fd: FormData) => {
   const ctx = await requireContext("manage");
   const name = str(fd, "name") || ctx.org.name;
-  const currency = (str(fd, "currency") || "EUR").toUpperCase().slice(0, 3);
+  const currency = str(fd, "currency").toUpperCase() || ctx.org.currency;
+  if (currency !== ctx.org.currency) {
+    if (!isCurrency(currency)) throw new UserError("Изберете валута от списъка.");
+    // смяната само преименува сумите — позволена е само преди да има цени или поръчки
+    if (await hasAmounts(ctx.db)) throw new UserError("Валутата не може да се смени, след като има цени или поръчки: сумите няма да бъдат преизчислени.");
+  }
   await controlDb.update(organizations).set({ name, currency }).where(eq(organizations.id, ctx.org.id));
   await setSetting(ctx.db, "lowStockAlerts", String(bool(fd, "lowStockAlerts")));
   await audit(ctx, "update", "organization", ctx.org.id, { name, currency });
   revalidatePath("/", "layout");
   return "Настройките са запазени.";
+});
+
+async function hasAmounts(db: Db) {
+  const [[priced], [ordered]] = await Promise.all([
+    db.select({ n: count() }).from(items).where(or(ne(items.unitCost, 0), ne(items.unitPrice, 0))),
+    db.select({ n: count() }).from(orders),
+  ]);
+  return priced.n + ordered.n > 0;
+}
+
+/** Лева → евро по фиксирания курс (само собственикът; виж src/lib/euro.ts). */
+export const convertToEuro = act(async () => {
+  const ctx = await requireContext("owner");
+  if (ctx.org.currency !== "BGN") throw new UserError("Организацията вече не е в лева.");
+  const r = await convertTenantToEuro(ctx.org, { id: ctx.user.id, name: ctx.user.name });
+  revalidatePath("/", "layout");
+  if (r.status === "already") return "Организацията вече е превалутирана.";
+  return `Превалутирано в евро: ${r.items} артикула и ${r.orderLines} реда в ${r.orders} поръчки (курс 1.95583).`;
 });
 
 export const saveReportParameters = act(async (fd: FormData) => {
