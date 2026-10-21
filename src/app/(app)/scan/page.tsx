@@ -26,7 +26,15 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader title="Сканиране" description="Намерете артикул по баркод или код и направете бърз приход или разход." />
+      <PageHeader
+        title="Сканиране"
+        description="Намерете артикул по баркод или код и направете бърз приход или разход."
+        actions={
+          <ButtonLink href="/m" variant="secondary">
+            Мобилен режим (и без връзка)
+          </ButtonLink>
+        }
+      />
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader title="Скенер" />

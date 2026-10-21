@@ -52,7 +52,7 @@ async function openCount(db: Db, countId: number) {
  * Сканиран или въведен код → ред. Кодът може да е баркод/код на артикул или номер на партида/сериен номер.
  * mode "add" прибавя (всяко сканиране +1), "set" задава точното количество.
  */
-export async function recordCount(db: TenantDb, countId: number, code: string, quantity: number, mode: "add" | "set" = "add") {
+export async function recordCount(db: Db, countId: number, code: string, quantity: number, mode: "add" | "set" = "add") {
   const count = await openCount(db, countId);
   code = code.trim();
   if (!code) throw new UserError("Въведете или сканирайте код.");

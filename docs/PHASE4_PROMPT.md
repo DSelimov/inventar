@@ -191,10 +191,17 @@ tenant, default `EUR`.
 ## D. Everyday use (former item 5)
 
 ### D1. Mobile scan mode (PWA)
-- Installable PWA (manifest, icons, service worker) with a full-screen scan mode for receiving, picking,
-  transfers and counts; large buttons, camera + Bluetooth scanner input, haptic/sound feedback.
-- Offline queue for counts and movements recorded without signal, synced in order when online, conflicts
-  shown to the user (never silently applied twice — idempotency key per queued action).
+- **Done.** `/m` (route group `(mobile)`, client-only `MobileScan`): big buttons Приход / Разход / Броене,
+  location or open count, quantity, camera (html5-qrcode) and Bluetooth/USB scanner input, vibration and
+  beep. Catalog (`/api/m/catalog`: items, pack barcodes, locations, open counts) is cached in localStorage,
+  so codes resolve offline; actions go to a local queue and are sent in order by `/api/m/sync`.
+- Idempotency: each action has a UUID; `offline_actions` (migration 0014) is written in the action's own
+  transaction, failures are stored too — a resend (or a parallel one) returns the stored result and never
+  books twice (`src/lib/offline-sync.ts`). Errors (e.g. insufficient stock) are shown in red on the phone.
+- PWA: `app/manifest.ts` (start `/m`, standalone), icons in `public/icons`, `public/sw.js` (network first,
+  `/m` and `/_next/static` from cache offline; registered in production only). Lot/serial items need the
+  full mode. Link "Мобилен режим" on /scan.
+- Verified against a production build (`pnpm start`): offline queue, reload while offline, sync once back.
 
 ### D2. Reorder suggestions
 - **Done.** `/orders/suggestions` ("Предложения за поръчка", button on Поръчки; `src/lib/replenishment.ts`):

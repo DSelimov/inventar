@@ -557,6 +557,22 @@ export const invoicePayments = mysqlTable("invoice_payments", {
   createdAt: createdAt(),
 });
 
+// -------------------------------------------------------------- offline actions
+/**
+ * Действия от мобилния режим, записани без връзка и изпратени по-късно. Идентификаторът е от телефона
+ * (UUID): повторно изпращане на същото действие връща записания резултат, без да се прилага втори път.
+ */
+export const offlineActions = mysqlTable("offline_actions", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  payload: json("payload").notNull(),
+  ok: boolean("ok").notNull(),
+  message: varchar("message", { length: 500 }),
+  userId: int("user_id"),
+  recordedAt: ts("recorded_at"),
+  createdAt: createdAt(),
+});
+
 // ------------------------------------------------------------------------ VIES
 /** Кеш на проверките във VIES (системата на ЕС за ДДС номера), за да не се пита при всяко отваряне. */
 export const viesChecks = mysqlTable("vies_checks", {
