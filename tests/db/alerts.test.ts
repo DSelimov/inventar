@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { shipments } from "@/db/tenant-schema";
+import { invoices, shipments } from "@/db/tenant-schema";
 import { alertCounts, listAlerts } from "@/lib/alerts";
 import { setSetting } from "@/lib/settings";
 import { applyMovement } from "@/lib/stock";
@@ -32,7 +32,7 @@ beforeAll(async () => {
 
 describe("известия", () => {
   it("ниска наличност, закъснели пратки, изтекли и изтичащи до 30 дни партиди", async () => {
-    expect(await alertCounts(t.db, today)).toEqual({ lowStock: 1, overdue: 1, expiring: 1, expired: 1, total: 4 });
+    expect(await alertCounts(t.db, today)).toEqual({ lowStock: 1, overdue: 1, overdueInvoices: 0, expiring: 1, expired: 1, total: 4 });
     const a = await listAlerts(t.db, today);
     expect(a.overdue.map((s) => s.reference)).toEqual(["LATE"]);
     expect(a.expired.map((l) => l.lotNumber)).toEqual(["OLD"]);
@@ -44,5 +44,15 @@ describe("известия", () => {
     expect((await alertCounts(t.db, today)).lowStock).toBe(0);
     expect((await listAlerts(t.db, today)).lowStock).toEqual([]);
     await setSetting(t.db, "lowStockAlerts", "true");
+  });
+
+  it("просрочена фактура: издадена, неплатена, с минал падеж", async () => {
+    await t.db.insert(invoices).values([
+      { kind: "invoice", number: "0000000001", status: "issued", dueDate: "2020-01-01", grossTotal: 10 },
+      { kind: "invoice", number: "0000000002", status: "issued", dueDate: "2020-01-01", grossTotal: 10, paymentStatus: "paid" },
+      { kind: "invoice", status: "draft", dueDate: "2020-01-01" },
+    ]);
+    expect((await alertCounts(t.db, today)).overdueInvoices).toBe(1);
+    expect((await listAlerts(t.db, today)).overdueInvoices.map((i) => i.number)).toEqual(["0000000001"]);
   });
 });

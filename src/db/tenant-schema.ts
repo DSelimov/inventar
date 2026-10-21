@@ -37,6 +37,8 @@ export const WEBHOOK_EVENTS = [
   "shipment.status_changed",
   "order.created",
   "order.status_changed",
+  "invoice.issued",
+  "invoice.paid",
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
@@ -434,6 +436,95 @@ export const writeOffLines = mysqlTable("write_off_lines", {
   value: amount("value"),
 });
 
+// -------------------------------------------------------------------- invoices
+export const INVOICE_KINDS = ["invoice", "credit_note", "debit_note", "proforma"] as const;
+export type InvoiceKind = (typeof INVOICE_KINDS)[number];
+export const INVOICE_STATUSES = ["draft", "issued", "cancelled"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+export const PAYMENT_STATUSES = ["unpaid", "partial", "paid"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+/**
+ * Фактура, кредитно/дебитно известие или проформа. Черновата се редактира; при издаване получава номер
+ * (10 цифри — общ ред за фактури и известия; проформите — свой) и снимка на данните на доставчика и
+ * получателя и на сумите. Издаденият документ не се променя: корекции — с известие, анулиране — с причина.
+ */
+export const invoices = mysqlTable(
+  "invoices",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    kind: mysqlEnum("kind", INVOICE_KINDS).notNull().default("invoice"),
+    number: varchar("number", { length: 32 }),
+    status: mysqlEnum("status", INVOICE_STATUSES).notNull().default("draft"),
+    issueDate: date("issue_date", { mode: "string" }),
+    /** Дата на данъчното събитие (доставката); по подразбиране = датата на издаване. */
+    taxEventDate: date("tax_event_date", { mode: "string" }),
+    dueDate: date("due_date", { mode: "string" }),
+    currency: varchar("currency", { length: 3 }).notNull().default("EUR"),
+    pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
+    paymentMethod: varchar("payment_method", { length: 64 }),
+    orderId: int("order_id").references(() => orders.id, { onDelete: "set null" }),
+    /** За известие: фактурата, към която е. */
+    relatedInvoiceId: int("related_invoice_id"),
+    /** Основание за известие / за анулиране. */
+    reason: varchar("reason", { length: 500 }),
+    partnerId: int("partner_id").references(() => partners.id, { onDelete: "set null" }),
+    // снимка на доставчика и получателя към издаването
+    supplierName: varchar("supplier_name", { length: 300 }),
+    supplierEik: varchar("supplier_eik", { length: 13 }),
+    supplierVatNumber: varchar("supplier_vat_number", { length: 32 }),
+    supplierAddress: varchar("supplier_address", { length: 500 }),
+    supplierMol: varchar("supplier_mol", { length: 200 }),
+    recipientName: varchar("recipient_name", { length: 300 }),
+    recipientEik: varchar("recipient_eik", { length: 13 }),
+    recipientVatNumber: varchar("recipient_vat_number", { length: 32 }),
+    recipientAddress: varchar("recipient_address", { length: 500 }),
+    recipientCountry: varchar("recipient_country", { length: 2 }),
+    recipientMol: varchar("recipient_mol", { length: 200 }),
+    netTotal: amount("net_total").notNull().default(0),
+    vatTotal: amount("vat_total").notNull().default(0),
+    grossTotal: amount("gross_total").notNull().default(0),
+    paidAmount: amount("paid_amount").notNull().default(0),
+    paymentStatus: mysqlEnum("payment_status", PAYMENT_STATUSES).notNull().default("unpaid"),
+    notes: text("notes"),
+    createdBy: varchar("created_by", { length: 200 }),
+    createdAt: createdAt(),
+    issuedAt: ts("issued_at"),
+    issuedBy: varchar("issued_by", { length: 200 }),
+    cancelledAt: ts("cancelled_at"),
+  },
+  (t) => [uniqueIndex("invoices_number").on(t.kind, t.number), index("invoices_issue_date").on(t.issueDate)],
+);
+
+export const invoiceLines = mysqlTable("invoice_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  itemId: int("item_id").references(() => items.id, { onDelete: "set null" }),
+  orderLineId: int("order_line_id").references(() => orderLines.id, { onDelete: "set null" }),
+  description: varchar("description", { length: 500 }).notNull(),
+  quantity: qty("quantity").notNull(),
+  unit: varchar("unit", { length: 32 }).notNull().default("бр."),
+  unitPrice: money("unit_price").notNull(),
+  vatRateId: int("vat_rate_id").references(() => vatRates.id, { onDelete: "set null" }),
+  vatRate: decimal("vat_rate", { precision: 5, scale: 2, mode: "number" }).notNull(),
+  legalBasis: varchar("legal_basis", { length: 255 }),
+  netAmount: amount("net_amount").notNull().default(0),
+  vatAmount: amount("vat_amount").notNull().default(0),
+  grossAmount: amount("gross_amount").notNull().default(0),
+  sortOrder: int("sort_order").notNull().default(0),
+});
+
+export const invoicePayments = mysqlTable("invoice_payments", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  paidOn: date("paid_on", { mode: "string" }).notNull(),
+  amount: amount("amount").notNull(),
+  method: varchar("method", { length: 64 }),
+  note: varchar("note", { length: 255 }),
+  createdBy: varchar("created_by", { length: 200 }),
+  createdAt: createdAt(),
+});
+
 // ------------------------------------------------------------ document numbers
 /** Поредни номера по вид документ и година: без дупки (броячът се увеличава в транзакцията на документа). */
 export const documentCounters = mysqlTable(
@@ -521,6 +612,21 @@ export const stockCountsRelations = relations(stockCounts, ({ one, many }) => ({
   category: one(categories, { fields: [stockCounts.categoryId], references: [categories.id] }),
   lines: many(stockCountLines),
 }));
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  lines: many(invoiceLines),
+  payments: many(invoicePayments),
+  order: one(orders, { fields: [invoices.orderId], references: [orders.id] }),
+  partner: one(partners, { fields: [invoices.partnerId], references: [partners.id] }),
+  related: one(invoices, { fields: [invoices.relatedInvoiceId], references: [invoices.id], relationName: "notes" }),
+  notesFor: many(invoices, { relationName: "notes" }),
+}));
+export const invoiceLinesRelations = relations(invoiceLines, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoiceLines.invoiceId], references: [invoices.id] }),
+  item: one(items, { fields: [invoiceLines.itemId], references: [items.id] }),
+}));
+export const invoicePaymentsRelations = relations(invoicePayments, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoicePayments.invoiceId], references: [invoices.id] }),
+}));
 export const writeOffsRelations = relations(writeOffs, ({ one, many }) => ({
   location: one(locations, { fields: [writeOffs.locationId], references: [locations.id] }),
   lines: many(writeOffLines),
@@ -592,6 +698,8 @@ export type Order = typeof orders.$inferSelect;
 export type OrderLine = typeof orderLines.$inferSelect;
 export type VatRate = typeof vatRates.$inferSelect;
 export type WriteOff = typeof writeOffs.$inferSelect;
+export type Invoice = typeof invoices.$inferSelect;
+export type InvoiceLine = typeof invoiceLines.$inferSelect;
 export type Shipment = typeof shipments.$inferSelect;
 export type ShipmentLine = typeof shipmentLines.$inferSelect;
 export type Collection = typeof collections.$inferSelect;

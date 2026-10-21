@@ -96,6 +96,12 @@ export default async function SettingsPage() {
             <Field label="МОЛ">
               <Input name="mol" defaultValue={company.mol} disabled={!manage} />
             </Field>
+            <Field label="Банка">
+              <Input name="bank" defaultValue={company.bank} disabled={!manage} />
+            </Field>
+            <Field label="IBAN" hint="Печата се във фактурите.">
+              <Input name="iban" defaultValue={company.iban} className="font-mono uppercase" disabled={!manage} />
+            </Field>
             {manage && (
               <div className="flex justify-end sm:col-span-2">
                 <SubmitButton variant="secondary">Запази</SubmitButton>

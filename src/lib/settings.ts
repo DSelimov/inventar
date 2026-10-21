@@ -45,8 +45,8 @@ export async function setSetting(db: Db, key: string, value: string) {
 }
 
 /** Данни на фирмата за документите (стокова разписка, справки). */
-export type CompanyDetails = { legalName: string; eik: string; vatNumber: string; address: string; phone: string; mol: string };
-export const COMPANY_FIELDS = ["legalName", "eik", "vatNumber", "address", "phone", "mol"] as const;
+export type CompanyDetails = { legalName: string; eik: string; vatNumber: string; address: string; phone: string; mol: string; bank: string; iban: string };
+export const COMPANY_FIELDS = ["legalName", "eik", "vatNumber", "address", "phone", "mol", "bank", "iban"] as const;
 
 export async function getCompanyDetails(db: Db): Promise<CompanyDetails> {
   const rows = await db.select().from(settings);

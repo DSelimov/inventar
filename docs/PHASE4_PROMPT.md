@@ -111,24 +111,24 @@ tenant, default `EUR`.
 ## B. Invoicing
 
 ### B1. Invoices, credit and debit notes
-- New module `src/lib/invoicing.ts` + tables `invoices`, `invoice_lines`, `document_counters`.
-  Types: фактура, кредитно известие, дебитно известие, проформа (proforma is not a tax document, own
-  numbering).
-- Numbering: 10-digit, continuous, no gaps, per tenant (optionally several series by location —
-  verify the ЗДДС/ППЗДДС rules for series). Number assigned on issue, never on draft.
-- Mandatory content per ЗДДС (verify the current list): number and date, date of tax event, supplier and
-  recipient name, address, ЕИК, ДДС №, description and quantity, unit price without VAT, tax base, rate,
-  VAT amount, total, legal basis when no VAT is charged, and the reason and original invoice for notes.
-- Create an invoice from a sales order or from one or more delivered shipments (lines and prices copied,
-  editable until issued); credit note from an invoice or from a customer return.
-- Issued documents are immutable; corrections only through notes. Cancellation keeps the number and marks
-  it annulled with a reason, according to the rules.
-- PDF in Bulgarian (original + copy), email to the customer from the app with the PDF attached (uses the
-  existing mail module), list with filters and paging, payment status (неплатена / частично / платена) and
-  due date with an overdue notification.
-- API: read endpoints + create-from-order; webhooks `invoice.issued`, `invoice.paid`.
-- Acceptance: concurrent issue never produces duplicate or skipped numbers (test); totals per rate match
-  line sums; credit note for a return reduces the open amount.
+- **Done.** `invoices`, `invoice_lines`, `invoice_payments` (migration 0010); engine `src/lib/invoicing.ts`,
+  PDF `src/lib/invoice-pdf.ts`, pages `/invoices` (filters, paging, numbering card) and `/invoices/[id]`
+  (draft editor / issued view), `/print/invoices/[id]` (?copy=1).
+- Kinds: фактура, кредитно и дебитно известие (same 10-digit series, Arabic numerals only — чл. 114,
+  ал. 1, т. 2 ЗДДС, checked October 2026), проформа (own ПФ-ГГГГ-NNN series, "не е данъчен документ").
+  The series continues across years; "Номерация" lets a company continue from its previous software before
+  the first issued invoice.
+- Issuing: number taken in the transaction; snapshot of supplier (company details incl. new bank / IBAN)
+  and recipient (partner ЕИК, ДДС №, address); line amounts and totals stored and frozen. Checks: company
+  name/ЕИК/address, recipient and address, legal basis at 0 %, a non-VAT-registered company cannot charge
+  VAT, notes need the related issued invoice and a reason. Cancellation keeps the number.
+- From a sales order (button "Фактура" / "Проформа"): delivered − returned − already invoiced, or ordered
+  if nothing is delivered; credit/debit notes start from the invoice's lines. Credit notes reduce the
+  amount due; payments set unpaid / partial / paid; overdue invoices appear in the bell, on
+  /notifications and in the daily digest. Email sends the PDF as an attachment.
+- API: `GET /api/v1/invoices`, `GET /api/v1/invoices/{id}`, `POST /api/v1/orders/{id}/invoice`; webhooks
+  `invoice.issued`, `invoice.paid`.
+- Not yet: amount in words, several series by location, documents in a currency other than the tenant's.
 
 ### B2. Partner data lookup
 - ЕИК validation (checksum for 9- and 13-digit numbers) and ДДС № validation (`BG` + ЕИК).

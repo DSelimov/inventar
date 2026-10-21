@@ -2,7 +2,7 @@ import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { log } from "@/lib/log";
 
-export type Mail = { to: string; subject: string; text: string; html: string };
+export type Mail = { to: string; subject: string; text: string; html: string; attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>; replyTo?: string };
 
 const g = globalThis as unknown as { __mailer?: Transporter | null };
 
@@ -31,7 +31,7 @@ export async function sendMail(mail: Mail) {
   if (!t) {
     // в production без съдържанието: линковете в писмата са еднократни токени
     if (process.env.NODE_ENV === "production") log.warn("mail.not_sent", { reason: "SMTP_HOST не е зададен", to: mail.to, subject: mail.subject });
-    else console.log(`\n[mail] SMTP не е настроен — писмото не е изпратено.\nДо: ${mail.to}\nТема: ${mail.subject}\n\n${mail.text}\n`);
+    else console.log(`\n[mail] SMTP не е настроен — писмото не е изпратено.\nДо: ${mail.to}\nТема: ${mail.subject}${mail.attachments?.length ? `\nПрикачени: ${mail.attachments.map((a) => a.filename).join(", ")}` : ""}\n\n${mail.text}\n`);
     return;
   }
   await t.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, ...mail });
@@ -109,4 +109,16 @@ export function digestMail(o: { to: string; name: string; orgName: string; url: 
     url: o.url,
     footer: "Получавате това писмо, защото сте мениджър или администратор. Може да го изключите от Настройки › Вашият профил.",
   });
+}
+
+/** Документ (фактура, известие) като прикачен PDF, без бутон — писмото е от фирмата до клиента. */
+export function documentMail(o: { to: string; orgName: string; title: string; lines: string[]; replyTo?: string; attachment: { filename: string; content: Buffer } }): Mail {
+  const text = [...o.lines, "", `— ${o.orgName}`].join("\n");
+  const html = `<!doctype html><html lang="bg"><body style="margin:0;background:#f4f5f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827">
+<div style="max-width:520px;margin:32px auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:28px">
+<div style="font-weight:600;font-size:16px;margin-bottom:20px">${escape(o.orgName)}</div>
+${o.lines.map((l) => `<p style="margin:0 0 12px;line-height:1.5">${escape(l)}</p>`).join("")}
+<p style="margin:16px 0 0;font-size:13px;color:#6b7280">Документът е прикачен като PDF.</p>
+</div></body></html>`;
+  return { to: o.to, subject: o.title, text, html, replyTo: o.replyTo, attachments: [{ ...o.attachment, contentType: "application/pdf" }] };
 }

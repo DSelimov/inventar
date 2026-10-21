@@ -19,14 +19,22 @@ export function createDoc(opts: { title: string; margin?: number; layout?: "port
   return doc;
 }
 
-/** Завършва документа и връща PDF отговор (inline — отваря се в браузъра). */
-export async function pdfResponse(doc: PDFKit.PDFDocument, filename: string) {
+/** Завършва документа и връща байтовете (за прикачване към имейл). */
+export async function pdfBuffer(doc: PDFKit.PDFDocument) {
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
   const done = new Promise<void>((resolve) => doc.on("end", () => resolve()));
   doc.end();
   await done;
-  const body = Buffer.concat(chunks);
+  return Buffer.concat(chunks);
+}
+
+/** Завършва документа и връща PDF отговор (inline — отваря се в браузъра). */
+export async function pdfResponse(doc: PDFKit.PDFDocument, filename: string) {
+  return pdfBytesResponse(await pdfBuffer(doc), filename);
+}
+
+export function pdfBytesResponse(body: Buffer, filename: string) {
   return new Response(new Uint8Array(body), {
     headers: {
       "Content-Type": "application/pdf",

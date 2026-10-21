@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
-import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, items, type ItemStatus, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
+import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 const countExpr = () => n(sql<number>`count(*)`);
@@ -464,4 +464,43 @@ export async function listWriteOffs(db: Db) {
 
 export async function getWriteOff(db: Db, id: number) {
   return db.query.writeOffs.findFirst({ where: eq(writeOffs.id, id), with: { location: true, lines: { with: { item: true, lot: true } } } });
+}
+
+// -------------------------------------------------------------------- invoices
+export type InvoiceFilters = { q?: string; kind?: InvoiceKind; status?: InvoiceStatus; payment?: PaymentStatus | "overdue"; from?: string; to?: string; partnerId?: number };
+
+export async function pageInvoices(db: Db, f: InvoiceFilters, page: number, today = new Date().toISOString().slice(0, 10)) {
+  const term = f.q ? `%${f.q}%` : null;
+  const where = and(
+    f.kind ? eq(invoices.kind, f.kind) : undefined,
+    f.status ? eq(invoices.status, f.status) : undefined,
+    f.payment === "overdue" ? and(eq(invoices.status, "issued"), inArray(invoices.kind, ["invoice", "debit_note"]), ne(invoices.paymentStatus, "paid"), lt(invoices.dueDate, today)) : f.payment ? eq(invoices.paymentStatus, f.payment) : undefined,
+    f.from ? gte(invoices.issueDate, f.from) : undefined,
+    f.to ? lte(invoices.issueDate, f.to) : undefined,
+    f.partnerId ? eq(invoices.partnerId, f.partnerId) : undefined,
+    term ? or(like(invoices.number, term), like(invoices.recipientName, term), like(partners.name, term), like(invoices.recipientEik, term)) : undefined,
+  );
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({ invoice: invoices, partnerName: partners.name })
+      .from(invoices)
+      .leftJoin(partners, eq(partners.id, invoices.partnerId))
+      .where(where)
+      .orderBy(desc(invoices.issueDate), desc(invoices.id))
+      .limit(PAGE_SIZE)
+      .offset(offsetOf(page)),
+    db.select({ total: countExpr() }).from(invoices).leftJoin(partners, eq(partners.id, invoices.partnerId)).where(where),
+  ]);
+  return { rows, total, page, pageSize: PAGE_SIZE };
+}
+
+export async function getInvoice(db: Db, id: number) {
+  return db.query.invoices.findFirst({
+    where: eq(invoices.id, id),
+    with: { lines: { orderBy: [asc(invoiceLines.sortOrder), asc(invoiceLines.id)] }, payments: { orderBy: [asc(invoicePayments.paidOn)] }, partner: true, order: true, related: true, notesFor: true },
+  });
+}
+
+export async function listOrderInvoices(db: Db, orderId: number) {
+  return db.select().from(invoices).where(eq(invoices.orderId, orderId)).orderBy(desc(invoices.id));
 }

@@ -2,7 +2,7 @@
  * OpenAPI 3.1 описание на REST API-то. Единственият източник за документацията:
  * /api/v1/openapi.json (машинно четимо), /docs/api (четимо) и /docs/api/console (интерактивно).
  */
-import { EVENT_TYPES, FIELD_TYPES, ITEM_STATUSES, MOVEMENT_TYPES, ORDER_STATUSES, ORDER_TYPES, PARTNER_TYPES, SHIPMENT_DIRECTIONS, SHIPMENT_STATUSES, TRACKING_MODES, WEBHOOK_EVENTS } from "@/db/schema";
+import { EVENT_TYPES, FIELD_TYPES, INVOICE_KINDS, INVOICE_STATUSES, ITEM_STATUSES, MOVEMENT_TYPES, ORDER_STATUSES, ORDER_TYPES, PARTNER_TYPES, PAYMENT_STATUSES, SHIPMENT_DIRECTIONS, SHIPMENT_STATUSES, TRACKING_MODES, WEBHOOK_EVENTS } from "@/db/schema";
 import { WEBHOOK_EVENT_LABELS } from "./webhook-labels";
 
 export const API_VERSION = "1.0.0";
@@ -318,6 +318,55 @@ const schemas: Record<string, Schema> = {
     ["id", "orderId", "itemId", "quantity", "fulfilledQuantity", "unitPrice", "vatRate"],
   ),
 
+  InvoiceLine: obj(
+    {
+      id: int("Идентификатор"),
+      itemId: nullable(int("Артикул (празно при свободен текст)")),
+      orderLineId: nullable(int("Ред от поръчката")),
+      description: str("Описание"),
+      quantity: qty("Количество"),
+      unit: str("Мерна единица"),
+      unitPrice: money("Единична цена (без или с ДДС според pricesIncludeVat)"),
+      vatRate: num("ДДС в проценти", { example: 20 }),
+      legalBasis: nullable(str("Основание при 0 %")),
+      netAmount: num("Данъчна основа на реда"),
+      vatAmount: num("ДДС на реда"),
+      grossAmount: num("Общо с ДДС"),
+    },
+    ["id", "description", "quantity", "unitPrice", "vatRate", "netAmount", "vatAmount", "grossAmount"],
+  ),
+
+  Invoice: obj(
+    {
+      id: int("Идентификатор"),
+      kind: enumOf(INVOICE_KINDS, "invoice = фактура, credit_note / debit_note = известие, proforma = проформа (не е данъчен документ)"),
+      number: nullable(str("Пореден десетразряден номер (общ за фактури и известия); проформа — ПФ-ГГГГ-NNN; празно при чернова", { example: "0000000042" })),
+      status: enumOf(INVOICE_STATUSES, "draft → issued; issued → cancelled (номерът остава)"),
+      issueDate: nullable(date("Дата на издаване")),
+      taxEventDate: nullable(date("Дата на данъчното събитие")),
+      dueDate: nullable(date("Падеж")),
+      currency: str("Валута", { example: "EUR" }),
+      pricesIncludeVat: bool("Цените на редовете са с ДДС"),
+      orderId: nullable(int("Клиентска поръчка")),
+      relatedInvoiceId: nullable(int("За известие: фактурата, към която е")),
+      reason: nullable(str("Основание (известие) или причина за анулиране")),
+      partnerId: nullable(int("Получател")),
+      supplierName: nullable(str("Доставчик към издаването")),
+      supplierEik: nullable(str("ЕИК на доставчика")),
+      supplierVatNumber: nullable(str("ДДС № на доставчика")),
+      recipientName: nullable(str("Получател към издаването")),
+      recipientEik: nullable(str("ЕИК на получателя")),
+      recipientVatNumber: nullable(str("ДДС № на получателя")),
+      netTotal: num("Данъчна основа"),
+      vatTotal: num("ДДС"),
+      grossTotal: num("Общо с ДДС"),
+      paidAmount: num("Платено"),
+      paymentStatus: enumOf(PAYMENT_STATUSES, "unpaid, partial, paid"),
+      lines: arr(ref("InvoiceLine"), "Редове (при GET /invoices/{id})."),
+    },
+    ["id", "kind", "status", "currency", "netTotal", "vatTotal", "grossTotal", "paymentStatus"],
+  ),
+
   Order: obj(
     {
       id: int("Идентификатор"),
@@ -384,6 +433,8 @@ export const WEBHOOK_PAYLOAD_EXAMPLES: Record<(typeof WEBHOOK_EVENTS)[number], R
   "shipment.status_changed": { id: 7, reference: "ПЗ-2026-003/1", status: "delivered" },
   "order.created": { id: 3, number: "ПЗ-2026-003", type: "purchase", lines: [{ itemId: 7, quantity: 40, unitPrice: 9.4 }] },
   "order.status_changed": { id: 3, number: "ПЗ-2026-003", status: "completed" },
+  "invoice.issued": { id: 15, kind: "invoice", number: "0000000042", orderId: 3, grossTotal: 120, currency: "EUR" },
+  "invoice.paid": { id: 15, kind: "invoice", number: "0000000042", paidAmount: 120, paymentStatus: "paid" },
 };
 
 // --------------------------------------------------------------------- spec
@@ -414,6 +465,7 @@ export function buildOpenApi(serverUrl: string) {
       { name: "Наличности", description: "Количества по локации и складови движения." },
       { name: "Пратки", description: "Входящи и изходящи пратки и техните статуси." },
       { name: "Поръчки", description: "Поръчки за доставка и клиентски поръчки." },
+      { name: "Фактури", description: "Фактури, кредитни и дебитни известия по ЗДДС, проформи." },
       { name: "Справочни данни", description: "Локации, партньори, категории." },
     ],
     components: {
@@ -580,6 +632,38 @@ export function buildOpenApi(serverUrl: string) {
           operationId: "getOrder",
           parameters: [idParam("поръчката")],
           responses: { ...ok(data(ref("Order"))), ...errorResponses({ "404": "Поръчката не е намерена." }) },
+        },
+      },
+      "/api/v1/invoices": {
+        get: {
+          tags: ["Фактури"],
+          summary: "Фактури, известия и проформи (по 50 на страница)",
+          operationId: "listInvoices",
+          parameters: [
+            q("q", "Номер, получател или ЕИК."),
+            q("kind", "Вид документ.", { type: "string", enum: [...INVOICE_KINDS] }),
+            q("status", "Статус.", { type: "string", enum: [...INVOICE_STATUSES] }),
+            q("payment", "Плащане; overdue = просрочени.", { type: "string", enum: [...PAYMENT_STATUSES, "overdue"] }),
+            q("from", "Издадени от дата (ГГГГ-ММ-ДД)."),
+            q("to", "Издадени до дата (ГГГГ-ММ-ДД)."),
+            q("partnerId", "Получател.", { type: "integer" }),
+            q("page", "Страница (от 1).", { type: "integer" }),
+          ],
+          responses: { ...ok(obj({ data: arr(ref("Invoice")), page: int("Страница"), pageSize: int("Размер"), total: int("Общо") })), ...errorResponses() },
+        },
+      },
+      "/api/v1/invoices/{id}": {
+        get: { tags: ["Фактури"], summary: "Документ с редове и плащания", operationId: "getInvoice", parameters: [idParam("документа")], responses: { ...ok(data(ref("Invoice"))), ...errorResponses({ "404": "Документът не е намерен." }) } },
+      },
+      "/api/v1/orders/{id}/invoice": {
+        post: {
+          tags: ["Фактури"],
+          summary: "Чернова на фактура от клиентска поръчка",
+          description: "Количествата са доставеното минус върнатото минус вече фактурираното (или поръчаното, ако нищо не е доставено). Черновата се издава в приложението.",
+          operationId: "createInvoiceFromOrder",
+          parameters: [idParam("поръчката")],
+          requestBody: body(obj({ kind: enumOf(["invoice", "proforma"], "По подразбиране invoice") }), { kind: "invoice" }),
+          responses: { ...created(data(ref("Invoice"))), ...errorResponses({ "400": "Не е клиентска поръчка или всичко е фактурирано.", "404": "Поръчката не е намерена." }) },
         },
       },
       "/api/v1/locations": {

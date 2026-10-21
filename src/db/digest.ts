@@ -34,6 +34,7 @@ async function main() {
     const sections = [
       { title: "Ниска наличност", count: counts.lowStock, examples: a.lowStock.map((i) => `${name(i)} (${i.quantity}/${i.minQuantity})`) },
       { title: "Закъснели пратки", count: counts.overdue, examples: a.overdue.map((s) => `${s.reference} от ${s.expectedDate}`) },
+      { title: "Просрочени фактури", count: counts.overdueInvoices, examples: a.overdueInvoices.map((i) => `№ ${i.number} · ${i.recipientName ?? ""} · падеж ${i.dueDate}`) },
       { title: "Изтекли партиди", count: counts.expired, examples: a.expired.map((l) => `${l.item.name} ${l.lotNumber}`) },
       { title: "Изтичащи до 30 дни", count: counts.expiring, examples: a.expiring.map((l) => `${l.item.name} ${l.lotNumber} (${l.expiryDate})`) },
     ];

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, Pencil, Trash2, Truck, Undo2, X } from "lucide-react";
+import { Check, FileText, Pencil, Trash2, Truck, Undo2, X } from "lucide-react";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -10,12 +10,14 @@ import { Table } from "@/components/ui/table";
 import { createReturnForOrder, createShipmentForRemaining, deleteOrder, setOrderStatus } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { getOrder } from "@/lib/queries";
+import { getOrder, listOrderInvoices } from "@/lib/queries";
 import { formatDate, formatDateTime, formatMoney, formatNumber, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { sumLines } from "@/lib/money";
 import { orderVat } from "@/lib/vat";
 import { addQty, subQty, sumQty } from "@/lib/quantity";
+import { invoiceFromOrder } from "@/lib/actions/invoices";
+import { KIND_TITLES } from "@/lib/invoicing";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -27,7 +29,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const order = await getOrder(ctx.db, id);
+  const [order, orderInvoices] = await Promise.all([getOrder(ctx.db, id), listOrderInvoices(ctx.db, id)]);
   if (!order) notFound();
 
   const currency = ctx.org.currency;
@@ -203,6 +205,18 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           {writable && (
             <Card>
               <CardHeader title="Действия" />
+              {orderInvoices.length > 0 && (
+                <CardBody className="space-y-1 border-b border-line text-sm">
+                  {orderInvoices.map((i) => (
+                    <div key={i.id} className="flex justify-between gap-2">
+                      <Link href={`/invoices/${i.id}`} className="hover:text-accent">
+                        {KIND_TITLES[i.kind]} {i.number ?? "(чернова)"}
+                      </Link>
+                      <span className="tabular-nums text-muted">{formatMoney(i.grossTotal, currency)}</span>
+                    </div>
+                  ))}
+                </CardBody>
+              )}
               <CardBody className="space-y-2">
                 {order.status === "draft" && (
                   <Form action={setOrderStatus.bind(null, id, "confirmed")}>
@@ -217,6 +231,20 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                       <Truck className="h-4 w-4" /> Създай пратка за оставащото ({formatNumber(remainingToShip)})
                     </Button>
                   </Form>
+                )}
+                {!purchase && order.status !== "draft" && order.status !== "cancelled" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Form action={invoiceFromOrder.bind(null, id, "invoice")}>
+                      <Button type="submit" variant="secondary" className="w-full">
+                        <FileText className="h-4 w-4" /> Фактура
+                      </Button>
+                    </Form>
+                    <Form action={invoiceFromOrder.bind(null, id, "proforma")}>
+                      <Button type="submit" variant="secondary" className="w-full">
+                        Проформа
+                      </Button>
+                    </Form>
+                  </div>
                 )}
                 {returnable > 0 && (
                   <Form action={createReturnForOrder.bind(null, id)}>

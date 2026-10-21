@@ -9,4 +9,6 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = {
   "shipment.status_changed": "Сменен статус на пратка",
   "order.created": "Създадена поръчка",
   "order.status_changed": "Сменен статус на поръчка",
+  "invoice.issued": "Издаден документ (фактура, известие)",
+  "invoice.paid": "Платена фактура",
 };

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AlertTriangle, BellOff, CalendarClock, PackageMinus, Truck } from "lucide-react";
+import { AlertTriangle, BellOff, CalendarClock, FileText, PackageMinus, Truck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -9,7 +9,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
 import { EXPIRY_WARNING_DAYS, listAlerts } from "@/lib/alerts";
 import { requireContext } from "@/lib/auth";
-import { daysBetween, formatDate, formatNumber, todayIso } from "@/lib/utils";
+import { daysBetween, formatDate, formatMoney, formatNumber, todayIso } from "@/lib/utils";
+import { sumMoney } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Известия" };
 
@@ -103,6 +104,35 @@ export default async function NotificationsPage() {
                     <td>{s.partnerRecord?.name ?? s.partner ?? "—"}</td>
                     <td className="text-muted">{formatDate(s.expectedDate)}</td>
                     <td className="text-right font-medium tabular-nums text-warning">{-days(s.expectedDate!)} дни</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Section>
+
+          <Section icon={FileText} title="Просрочени фактури" count={a.overdueInvoices.length} tone="danger">
+            <Table>
+              <thead>
+                <tr>
+                  <th>Фактура</th>
+                  <th>Получател</th>
+                  <th>Падеж</th>
+                  <th className="text-right">Сума</th>
+                </tr>
+              </thead>
+              <tbody>
+                {a.overdueInvoices.map((i) => (
+                  <tr key={i.id}>
+                    <td>
+                      <Link href={`/invoices/${i.id}`} className="font-mono font-medium hover:text-accent">
+                        {i.number}
+                      </Link>
+                    </td>
+                    <td>{i.recipientName ?? "—"}</td>
+                    <td className="font-medium text-danger">
+                      {formatDate(i.dueDate)} · {-days(i.dueDate!)} дни
+                    </td>
+                    <td className="text-right tabular-nums">{formatMoney(sumMoney([i.grossTotal, -i.paidAmount]), i.currency)}</td>
                   </tr>
                 ))}
               </tbody>
