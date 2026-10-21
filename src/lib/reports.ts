@@ -5,6 +5,7 @@ import type { Db } from "@/db/tenant";
 import { categories, items, lots, partners, stockMovements, type Item } from "@/db/tenant-schema";
 import { incomingQuantities } from "./queries";
 import type { AppSettings } from "./settings";
+import { lineTotal, sumLines, sumMoney } from "@/lib/money";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 
@@ -47,12 +48,12 @@ export async function buildReports(db: Db, s: AppSettings) {
     const key = it.categoryId;
     const entry = catMap.get(key) ?? { id: key, name: it.category?.name ?? "Без категория", color: it.category?.color ?? "#9ca3af", units: 0, revenue: 0, cost: 0 };
     entry.units += out;
-    entry.revenue += out * it.unitPrice;
-    entry.cost += out * it.unitCost;
+    entry.revenue = sumMoney([entry.revenue, lineTotal(out, it.unitPrice)]);
+    entry.cost = sumMoney([entry.cost, lineTotal(out, it.unitCost)]);
     catMap.set(key, entry);
   }
   const turnover = [...catMap.values()]
-    .map((c) => ({ ...c, margin: c.revenue - c.cost, marginPct: c.revenue > 0 ? ((c.revenue - c.cost) / c.revenue) * 100 : 0 }))
+    .map((c) => ({ ...c, margin: sumMoney([c.revenue, -c.cost]), marginPct: c.revenue > 0 ? ((c.revenue - c.cost) / c.revenue) * 100 : 0 }))
     .sort((a, b) => b.revenue - a.revenue);
   const totals = turnover.reduce((acc, c) => ({ units: acc.units + c.units, revenue: acc.revenue + c.revenue, cost: acc.cost + c.cost }), { units: 0, revenue: 0, cost: 0 });
 
@@ -70,7 +71,7 @@ export async function buildReports(db: Db, s: AppSettings) {
       const last = lastByItem.get(it.id)?.lastOut;
       return !last || last < deadStart;
     })
-    .map((it) => ({ item: it, lastOut: lastByItem.get(it.id)?.lastOut ?? null, value: it.quantity * it.unitCost }))
+    .map((it) => ({ item: it, lastOut: lastByItem.get(it.id)?.lastOut ?? null, value: lineTotal(it.quantity, it.unitCost) }))
     .sort((a, b) => b.value - a.value);
 
   // ---- ageing buckets (days since last inbound)
@@ -89,7 +90,7 @@ export async function buildReports(db: Db, s: AppSettings) {
     const bucket = ageing.find((b) => days <= b.max)!;
     bucket.items++;
     bucket.units += it.quantity;
-    bucket.value += it.quantity * it.unitCost;
+    bucket.value = sumMoney([bucket.value, lineTotal(it.quantity, it.unitCost)]);
   }
 
   // ---- reorder suggestions
@@ -122,14 +123,14 @@ export async function buildReports(db: Db, s: AppSettings) {
     .where(gte(stockMovements.createdAt, monthStart))
     .groupBy(sql`date_format(${stockMovements.createdAt}, '%Y-%m')`);
   const deltaByMonth = new Map(monthly.map((m) => [m.month, m.deltaValue]));
-  const currentValue = activeItems.reduce((a, it) => a + it.quantity * it.unitCost, 0);
+  const currentValue = sumLines(activeItems, (it) => it.quantity, (it) => it.unitCost);
   const series: Array<{ month: string; label: string; value: number }> = [];
   let running = currentValue;
   for (let i = 0; i < 12; i++) {
     const d = subMonths(now, i);
     const key = format(d, "yyyy-MM");
     series.unshift({ month: key, label: format(d, "MMM", { locale: undefined }), value: Math.max(0, running) });
-    running -= deltaByMonth.get(key) ?? 0; // value at the end of the previous month
+    running = sumMoney([running, -(deltaByMonth.get(key) ?? 0)]); // value at the end of the previous month
   }
 
   // ---- expiring lots

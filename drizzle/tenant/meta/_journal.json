@@ -29,6 +29,13 @@
       "when": 1792580386397,
       "tag": "0003_returns",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1792593164998,
+      "tag": "0004_money_decimal",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { Field, FormActions, Input, Select, Textarea } from "@/components/ui/fie
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
+import { sumLines } from "@/lib/money";
 
 export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number };
 export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null };
@@ -53,7 +54,7 @@ export function OrderForm({
 
   const purchase = type === "purchase";
   const partnerList = partners.filter((p) => p.type === "both" || p.type === (purchase ? "supplier" : "customer"));
-  const total = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.price) || 0), 0);
+  const total = sumLines(lines, (l) => Number(l.quantity) || 0, (l) => Number(String(l.price).replace(",", ".")) || 0);
 
   return (
     <Form action={action} className="space-y-6">

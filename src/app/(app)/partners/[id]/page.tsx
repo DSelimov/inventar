@@ -13,6 +13,7 @@ import { can } from "@/lib/permissions";
 import { getPartner } from "@/lib/queries";
 import { formatDate, formatMoney, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
+import { sumLines } from "@/lib/money";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -79,7 +80,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
                         <Badge tone={statusTone[o.status]}>{label(o.status)}</Badge>
                       </td>
                       <td className="text-muted">{formatDate(o.orderDate)}</td>
-                      <td className="text-right tabular-nums">{formatMoney(o.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0), ctx.org.currency)}</td>
+                      <td className="text-right tabular-nums">{formatMoney(sumLines(o.lines, (l) => l.quantity, (l) => l.unitPrice), ctx.org.currency)}</td>
                     </tr>
                   ))}
                 </tbody>

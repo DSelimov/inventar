@@ -13,6 +13,7 @@ import { can } from "@/lib/permissions";
 import { getOrder } from "@/lib/queries";
 import { formatDate, formatDateTime, formatMoney, formatNumber, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
+import { lineTotal, sumLines } from "@/lib/money";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -30,7 +31,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const currency = ctx.org.currency;
   const writable = can(ctx.role, "write");
   const purchase = order.type === "purchase";
-  const total = order.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+  const total = sumLines(order.lines, (l) => l.quantity, (l) => l.unitPrice);
   const ordered = order.lines.reduce((s, l) => s + l.quantity, 0);
   const fulfilled = order.lines.reduce((s, l) => s + Math.min(l.quantity, l.fulfilledQuantity), 0);
   const reserved = new Map<number, number>();
@@ -120,7 +121,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                       <td className={`text-right tabular-nums ${rest > 0 ? "font-medium text-warning" : "text-muted"}`}>{formatNumber(rest)}</td>
                       {returned > 0 && <td className={`text-right tabular-nums ${l.returnedQuantity ? "text-danger" : "text-muted"}`}>{l.returnedQuantity ? formatNumber(l.returnedQuantity) : "—"}</td>}
                       <td className="text-right tabular-nums text-muted">{formatMoney(l.unitPrice, currency)}</td>
-                      <td className="text-right tabular-nums">{formatMoney(l.quantity * l.unitPrice, currency)}</td>
+                      <td className="text-right tabular-nums">{formatMoney(lineTotal(l.quantity, l.unitPrice), currency)}</td>
                     </tr>
                   );
                 })}

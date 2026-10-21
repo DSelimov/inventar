@@ -4,6 +4,7 @@ import { requireContext } from "@/lib/auth";
 import { createDoc, documentHeader, pageNumbers, pdfResponse, table } from "@/lib/pdf";
 import { getCompanyDetails } from "@/lib/settings";
 import { formatDate, formatMoney, formatNumber } from "@/lib/utils";
+import { lineTotal, sumMoney } from "@/lib/money";
 
 /** Справка за наличност към момента. ?location=ID — само в тази локация; ?category=ID; ?zero=1 — и нулевите. */
 export async function GET(req: Request) {
@@ -59,8 +60,9 @@ export async function GET(req: Request) {
     ],
     rows.map((r) => {
       units += r.qty;
-      value += r.qty * r.cost;
-      return [r.sku, r.variant ? `${r.name} · ${r.variant}` : r.name, r.category ?? "—", formatNumber(r.qty), r.unit, formatMoney(r.cost, ctx.org.currency), formatMoney(r.qty * r.cost, ctx.org.currency)];
+      const rowValue = lineTotal(r.qty, r.cost);
+      value = sumMoney([value, rowValue]);
+      return [r.sku, r.variant ? `${r.name} · ${r.variant}` : r.name, r.category ?? "—", formatNumber(r.qty), r.unit, formatMoney(r.cost, ctx.org.currency), formatMoney(rowValue, ctx.org.currency)];
     }),
     { zebra: true },
   );

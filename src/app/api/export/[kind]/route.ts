@@ -3,6 +3,7 @@ import { items, stockMovements } from "@/db/tenant-schema";
 import { getContext } from "@/lib/auth";
 import { toCsv } from "@/lib/csv";
 import { label } from "@/lib/utils";
+import { lineTotal } from "@/lib/money";
 
 function csvResponse(name: string, rows: Array<Array<string | number | null | undefined>>) {
   return new Response(toCsv(rows), {
@@ -33,7 +34,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ kind: s
     const rows = await db.query.stockLevels.findMany({ with: { item: true, location: true } });
     return csvResponse("nalichnosti", [
       ["sku", "name", "location", "location_code", "quantity", "unit", "value_at_cost"],
-      ...rows.filter((r) => r.quantity !== 0).map((r) => [r.item.sku, r.item.name, r.location.name, r.location.code, r.quantity, r.item.unit, (r.quantity * r.item.unitCost).toFixed(2)]),
+      ...rows.filter((r) => r.quantity !== 0).map((r) => [r.item.sku, r.item.name, r.location.name, r.location.code, r.quantity, r.item.unit, lineTotal(r.quantity, r.item.unitCost).toFixed(2)]),
     ]);
   }
   if (kind === "movements") {

@@ -17,6 +17,7 @@ import { param, type SearchParams } from "@/lib/paging";
 import { can } from "@/lib/permissions";
 import { getStockCount } from "@/lib/queries";
 import { cn, formatDateTime, formatMoney, formatNumber } from "@/lib/utils";
+import { lineTotal, sumLines } from "@/lib/money";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -42,7 +43,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
   const lines = [...count.lines].sort((a, b) => a.item.name.localeCompare(b.item.name, "bg") || (a.lotNumber ?? "").localeCompare(b.lotNumber ?? ""));
   const counted = lines.filter((l) => l.counted !== null);
   const diffs = counted.filter((l) => l.counted !== l.expected);
-  const valueDelta = diffs.reduce((a, l) => a + (l.counted! - l.expected) * l.item.unitCost, 0);
+  const valueDelta = sumLines(diffs, (l) => l.counted! - l.expected, (l) => l.item.unitCost);
   const shown = lines.filter((l) => (show === "uncounted" ? l.counted === null : show === "diff" ? l.counted !== null && l.counted !== l.expected : true));
   const tracked = [...new Map(lines.filter((l) => l.item.tracking !== "none").map((l) => [l.itemId, l.item])).values()];
   const progress = lines.length ? Math.round((counted.length / lines.length) * 100) : 0;
@@ -158,7 +159,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
                         <td className={cn("text-right font-medium tabular-nums", delta === null ? "text-muted" : delta < 0 ? "text-danger" : delta > 0 ? "text-success" : "text-muted")}>
                           {delta === null ? "" : delta > 0 ? `+${formatNumber(delta)}` : formatNumber(delta)}
                         </td>
-                        <td className="text-right text-xs tabular-nums text-muted">{delta ? money(delta * l.item.unitCost) : ""}</td>
+                        <td className="text-right text-xs tabular-nums text-muted">{delta ? money(lineTotal(delta, l.item.unitCost)) : ""}</td>
                       </tr>
                     );
                   })}

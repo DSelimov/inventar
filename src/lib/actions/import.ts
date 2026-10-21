@@ -10,6 +10,7 @@ import { getDefaultLocation } from "@/lib/queries";
 import { applyMovement } from "@/lib/stock";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { parseMoney } from "@/lib/money";
 
 export type ImportRow = {
   sku: string;
@@ -62,8 +63,8 @@ export const importItems = act(async (fd: FormData) => {
         categoryId,
         minQuantity: Math.max(0, Math.trunc(r.minQuantity ?? 0)),
         unit: r.unit || "бр.",
-        unitCost: Math.max(0, r.unitCost ?? 0),
-        unitPrice: Math.max(0, r.unitPrice ?? 0),
+        unitCost: parseMoney(r.unitCost, `Ред „${r.sku}“: доставна цена`),
+        unitPrice: parseMoney(r.unitPrice, `Ред „${r.sku}“: продажна цена`),
         description: r.description || null,
       };
       const existing = await tx.query.items.findFirst({ where: eq(items.sku, r.sku) });

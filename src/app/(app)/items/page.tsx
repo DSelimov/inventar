@@ -15,6 +15,7 @@ import { can } from "@/lib/permissions";
 import { pageParam } from "@/lib/paging";
 import { listCategories, listLocations, pageItems } from "@/lib/queries";
 import { formatDate, formatMoney, formatNumber, isLowStock, plural } from "@/lib/utils";
+import { lineTotal } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Артикули" };
 
@@ -172,7 +173,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                       </td>
                     )}
                     <td className="text-right tabular-nums text-muted">{formatMoney(item.unitCost, ctx.org.currency)}</td>
-                    <td className="text-right tabular-nums font-medium">{formatMoney(item.quantity * item.unitCost, ctx.org.currency)}</td>
+                    <td className="text-right tabular-nums font-medium">{formatMoney(lineTotal(item.quantity, item.unitCost), ctx.org.currency)}</td>
                     <td className="text-muted">{formatDate(item.updatedAt)}</td>
                   </tr>
                 );

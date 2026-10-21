@@ -3,6 +3,7 @@ import { createDoc, documentHeader, mm, pageNumbers, pdfResponse, table } from "
 import { getStockCount } from "@/lib/queries";
 import { getCompanyDetails } from "@/lib/settings";
 import { formatDate, formatMoney, formatNumber } from "@/lib/utils";
+import { lineTotal, sumMoney } from "@/lib/money";
 
 /**
  * Инвентаризация като PDF: лист за броене (?blind=1 — без очакваните количества, за честно броене)
@@ -55,8 +56,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       ],
       lines.map((l) => {
         const d = l.counted === null ? null : l.counted - l.expected;
-        if (d) delta += d * l.item.unitCost;
-        return [l.item.sku, l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name, l.lotNumber ?? "", formatNumber(l.expected), l.counted === null ? "—" : formatNumber(l.counted), d === null || d === 0 ? "" : d > 0 ? `+${formatNumber(d)}` : formatNumber(d), d ? money(d * l.item.unitCost) : ""];
+        const value = d ? lineTotal(d, l.item.unitCost) : 0;
+        delta = sumMoney([delta, value]);
+        return [l.item.sku, l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name, l.lotNumber ?? "", formatNumber(l.expected), l.counted === null ? "—" : formatNumber(l.counted), d === null || d === 0 ? "" : d > 0 ? `+${formatNumber(d)}` : formatNumber(d), d ? money(value) : ""];
       }),
       { zebra: true },
     );

@@ -8,6 +8,7 @@ import { UserError } from "@/lib/errors";
 import { optional } from "@/lib/forms";
 import { dismissOnboarding, loadDemoData, quickStart, removeDemoData, type QuickItem } from "@/lib/onboarding";
 import { slugSku } from "@/lib/utils";
+import { parseMoney } from "@/lib/money";
 
 const revalidate = () => {
   revalidatePath("/", "layout");
@@ -21,9 +22,8 @@ export const quickStartItems = act(async (fd: FormData) => {
     const name = String(fd.get(`name_${i}`) ?? "").trim();
     if (!name) continue;
     const quantity = Math.trunc(Number(fd.get(`qty_${i}`) || 0));
-    const unitPrice = Number(String(fd.get(`price_${i}`) || "0").replace(",", "."));
+    const unitPrice = parseMoney(fd.get(`price_${i}`), `Ред ${i + 1}: цена`);
     if (!Number.isInteger(quantity) || quantity < 0) throw new UserError(`Ред ${i + 1}: невалидно количество.`);
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new UserError(`Ред ${i + 1}: невалидна цена.`);
     rows.push({ name, quantity, unitPrice, unit: String(fd.get(`unit_${i}`) || "бр.").trim() || "бр." });
   }
   const r = await quickStart(ctx.db, ctx.user, { category: optional(fd, "category"), items: rows }, slugSku);

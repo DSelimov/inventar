@@ -15,6 +15,7 @@ import { can } from "@/lib/permissions";
 import { getCollection, listItemOptions } from "@/lib/queries";
 import { formatMoney, formatNumber } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
+import { lineTotal, sumLines } from "@/lib/money";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -35,7 +36,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
   const memberIds = new Set(members.map((m) => m.id));
   const available = options.filter((o) => !memberIds.has(o.id));
   const totalUnits = members.reduce((s, m) => s + m.quantity, 0);
-  const totalValue = members.reduce((s, m) => s + m.quantity * m.unitCost, 0);
+  const totalValue = sumLines(members, (m) => m.quantity, (m) => m.unitCost);
 
   return (
     <>
@@ -93,7 +94,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
                     <td className="text-right tabular-nums">
                       {formatNumber(m.quantity)} {m.unit}
                     </td>
-                    <td className="text-right tabular-nums">{formatMoney(m.quantity * m.unitCost, settings.currency)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(lineTotal(m.quantity, m.unitCost), settings.currency)}</td>
                     <td className="text-right">
                       {writable && <Form action={removeItemFromCollection.bind(null, id, m.id)}>
                         <Button type="submit" variant="ghost" size="sm" aria-label="Премахни от колекцията">

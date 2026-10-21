@@ -14,6 +14,7 @@ import { can } from "@/lib/permissions";
 import { buildReports } from "@/lib/reports";
 import { getSettings } from "@/lib/settings";
 import { LOCALE, formatDate, formatMoney, formatNumber } from "@/lib/utils";
+import { lineTotal, sumMoney } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Отчети" };
 
@@ -178,8 +179,8 @@ export default async function ReportsPage() {
                       </Link>
                     </td>
                     <td className="text-right tabular-nums">{formatNumber(out)}</td>
-                    <td className="text-right tabular-nums">{money(out * item.unitPrice)}</td>
-                    <td className="text-right tabular-nums text-muted">{money(out * (item.unitPrice - item.unitCost))}</td>
+                    <td className="text-right tabular-nums">{money(lineTotal(out, item.unitPrice))}</td>
+                    <td className="text-right tabular-nums text-muted">{money(sumMoney([lineTotal(out, item.unitPrice), -lineTotal(out, item.unitCost)]))}</td>
                   </tr>
                 ))}
               </tbody>

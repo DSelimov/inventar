@@ -4,6 +4,7 @@ import type { Db, TenantDb } from "@/db/tenant";
 import { items, lots, stockCountLines, stockCounts, stockLevels, type StockCountLine } from "@/db/tenant-schema";
 import { UserError } from "./errors";
 import { applyMovement, type Actor } from "./stock";
+import { lineTotal, sumMoney } from "@/lib/money";
 
 /**
  * Инвентаризация: при създаване се записва снимка на очакваните количества в локацията (по артикул,
@@ -154,7 +155,7 @@ export async function applyStockCount(db: TenantDb, countId: number, actor: Acto
         await applyMovement(tx, { actor, itemId: l.itemId, locationId: count.locationId, type: "out", quantity: -delta, reason, lot: { lotId: l.lotId } });
       }
       adjusted++;
-      valueDelta += delta * l.item.unitCost;
+      valueDelta = sumMoney([valueDelta, lineTotal(delta, l.item.unitCost)]);
     }
   });
   return { adjusted, valueDelta, number: count.number };

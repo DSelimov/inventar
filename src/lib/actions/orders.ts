@@ -11,6 +11,7 @@ import { getDefaultLocation, nextOrderNumber } from "@/lib/queries";
 import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { parseMoney } from "@/lib/money";
 
 function revalidate(id?: number) {
   revalidatePath("/");
@@ -27,7 +28,7 @@ function readLines(fd: FormData) {
   ids.forEach((id, i) => {
     const itemId = Number(id);
     const quantity = Math.trunc(Number(qtys[i] ?? 0));
-    const unitPrice = Number(String(prices[i] ?? "0").replace(",", ".")) || 0;
+    const unitPrice = parseMoney(prices[i], `Ред ${i + 1}: цена`);
     if (Number.isInteger(itemId) && itemId > 0 && quantity > 0) {
       const prev = merged.get(itemId);
       merged.set(itemId, { quantity: (prev?.quantity ?? 0) + quantity, unitPrice });

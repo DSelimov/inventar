@@ -112,7 +112,7 @@ export function ItemForm({
             <Input name="unit" defaultValue={item?.unit ?? "бр."} placeholder="бр., кг, кашон…" />
           </Field>
           <Field label="Доставна цена" hint="Колко плащате за единица.">
-            <Input name="unitCost" type="number" min={0} step="0.01" defaultValue={item?.unitCost ?? 0} />
+            <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} />
           </Field>
           <Field label="Продажна цена" hint="На каква цена продавате (по избор).">
             <Input name="unitPrice" type="number" min={0} step="0.01" defaultValue={item?.unitPrice ?? 0} />

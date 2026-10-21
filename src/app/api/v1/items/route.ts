@@ -3,6 +3,7 @@ import { items, TRACKING_MODES } from "@/db/tenant-schema";
 import { ApiError, handler, json, readJson } from "@/lib/api";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
+import { parseMoney } from "@/lib/money";
 
 export const GET = handler("read", async (req, ctx) => {
   const url = new URL(req.url);
@@ -34,8 +35,8 @@ export const POST = handler("write", async (req, ctx) => {
       description: body.description ?? null,
       categoryId: body.categoryId ?? null,
       unit: body.unit ?? "бр.",
-      unitCost: body.unitCost ?? 0,
-      unitPrice: body.unitPrice ?? 0,
+      unitCost: parseMoney(body.unitCost, "unitCost"),
+      unitPrice: parseMoney(body.unitPrice, "unitPrice"),
       minQuantity: body.minQuantity ?? 0,
       tracking: (TRACKING_MODES as readonly string[]).includes(body.tracking ?? "") ? (body.tracking as (typeof TRACKING_MODES)[number]) : "none",
     })

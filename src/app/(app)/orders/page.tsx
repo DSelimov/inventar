@@ -15,6 +15,7 @@ import { can } from "@/lib/permissions";
 import { pageParam, param, type SearchParams } from "@/lib/paging";
 import { pageOrders } from "@/lib/queries";
 import { cn, formatDate, formatMoney, label } from "@/lib/utils";
+import { sumLines } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Поръчки" };
 
@@ -91,7 +92,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               {rows.map((o) => {
                 const ordered = o.lines.reduce((s, l) => s + l.quantity, 0);
                 const done = o.lines.reduce((s, l) => s + Math.min(l.quantity, l.fulfilledQuantity), 0);
-                const value = o.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+                const value = sumLines(o.lines, (l) => l.quantity, (l) => l.unitPrice);
                 return (
                   <tr key={o.id}>
                     <td>

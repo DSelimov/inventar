@@ -7,13 +7,14 @@ import { fieldDefinitions, itemFieldValues, items, ITEM_STATUSES, TRACKING_MODES
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { deleteItemFiles } from "@/lib/item-images";
-import { int, num, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
+import { int, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { getDefaultLocation } from "@/lib/queries";
 import { applyMovement, transferStock } from "@/lib/stock";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
+import { parseMoney } from "@/lib/money";
 
 function revalidateItems(id?: number) {
   revalidatePath("/");
@@ -49,8 +50,8 @@ function readItem(fd: FormData) {
     tracking: oneOf(fd, "tracking", TRACKING_MODES, "none"),
     minQuantity: Math.max(0, int(fd, "minQuantity", 0)),
     unit: str(fd, "unit", "бр.") || "бр.",
-    unitCost: Math.max(0, num(fd, "unitCost", 0)),
-    unitPrice: Math.max(0, num(fd, "unitPrice", 0)),
+    unitCost: parseMoney(str(fd, "unitCost"), "Доставна цена"),
+    unitPrice: parseMoney(str(fd, "unitPrice"), "Продажна цена"),
     status: oneOf(fd, "status", ITEM_STATUSES, "active"),
     variantLabel: optional(fd, "variantLabel"),
   };
@@ -140,8 +141,8 @@ export const createVariant = act(async (parentId: number, fd: FormData) => {
       tracking: parent.tracking,
       minQuantity: parent.minQuantity,
       unit: parent.unit,
-      unitCost: num(fd, "unitCost", parent.unitCost),
-      unitPrice: num(fd, "unitPrice", parent.unitPrice),
+      unitCost: parseMoney(str(fd, "unitCost"), "Доставна цена", parent.unitCost),
+      unitPrice: parseMoney(str(fd, "unitPrice"), "Продажна цена", parent.unitPrice),
     })
     .$returningId();
   const values = await ctx.db.select().from(itemFieldValues).where(eq(itemFieldValues.itemId, parent.id));

@@ -32,11 +32,13 @@ so stock value at a past date and cost of goods sold cannot be computed; one `or
 tenant, default `EUR`.
 
 ### A1. Exact money
-- Migrate every money column to `decimal(14,4)` for unit amounts and `decimal(14,2)` for document totals.
-  Drizzle `decimal` returns strings: add `src/lib/money.ts` (parse, add, multiply by quantity, round
-  half-up to cents, format) and use it everywhere instead of float arithmetic. No `number` money math left
-  in `src/` (grep check in a test).
-- API: amounts as strings with 2–4 decimals in JSON; document the change in OpenAPI.
+- **Done.** Money columns are `decimal(14,4)` via the `money()` column helper in `tenant-schema.ts`
+  (Drizzle `mode: "number"`). All arithmetic goes through `src/lib/money.ts` (`lineTotal`, `sumLines`,
+  `sumMoney`, `roundMoney`, `parseMoney`) on whole ten-thousandths, rounding half away from zero to cents;
+  `tests/unit/money.test.ts` fails if `… * unitCost/unitPrice` appears in JS outside that module. Every new
+  money column (VAT, invoices, movement cost) uses `money()` and these helpers.
+- API keeps amounts as JSON numbers (no breaking change); inputs with more than 4 decimals are rounded,
+  negative or invalid ones are rejected. Document totals as `decimal(14,2)` come with B1.
 - Acceptance: 0.1 + 0.2 style sums are exact in reports, PDFs and API; the existing test suite passes.
 
 ### A2. Fractional quantities and units of measure

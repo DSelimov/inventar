@@ -3,7 +3,7 @@
  * Потребителите живеят в контролната база, затова тук се пазят само user_id + име (снимка).
  */
 import { relations, sql } from "drizzle-orm";
-import { boolean, date, datetime, double, index, int, json, mysqlEnum, mysqlTable, primaryKey, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, date, datetime, decimal, index, int, json, mysqlEnum, mysqlTable, primaryKey, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 // ---------------------------------------------------------------- enumerations
 export const FIELD_TYPES = ["text", "number", "date", "select", "boolean"] as const;
@@ -40,6 +40,8 @@ export const WEBHOOK_EVENTS = [
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
+/** Пари: точно в базата (decimal), число в TypeScript; аритметиката е в src/lib/money.ts. */
+const money = (name: string) => decimal(name, { precision: 14, scale: 4, mode: "number" });
 const createdAt = () => datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`);
 const ts = (name: string) => datetime(name, { fsp: 3 });
 
@@ -91,8 +93,8 @@ export const items = mysqlTable(
     quantity: int("quantity").notNull().default(0),
     minQuantity: int("min_quantity").notNull().default(0),
     unit: varchar("unit", { length: 32 }).notNull().default("бр."),
-    unitCost: double("unit_cost").notNull().default(0),
-    unitPrice: double("unit_price").notNull().default(0),
+    unitCost: money("unit_cost").notNull().default(0),
+    unitPrice: money("unit_price").notNull().default(0),
     status: mysqlEnum("status", ITEM_STATUSES).notNull().default("active"),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().default(sql`CURRENT_TIMESTAMP(3)`),
@@ -212,7 +214,7 @@ export const orderLines = mysqlTable("order_lines", {
   fulfilledQuantity: int("fulfilled_quantity").notNull().default(0),
   /** Върнато от клиента (продажба) или към доставчика (доставка) след изпълнение. */
   returnedQuantity: int("returned_quantity").notNull().default(0),
-  unitPrice: double("unit_price").notNull().default(0),
+  unitPrice: money("unit_price").notNull().default(0),
 });
 
 // ------------------------------------------------------------------- shipments

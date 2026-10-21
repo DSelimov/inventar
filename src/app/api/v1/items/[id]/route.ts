@@ -3,6 +3,7 @@ import { items, lots } from "@/db/tenant-schema";
 import { ApiError, handler, json, paramId, readJson } from "@/lib/api";
 import { apiImage, listItemImages } from "@/lib/item-images";
 import { emit } from "@/lib/webhooks";
+import { parseMoney } from "@/lib/money";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,7 @@ export const PATCH = handler("write", async (req, ctx, { params }: Params) => {
   const body = await readJson<Record<string, unknown>>(req);
   const patch: Record<string, unknown> = {};
   for (const k of EDITABLE) if (k in body) patch[k] = body[k];
+  for (const k of ["unitCost", "unitPrice"] as const) if (k in patch) patch[k] = parseMoney(patch[k], k, existing[k]);
   if (!Object.keys(patch).length) throw new ApiError(422, "Няма полета за промяна.");
   await ctx.db.update(items).set({ ...patch, updatedAt: new Date() }).where(eq(items.id, id));
   const row = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });

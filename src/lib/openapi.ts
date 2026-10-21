@@ -14,7 +14,8 @@ const ref = (name: string): Schema => ({ $ref: `#/components/schemas/${name}` })
 const nullable = (s: Schema): Schema => ({ ...s, type: Array.isArray(s.type) ? s.type : [s.type, "null"] });
 const str = (description: string, extra: Schema = {}): Schema => ({ type: "string", description, ...extra });
 const int = (description: string, extra: Schema = {}): Schema => ({ type: "integer", description, ...extra });
-const num = (description: string, extra: Schema = {}): Schema => ({ type: "number", description, ...extra });
+/** Суми: decimal(14,4) в базата; повече от 4 знака след запетаята се закръглят, отрицателни се отказват (422). */
+const money = (description: string, extra: Schema = {}): Schema => ({ type: "number", minimum: 0, maximum: 9_999_999_999, description: `${description} (до 4 знака след запетаята)`, ...extra });
 const bool = (description: string): Schema => ({ type: "boolean", description });
 const date = (description: string): Schema => ({ type: "string", format: "date", description: `${description} (ГГГГ-ММ-ДД)`, example: "2026-10-20" });
 const datetime = (description: string): Schema => ({ type: "string", format: "date-time", description, example: "2026-10-20T08:00:00.000Z" });
@@ -122,8 +123,8 @@ const schemas: Record<string, Schema> = {
       quantity: int("Обща наличност във всички локации (кеширана сума)", { example: 50 }),
       minQuantity: int("Минимум; при достигане се вдига сигнал и webhook item.low_stock"),
       unit: str("Мерна единица", { example: "бр." }),
-      unitCost: num("Доставна цена за единица", { example: 12.5 }),
-      unitPrice: num("Продажна цена за единица", { example: 24.9 }),
+      unitCost: money("Доставна цена за единица", { example: 12.5 }),
+      unitPrice: money("Продажна цена за единица", { example: 24.9 }),
       status: enumOf(ITEM_STATUSES, "active или archived"),
       createdAt: datetime("Създаден"),
       updatedAt: datetime("Последна промяна"),
@@ -167,8 +168,8 @@ const schemas: Record<string, Schema> = {
       description: str("Описание"),
       categoryId: int("Категория"),
       unit: str("Мерна единица, по подразбиране „бр.“"),
-      unitCost: num("Доставна цена"),
-      unitPrice: num("Продажна цена"),
+      unitCost: money("Доставна цена"),
+      unitPrice: money("Продажна цена"),
       minQuantity: int("Минимално количество"),
       tracking: enumOf(TRACKING_MODES, "Режим на проследяване; по подразбиране none."),
     },
@@ -183,8 +184,8 @@ const schemas: Record<string, Schema> = {
       description: nullable(str("Описание")),
       categoryId: nullable(int("Категория")),
       unit: str("Мерна единица"),
-      unitCost: num("Доставна цена"),
-      unitPrice: num("Продажна цена"),
+      unitCost: money("Доставна цена"),
+      unitPrice: money("Продажна цена"),
       minQuantity: int("Минимално количество"),
       status: enumOf(ITEM_STATUSES, "active или archived"),
     },
@@ -293,7 +294,7 @@ const schemas: Record<string, Schema> = {
       quantity: int("Поръчано количество"),
       fulfilledQuantity: int("Доставено до момента (сума от доставените пратки)"),
       returnedQuantity: int("Върнато след доставка (сума от доставените връщания)"),
-      unitPrice: num("Единична цена"),
+      unitPrice: money("Единична цена"),
       item: ref("Item"),
     },
     ["id", "orderId", "itemId", "quantity", "fulfilledQuantity", "unitPrice"],

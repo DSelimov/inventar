@@ -17,6 +17,7 @@ import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images
 import { getItem, listLocations } from "@/lib/queries";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
+import { lineTotal } from "@/lib/money";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -85,8 +86,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Обща наличност" value={`${formatNumber(item.quantity)} ${item.unit}`} tone={low ? "danger" : undefined} />
         <Stat label="Минимум" value={item.minQuantity > 0 ? `${formatNumber(item.minQuantity)} ${item.unit}` : "—"} />
-        <Stat label="Стойност на склад" value={formatMoney(item.quantity * item.unitCost, currency)} hint={`${formatMoney(item.unitCost, currency)} / ${item.unit}`} />
-        <Stat label="Продажна стойност" value={formatMoney(item.quantity * item.unitPrice, currency)} hint={`${formatMoney(item.unitPrice, currency)} / ${item.unit}`} />
+        <Stat label="Стойност на склад" value={formatMoney(lineTotal(item.quantity, item.unitCost), currency)} hint={`${formatMoney(item.unitCost, currency)} / ${item.unit}`} />
+        <Stat label="Продажна стойност" value={formatMoney(lineTotal(item.quantity, item.unitPrice), currency)} hint={`${formatMoney(item.unitPrice, currency)} / ${item.unit}`} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -112,7 +113,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                       <td className="text-right tabular-nums">
                         {formatNumber(lvl?.quantity ?? 0)} {item.unit}
                       </td>
-                      <td className="text-right tabular-nums text-muted">{formatMoney((lvl?.quantity ?? 0) * item.unitCost, currency)}</td>
+                      <td className="text-right tabular-nums text-muted">{formatMoney(lineTotal(lvl?.quantity ?? 0, item.unitCost), currency)}</td>
                     </tr>
                   );
                 })}
