@@ -166,7 +166,15 @@ export const createReturnForOrder = act(async (id: number) => {
   const related = await ctx.db.query.shipments.findMany({ where: eq(shipments.orderId, id), with: { lines: { with: { lot: true } } } });
   const pendingReturns = new Map<number, number>();
   for (const s of related) if (s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) pendingReturns.set(l.itemId, (pendingReturns.get(l.itemId) ?? 0) + l.quantity);
-  const lines = o.lines.map((l) => ({ line: l, quantity: l.fulfilledQuantity - l.returnedQuantity - (pendingReturns.get(l.itemId) ?? 0) })).filter((x) => x.quantity > 0);
+  // отворените връщания се приспадат по редовете на артикула поред, а не от всеки ред поотделно
+  const lines = o.lines
+    .map((l) => {
+      const open = l.fulfilledQuantity - l.returnedQuantity;
+      const pending = Math.min(open, pendingReturns.get(l.itemId) ?? 0);
+      pendingReturns.set(l.itemId, (pendingReturns.get(l.itemId) ?? 0) - pending);
+      return { line: l, quantity: open - pending };
+    })
+    .filter((x) => x.quantity > 0);
   if (!lines.length) throw new UserError("Няма количества за връщане: нищо не е доставено или всичко вече е върнато.");
 
   // партида от оригиналната доставка, ако е една-единствена

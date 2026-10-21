@@ -132,4 +132,36 @@ describe("инвентаризация", () => {
     expect(await level(ok)).toBe(5); // и другата корекция е отменена
     expect((await t.db.select().from(stockCounts).where(eq(stockCounts.id, c.id)))[0].status).toBe("open");
   });
+
+  it("паралелно прилагане: корекцията се записва само веднъж", async () => {
+    const a = await createItem(t.db);
+    await move({ itemId: a, locationId: t.main, type: "in", quantity: 10 });
+    const c = await createStockCount(t.db, { locationId: t.main, categoryId: null, createdBy: "Тест" });
+    const line = (await linesOf(c.id)).find((l) => l.itemId === a)!;
+    await saveCountedValues(t.db, c.id, new Map([[line.id, 7]]));
+    const results = await Promise.allSettled([applyStockCount(t.db, c.id, actor), applyStockCount(t.db, c.id, actor)]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await level(a)).toBe(7);
+  });
+
+  it("сканиране: баркодът е без значение на регистъра, паралелните +1 не се губят", async () => {
+    const a = await createItem(t.db, "none", { barcode: `AB${Date.now()}X` });
+    await move({ itemId: a, locationId: t.main, type: "in", quantity: 3 });
+    const c = await createStockCount(t.db, { locationId: t.main, createdBy: "Тест" });
+    const barcode = (await t.db.select().from(items).where(eq(items.id, a)))[0].barcode!;
+    await Promise.all(Array.from({ length: 5 }, (_, i) => recordCount(t.db, c.id, i % 2 ? barcode.toLowerCase() : barcode, 1)));
+    const forItem = (await linesOf(c.id)).filter((l) => l.itemId === a);
+    expect(forItem).toHaveLength(1);
+    expect(forItem[0].counted).toBe(5);
+  });
+
+  it("сканиране: обща партида при два артикула не се отчита на случаен ред", async () => {
+    const a = await createItem(t.db, "lot");
+    const b = await createItem(t.db, "lot");
+    const lot = `SHARED-${Date.now()}`;
+    await move({ itemId: a, locationId: t.main, type: "in", quantity: 2, lot: { lotNumber: lot } });
+    await move({ itemId: b, locationId: t.main, type: "in", quantity: 2, lot: { lotNumber: lot } });
+    const c = await createStockCount(t.db, { locationId: t.main, createdBy: "Тест" });
+    await expect(recordCount(t.db, c.id, lot, 1)).rejects.toThrow("при няколко артикула");
+  });
 });

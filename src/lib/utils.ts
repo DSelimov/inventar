@@ -94,6 +94,8 @@ export const STATUS_LABELS: Record<string, string> = {
   confirmed: "Потвърдена",
   partial: "Частично изпълнена",
   completed: "Изпълнена",
+  open: "В процес",
+  applied: "Приложена",
   event: "Събитие",
   reminder: "Напомняне",
   deadline: "Краен срок",

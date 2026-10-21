@@ -1,10 +1,10 @@
 import "server-only";
 import { addDays, format } from "date-fns";
-import { count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, ne, notInArray, or } from "drizzle-orm";
 import { controlDb } from "@/db/control";
 import { memberships } from "@/db/control-schema";
 import type { TenantDb } from "@/db/tenant";
-import { categories, items, orderLines, orders, partners, settings } from "@/db/tenant-schema";
+import { categories, items, orderLines, orders, partners, settings, shipmentLines, shipments, stockCountLines, stockMovements } from "@/db/tenant-schema";
 import { UserError } from "./errors";
 import { getDefaultLocation } from "./queries";
 import { getCompanyDetails, setSetting } from "./settings";
@@ -93,7 +93,7 @@ export async function loadDemoData(db: TenantDb, actor: Actor & object) {
         .values({ sku: it.sku, barcode: it.barcode, name: it.name, categoryId: ids.categories[it.cat], minQuantity: it.minQuantity, unitCost: it.unitCost, unitPrice: it.unitPrice, unit: it.unit ?? "бр." })
         .$returningId();
       ids.items.push(id);
-      await applyMovement(tx, { actor, itemId: id, locationId: location.id, type: "in", quantity: it.qty, reason: "Демо: начална наличност" });
+      await applyMovement(tx, { actor, itemId: id, locationId: location.id, type: "in", quantity: it.qty, reason: DEMO_STOCK_REASON });
     }
     for (const p of DEMO.partners) ids.partners.push((await tx.insert(partners).values(p).$returningId())[0].id);
     const [{ id: po }] = await tx
@@ -110,11 +110,14 @@ export async function loadDemoData(db: TenantDb, actor: Actor & object) {
   return { items: ids.items.length };
 }
 
+const DEMO_STOCK_REASON = "Демо: начална наличност";
+
 /** Изтрива само записите, създадени от loadDemoData (и всичко, свързано с тях каскадно). */
 export async function removeDemoData(db: TenantDb) {
   const [row] = await db.select().from(settings).where(eq(settings.key, "demo.ids"));
   if (!row) throw new UserError("Няма заредени демо данни.");
   const ids = JSON.parse(row.value) as DemoIds;
+  await assertDemoUnused(db, ids);
   await db.transaction(async (tx) => {
     if (ids.orders.length) await tx.delete(orders).where(inArray(orders.id, ids.orders));
     if (ids.items.length) await tx.delete(items).where(inArray(items.id, ids.items));
@@ -123,4 +126,24 @@ export async function removeDemoData(db: TenantDb) {
     await tx.delete(settings).where(eq(settings.key, "demo.ids"));
   });
   return ids;
+}
+
+/**
+ * Каскадното изтриване на демо артикулите би изтрило и редове от истински поръчки, пратки, броения и
+ * движения — затова при такава употреба отказваме вместо да трием тихо.
+ */
+async function assertDemoUnused(db: TenantDb, ids: DemoIds) {
+  if (!ids.items.length && !ids.partners.length) return;
+  const n = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
+  const itemIds = ids.items.length ? ids.items : [0];
+  const partnerIds = ids.partners.length ? ids.partners : [0];
+  const orderIds = ids.orders.length ? ids.orders : [0];
+  const used =
+    (await n(db.select({ n: count() }).from(orderLines).where(and(inArray(orderLines.itemId, itemIds), notInArray(orderLines.orderId, orderIds))))) +
+    (await n(db.select({ n: count() }).from(shipmentLines).where(inArray(shipmentLines.itemId, itemIds)))) +
+    (await n(db.select({ n: count() }).from(stockCountLines).where(inArray(stockCountLines.itemId, itemIds)))) +
+    (await n(db.select({ n: count() }).from(stockMovements).where(and(inArray(stockMovements.itemId, itemIds), or(isNull(stockMovements.reason), ne(stockMovements.reason, DEMO_STOCK_REASON)))))) +
+    (await n(db.select({ n: count() }).from(orders).where(and(inArray(orders.partnerId, partnerIds), notInArray(orders.id, orderIds))))) +
+    (await n(db.select({ n: count() }).from(shipments).where(inArray(shipments.partnerId, partnerIds))));
+  if (used) throw new UserError("Демо артикулите или партньорите вече се използват в поръчки, пратки, движения или инвентаризации. Изтрийте ги поотделно, за да не загубите истински данни.");
 }

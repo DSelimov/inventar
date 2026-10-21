@@ -62,9 +62,14 @@ export async function recordCount(db: TenantDb, countId: number, code: string, q
   if (!Number.isInteger(quantity) || quantity < 0) throw new UserError("Въведете валидно количество.");
 
   const lines = await db.select({ line: stockCountLines, item: items }).from(stockCountLines).innerJoin(items, eq(items.id, stockCountLines.itemId)).where(eq(stockCountLines.countId, countId));
-  let match = lines.find((l) => l.line.lotNumber && l.line.lotNumber.toLowerCase() === code.toLowerCase());
+  const key = code.toLowerCase();
+  const byLot = lines.filter((l) => l.line.lotNumber?.toLowerCase() === key);
+  // един и същ номер на партида при няколко артикула: сканирането не може да избере реда
+  if (new Set(byLot.map((l) => l.line.itemId)).size > 1) throw new UserError(`Партида „${code}“ е при няколко артикула — въведете количеството в таблицата.`);
+  let match = byLot[0];
   if (!match) {
-    const forItem = lines.filter((l) => l.item.barcode === code || l.item.sku.toLowerCase() === code.toLowerCase());
+    // MySQL сравнява без значение на регистъра — същото и тук, иначе резервното търсене добавя дублиран ред
+    const forItem = lines.filter((l) => l.item.barcode?.toLowerCase() === key || l.item.sku.toLowerCase() === key);
     if (forItem.length > 1) throw new UserError(`„${forItem[0].item.name}“ е с партиди/серийни номера — сканирайте номера на партидата.`);
     match = forItem[0];
   }
@@ -81,10 +86,14 @@ export async function recordCount(db: TenantDb, countId: number, code: string, q
     const [{ id }] = await db.insert(stockCountLines).values({ countId, itemId: item.id, expected: level?.quantity ?? 0 }).$returningId();
     [line] = await db.select().from(stockCountLines).where(eq(stockCountLines.id, id));
   }
-  let counted = mode === "add" ? (line.counted ?? 0) + quantity : quantity;
-  if (item.tracking === "serial") counted = Math.min(counted, 1);
-  await db.update(stockCountLines).set({ counted, countedAt: new Date() }).where(eq(stockCountLines.id, line.id));
-  return { item, line: { ...line, counted } };
+  // "add" се изчислява в SQL: паралелни сканирания (камера + скенер, двама броячи) не губят бройки
+  const next = mode === "add" ? sql`coalesce(${stockCountLines.counted}, 0) + ${quantity}` : sql`${quantity}`;
+  await db
+    .update(stockCountLines)
+    .set({ counted: item.tracking === "serial" ? sql`least(${next}, 1)` : next, countedAt: new Date() })
+    .where(eq(stockCountLines.id, line.id));
+  const [row] = await db.select({ counted: stockCountLines.counted }).from(stockCountLines).where(eq(stockCountLines.id, line.id));
+  return { item, line: { ...line, counted: row?.counted ?? null } };
 }
 
 /** Нова партида (или сериен номер), открита при броенето, за артикул с проследяване. */
@@ -121,12 +130,15 @@ export async function saveCountedValues(db: TenantDb, countId: number, values: M
 /** Прилага разликите в една транзакция. Неброените редове се пропускат, освен при uncountedAsZero. */
 export async function applyStockCount(db: TenantDb, countId: number, actor: Actor & object, o: { uncountedAsZero?: boolean } = {}) {
   const count = await openCount(db, countId);
-  const lines = await db.query.stockCountLines.findMany({ where: eq(stockCountLines.countId, countId), with: { item: true, lot: true } });
   const reason = `Инвентаризация ${count.number}`;
   let adjusted = 0;
   let valueDelta = 0;
 
   await db.transaction(async (tx) => {
+    // Заема инвентаризацията атомарно: при две паралелни прилагания само едното минава.
+    const [res] = await tx.update(stockCounts).set({ status: "applied", appliedAt: new Date(), appliedBy: actor.name }).where(and(eq(stockCounts.id, countId), eq(stockCounts.status, "open")));
+    if (res.affectedRows !== 1) throw new UserError("Инвентаризацията вече е приключена.");
+    const lines = await tx.query.stockCountLines.findMany({ where: eq(stockCountLines.countId, countId), with: { item: true, lot: true } });
     for (const l of lines) {
       const counted = l.counted ?? (o.uncountedAsZero ? 0 : null);
       if (counted === null) continue;
@@ -144,7 +156,6 @@ export async function applyStockCount(db: TenantDb, countId: number, actor: Acto
       adjusted++;
       valueDelta += delta * l.item.unitCost;
     }
-    await tx.update(stockCounts).set({ status: "applied", appliedAt: new Date(), appliedBy: actor.name }).where(eq(stockCounts.id, countId));
   });
   return { adjusted, valueDelta, number: count.number };
 }

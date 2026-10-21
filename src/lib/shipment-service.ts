@@ -9,10 +9,15 @@ import { UserError } from "@/lib/errors";
 async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: number; quantity: number }>) {
   const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { lines: true } });
   if (!order) return;
+  // Един артикул може да е на няколко реда: доставеното запълва редовете поред, излишъкът остава на последния.
   for (const d of delivered) {
-    const line = order.lines.find((l) => l.itemId === d.itemId);
-    if (line) {
-      line.fulfilledQuantity += d.quantity;
+    const forItem = order.lines.filter((l) => l.itemId === d.itemId);
+    let left = d.quantity;
+    for (const [i, line] of forItem.entries()) {
+      const take = i === forItem.length - 1 ? left : Math.min(left, Math.max(0, line.quantity - line.fulfilledQuantity));
+      if (take <= 0) continue;
+      line.fulfilledQuantity += take;
+      left -= take;
       await tx.update(orderLines).set({ fulfilledQuantity: line.fulfilledQuantity }).where(eq(orderLines.id, line.id));
     }
   }
@@ -35,11 +40,21 @@ async function registerReturn(tx: Db, orderId: number, returned: Array<{ itemId:
   const byItem = new Map<number, number>();
   for (const r of returned) byItem.set(r.itemId, (byItem.get(r.itemId) ?? 0) + r.quantity);
   for (const [itemId, qty] of byItem) {
-    const line = order.lines.find((l) => l.itemId === itemId);
-    if (!line) throw new UserError("Връщането съдържа артикул, който не е в поръчката.");
-    const returnable = line.fulfilledQuantity - line.returnedQuantity;
-    if (qty > returnable) throw new UserError(`„${line.item.name}“: може да се върнат най-много ${returnable} ${line.item.unit} (доставени ${line.fulfilledQuantity}, вече върнати ${line.returnedQuantity}).`);
-    await tx.update(orderLines).set({ returnedQuantity: line.returnedQuantity + qty }).where(eq(orderLines.id, line.id));
+    const forItem = order.lines.filter((l) => l.itemId === itemId);
+    if (!forItem.length) throw new UserError("Връщането съдържа артикул, който не е в поръчката.");
+    const fulfilled = forItem.reduce((sum, l) => sum + l.fulfilledQuantity, 0);
+    const alreadyReturned = forItem.reduce((sum, l) => sum + l.returnedQuantity, 0);
+    const returnable = fulfilled - alreadyReturned;
+    const { item } = forItem[0];
+    if (qty > returnable) throw new UserError(`„${item.name}“: може да се върнат най-много ${returnable} ${item.unit} (доставени ${fulfilled}, вече върнати ${alreadyReturned}).`);
+    // разпределя върнатото по редовете на артикула
+    let left = qty;
+    for (const line of forItem) {
+      const take = Math.min(left, line.fulfilledQuantity - line.returnedQuantity);
+      if (take <= 0) continue;
+      left -= take;
+      await tx.update(orderLines).set({ returnedQuantity: line.returnedQuantity + take }).where(eq(orderLines.id, line.id));
+    }
   }
 }
 

@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { controlDb } from "@/db/control";
 import { users } from "@/db/control-schema";
 import { act } from "@/lib/action";
+import { audit } from "@/lib/audit";
 import { destroyOtherSessions, requireContext, verifyPassword } from "@/lib/auth";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { UserError } from "@/lib/errors";
@@ -60,6 +61,7 @@ export const confirmTotpSetup = act(async (fd: FormData) => {
   await destroyOtherSessions(ctx.user.id);
   await showRecoveryCodesOnce(codes);
   log.info("auth.2fa_enabled", { userId: ctx.user.id });
+  await audit(ctx, "2fa_enabled", "user", ctx.user.id);
   revalidatePath("/profile");
   return "Двуфакторната защита е включена. Запазете кодовете за възстановяване.";
 });
@@ -78,17 +80,22 @@ export const disableTotp = act(async (fd: FormData) => {
   if (verifyTotp(decrypt(ctx.user.totpSecretEnc), str(fd, "code"), ctx.user.totpLastStep) === null) throw new UserError("Невалиден код от приложението.");
   await controlDb.update(users).set({ totpSecretEnc: null, totpPendingEnc: null, totpEnabledAt: null, totpLastStep: null, totpRecoveryHashes: null }).where(eq(users.id, ctx.user.id));
   log.warn("auth.2fa_disabled", { userId: ctx.user.id });
+  await audit(ctx, "2fa_disabled", "user", ctx.user.id);
   revalidatePath("/profile");
   return "Двуфакторната защита е изключена.";
 });
 
 export const regenerateRecoveryCodes = act(async (fd: FormData) => {
   const ctx = await requireContext("read");
-  if (!ctx.user.totpEnabledAt) throw new UserError("Двуфакторната защита не е включена.");
+  if (!ctx.user.totpEnabledAt || !ctx.user.totpSecretEnc) throw new UserError("Двуфакторната защита не е включена.");
   if (!verifyPassword(str(fd, "password"), ctx.user.passwordHash)) throw new UserError("Грешна парола.");
+  // вторият фактор е нужен и тук: само с парола и сесия новите кодове биха заобиколили 2FA
+  const step = verifyTotp(decrypt(ctx.user.totpSecretEnc), str(fd, "code"), ctx.user.totpLastStep);
+  if (step === null) throw new UserError("Невалиден код от приложението.");
   const { codes, hashes } = generateRecoveryCodes();
-  await controlDb.update(users).set({ totpRecoveryHashes: hashes }).where(eq(users.id, ctx.user.id));
+  await controlDb.update(users).set({ totpRecoveryHashes: hashes, totpLastStep: step }).where(eq(users.id, ctx.user.id));
   await showRecoveryCodesOnce(codes);
+  await audit(ctx, "2fa_recovery_codes", "user", ctx.user.id);
   revalidatePath("/profile");
   return "Нови кодове за възстановяване — старите вече не важат.";
 });

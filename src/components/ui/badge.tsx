@@ -50,6 +50,8 @@ export const statusTone: Record<string, Tone> = {
   confirmed: "info",
   partial: "warning",
   completed: "success",
+  open: "info",
+  applied: "success",
   transfer_in: "info",
   transfer_out: "info",
   purchase: "info",

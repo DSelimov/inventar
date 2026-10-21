@@ -48,13 +48,17 @@ export const saveCounts = act(async (countId: number, fd: FormData) => {
     values.set(Number(m[1]), v === "" ? null : Number(v.replace(",", ".")));
   }
   const changed = await saveCountedValues(ctx.db, countId, values);
+  if (changed) await audit(ctx, "update", "stock_count", countId, { counted: changed });
   revalidate(countId);
   return changed ? `Запазени са ${changed} количества.` : "Няма промени.";
 });
 
 export const addCountLot = act(async (countId: number, fd: FormData) => {
   const ctx = await requireContext("write");
-  await addLotLine(ctx.db, countId, int(fd, "itemId", 0), str(fd, "lotNumber"), Math.max(0, int(fd, "quantity", 1)));
+  const itemId = int(fd, "itemId", 0);
+  const lotNumber = str(fd, "lotNumber");
+  await addLotLine(ctx.db, countId, itemId, lotNumber, Math.max(0, int(fd, "quantity", 1)));
+  await audit(ctx, "update", "stock_count", countId, { itemId, lotNumber: lotNumber.trim() });
   revalidate(countId);
   return "Партидата е добавена към броенето.";
 });

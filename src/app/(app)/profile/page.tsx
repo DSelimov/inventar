@@ -128,6 +128,9 @@ export default async function ProfilePage() {
                   <Field label="Парола" className="min-w-40 flex-1">
                     <Input name="password" type="password" required autoComplete="current-password" />
                   </Field>
+                  <Field label="Код от приложението" className="min-w-40 flex-1">
+                    <Input name="code" inputMode="numeric" required autoComplete="one-time-code" />
+                  </Field>
                   <SubmitButton variant="secondary">
                     <KeyRound className="h-4 w-4" />
                     Нови кодове

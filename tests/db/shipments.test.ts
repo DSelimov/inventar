@@ -130,4 +130,16 @@ describe("changeShipmentStatus", () => {
     expect(await qty(plain)).toBe(3);
     expect(await orderState(po)).toEqual({ status: "completed", fulfilled: [5], returned: [2] });
   });
+
+  it("артикул на два реда в поръчката: доставката и връщането се разпределят по редовете", async () => {
+    const plain = await createItem(t.db);
+    await t.db.transaction((tx) => applyMovement(tx, { actor, itemId: plain, locationId: t.main, type: "in", quantity: 20 }));
+    const so = await order("sales", [{ itemId: plain, quantity: 10 }, { itemId: plain, quantity: 5 }]);
+    await changeShipmentStatus(t.db, actor, await shipment("outbound", [{ itemId: plain, quantity: 15 }], so), "delivered");
+    expect(await orderState(so)).toEqual({ status: "completed", fulfilled: [10, 5], returned: [0, 0] });
+
+    await changeShipmentStatus(t.db, actor, await shipment("inbound", [{ itemId: plain, quantity: 12 }], so, true), "delivered");
+    expect(await orderState(so)).toEqual({ status: "completed", fulfilled: [10, 5], returned: [10, 2] });
+    expect(await qty(plain)).toBe(17);
+  });
 });

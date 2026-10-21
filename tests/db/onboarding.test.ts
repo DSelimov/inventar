@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { categories, items, orders, partners, stockMovements } from "@/db/tenant-schema";
+import { categories, items, orderLines, orders, partners, stockMovements } from "@/db/tenant-schema";
 import { loadDemoData, onboardingState, quickStart, removeDemoData } from "@/lib/onboarding";
 import { applyMovement } from "@/lib/stock";
 import { slugSku } from "@/lib/utils";
@@ -56,5 +56,17 @@ describe("демо данни", () => {
     expect((await t.db.select().from(stockMovements).where(eq(stockMovements.itemId, own))).length).toBe(1);
     expect((await onboardingState(t.db, t.org.id)).hasDemo).toBe(false);
     await expect(removeDemoData(t.db)).rejects.toThrow("Няма заредени демо данни");
+  });
+
+  it("демо артикул в истинска поръчка: изтриването се отказва и нищо не се губи", async () => {
+    const u = await createTenant("onb2");
+    await loadDemoData(u.db, actor);
+    const [demoItem] = await u.db.select().from(items).limit(1);
+    const [{ id: real }] = await u.db.insert(orders).values({ type: "sales", number: "МОЯ-1", status: "confirmed" }).$returningId();
+    await u.db.insert(orderLines).values({ orderId: real, itemId: demoItem.id, quantity: 1 });
+
+    await expect(removeDemoData(u.db)).rejects.toThrow("вече се използват");
+    expect((await u.db.select().from(orderLines).where(eq(orderLines.orderId, real))).length).toBe(1);
+    expect((await u.db.select().from(items)).length).toBe(6);
   });
 });
