@@ -7,7 +7,8 @@ import { lots, ORDER_TYPES, orderLines, orders, shipmentLines, shipments, type O
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { oneOf, optional, optionalInt, str } from "@/lib/forms";
-import { getDefaultLocation, nextOrderNumber } from "@/lib/queries";
+import { nextNumber } from "@/lib/numbering";
+import { getDefaultLocation } from "@/lib/queries";
 import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
@@ -54,9 +55,10 @@ export const createOrder = act(async (fd: FormData) => {
   const lines = await assignVat(ctx.db, readLines(fd));
   await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
-  const number = str(fd, "number") || (await nextOrderNumber(ctx.db, type));
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
-  const id = await ctx.db.transaction(async (tx) => {
+  const { id, number } = await ctx.db.transaction(async (tx) => {
+    // ръчно въведен номер или следващият поред (заема се в транзакцията — без дупки)
+    const number = str(fd, "number") || (await nextNumber(tx, type));
     const [row] = await tx
       .insert(orders)
       .values({
@@ -73,7 +75,7 @@ export const createOrder = act(async (fd: FormData) => {
       })
       .$returningId();
     await tx.insert(orderLines).values(lines.map((l) => ({ ...l, orderId: row.id })));
-    return row.id;
+    return { id: row.id, number };
   });
   await audit(ctx, "create", "order", id, { number, type });
   emit(ctx.db, "order.created", { id, number, type, lines });

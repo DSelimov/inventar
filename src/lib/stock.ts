@@ -42,10 +42,10 @@ export async function applyMovement(tx: Db, input: MovementInput) {
 
   let delta: number;
   if (input.type === "in" || input.type === "transfer_in") delta = input.quantity;
-  else if (input.type === "out" || input.type === "transfer_out") delta = -input.quantity;
+  else if (input.type === "out" || input.type === "transfer_out" || input.type === "write_off") delta = -input.quantity;
   else delta = subQty(input.quantity, before);
 
-  if (delta === 0) return { delta: 0, after: item.quantity };
+  if (delta === 0) return { delta: 0, after: item.quantity, unitCost: item.unitCost, value: 0 };
   const after = addQty(before, delta);
   if (after < 0) throw new UserError(`Недостатъчна наличност в локацията (има ${before} ${item.unit}).`);
 

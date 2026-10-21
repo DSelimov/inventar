@@ -55,7 +55,7 @@ describe("applyMovement — без проследяване", () => {
   it("корекция до същото количество не създава движение", async () => {
     const id = await createItem(t.db);
     await move({ itemId: id, locationId: t.main, type: "in", quantity: 2 });
-    expect(await move({ itemId: id, locationId: t.main, type: "adjust", quantity: 2 })).toEqual({ delta: 0, after: 2 });
+    expect(await move({ itemId: id, locationId: t.main, type: "adjust", quantity: 2 })).toMatchObject({ delta: 0, after: 2, value: 0 });
     expect(await movements(id)).toHaveLength(1);
   });
 

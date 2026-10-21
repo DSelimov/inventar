@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
-import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, items, type ItemStatus, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks } from "@/db/tenant-schema";
+import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, items, type ItemStatus, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 const countExpr = () => n(sql<number>`count(*)`);
@@ -217,12 +217,6 @@ export async function getOrder(db: Db, id: number) {
     where: eq(orders.id, id),
     with: { partner: true, location: true, lines: { with: { item: true, vatRateRecord: true } }, shipments: { orderBy: [desc(shipments.createdAt)], with: { lines: true } } },
   });
-}
-
-export async function nextOrderNumber(db: Db, type: OrderType) {
-  const [row] = await db.select({ count: n(sql<number>`count(*)`) }).from(orders).where(eq(orders.type, type));
-  const prefix = type === "purchase" ? "ПЗ" : "ПР";
-  return `${prefix}-${new Date().getFullYear()}-${String((row?.count ?? 0) + 1).padStart(3, "0")}`;
 }
 
 /** Очаквано количество от отворени входящи пратки, по артикул. */
@@ -462,4 +456,12 @@ export async function listWebhooks(db: Db) {
     with: { deliveries: { orderBy: (d, { desc }) => [desc(d.createdAt)], limit: 5 } },
     orderBy: [desc(webhooks.createdAt)],
   });
+}
+
+export async function listWriteOffs(db: Db) {
+  return db.query.writeOffs.findMany({ with: { location: true, lines: true }, orderBy: [desc(writeOffs.createdAt)], limit: 200 });
+}
+
+export async function getWriteOff(db: Db, id: number) {
+  return db.query.writeOffs.findFirst({ where: eq(writeOffs.id, id), with: { location: true, lines: { with: { item: true, lot: true } } } });
 }

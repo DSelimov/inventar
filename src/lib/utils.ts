@@ -82,6 +82,7 @@ export const STATUS_LABELS: Record<string, string> = {
   adjust: "Корекция",
   transfer_in: "Трансфер (вход)",
   transfer_out: "Трансфер (изход)",
+  write_off: "Брак",
   none: "Без проследяване",
   lot: "Партиди",
   serial: "Серийни номера",

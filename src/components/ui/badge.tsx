@@ -54,6 +54,7 @@ export const statusTone: Record<string, Tone> = {
   applied: "success",
   transfer_in: "info",
   transfer_out: "info",
+  write_off: "danger",
   purchase: "info",
   sales: "accent",
 };

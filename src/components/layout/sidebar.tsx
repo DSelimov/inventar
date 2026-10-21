@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Truck, Users } from "lucide-react";
+import { BarChart3, Bell, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Trash, Truck, Users } from "lucide-react";
 import type { Role } from "@/db/schema";
 import { logout } from "@/lib/actions/auth";
 import { ROLE_LABELS } from "@/lib/permissions";
@@ -16,6 +16,7 @@ const NAV = [
   { href: "/shipments", label: "Пратки", icon: Truck },
   { href: "/movements", label: "Движения", icon: History },
   { href: "/counts", label: "Инвентаризация", icon: ClipboardCheck },
+  { href: "/write-offs", label: "Брак", icon: Trash },
   { href: "/partners", label: "Партньори", icon: Users },
   { href: "/collections", label: "Колекции", icon: Layers },
   { href: "/calendar", label: "Календар", icon: CalendarDays },

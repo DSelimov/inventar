@@ -3,6 +3,7 @@ import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import type { Db, TenantDb } from "@/db/tenant";
 import { items, lots, stockCountLines, stockCounts, stockLevels, type StockCountLine } from "@/db/tenant-schema";
 import { UserError } from "./errors";
+import { nextNumber } from "./numbering";
 import { applyMovement, type Actor } from "./stock";
 import { lineTotal, sumMoney } from "@/lib/money";
 import { addQty, assertQuantity, itemDecimals, subQty } from "./quantity";
@@ -12,12 +13,6 @@ import { addQty, assertQuantity, itemDecimals, subQty } from "./quantity";
  * а при партиди/серийни номера — по партида). Корекцията при прилагане е разликата преброено − очаквано,
  * приложена към текущата наличност: движенията по време на броенето не се губят.
  */
-
-export async function nextCountNumber(db: Db) {
-  const year = new Date().getFullYear();
-  const [row] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(stockCounts).where(sql`year(${stockCounts.createdAt}) = ${year}`);
-  return `ИНВ-${year}-${String((row?.n ?? 0) + 1).padStart(3, "0")}`;
-}
 
 export async function createStockCount(db: TenantDb, o: { locationId: number; categoryId?: number | null; includeZero?: boolean; notes?: string | null; createdBy: string }) {
   const itemWhere = and(eq(items.status, "active"), o.categoryId ? eq(items.categoryId, o.categoryId) : undefined);
@@ -39,7 +34,7 @@ export async function createStockCount(db: TenantDb, o: { locationId: number; ca
   if (!lines.length) throw new UserError("В тази локация няма артикули за броене (опитайте „включи и нулевите“).");
 
   return db.transaction(async (tx) => {
-    const number = await nextCountNumber(tx);
+    const number = await nextNumber(tx, "count");
     const [{ id }] = await tx.insert(stockCounts).values({ number, locationId: o.locationId, categoryId: o.categoryId ?? null, notes: o.notes ?? null, createdBy: o.createdBy }).$returningId();
     for (let i = 0; i < lines.length; i += 500) await tx.insert(stockCountLines).values(lines.slice(i, i + 500).map((l) => ({ ...l, countId: id })));
     return { id, number, lines: lines.length };

@@ -64,6 +64,13 @@
       "when": 1792606544729,
       "tag": "0008_vat",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1792607300085,
+      "tag": "0009_write_offs_numbering",
+      "breakpoints": true
     }
   ]
 }

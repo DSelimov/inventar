@@ -93,12 +93,18 @@ tenant, default `EUR`.
   format checks in `src/lib/tax-ids.ts` (checksum and VIES come with B2).
 
 ### A6. Missing warehouse documents
-- **Протокол за брак** (write-off): reason, commission members, items with cost; issues stock with type
-  `out` and reason; PDF with signatures.
-- **Складова разписка / приемателен протокол** for receipts and **стокова разписка** (exists) now with
-  prices and VAT totals.
-- Continuous numbering per document type and year, generated inside the transaction (no gaps on rollback:
-  use a counter table with `SELECT … FOR UPDATE`, not `count(*)` like `nextCountNumber` does today).
+- **Done.** Протокол за брак: `write_offs` / `write_off_lines` (migration 0009), pages `/write-offs`
+  (list, new, detail), PDF `/print/write-offs/[id]` with commission and МОЛ signature lines. Draft →
+  "Приложи" (role delete) books a new movement type `write_off` at cost (average or FIFO) and stores the
+  value on each line; status is claimed atomically, so it applies once. Tracked items need a lot from the
+  location. Write-offs are not sales: the turnover report keeps counting only `out`.
+- The receipt note (Приемателен протокол) and the delivery note (Стокова разписка) already print with
+  prices and VAT totals (A5).
+- Numbering: `document_counters` + `nextNumber` / `peekNumber` (`src/lib/numbering.ts`) — per type and
+  year (ПЗ, ПР, ИНВ, БР), `INSERT … ON DUPLICATE KEY UPDATE last_number = LAST_INSERT_ID(…)` inside the
+  document's transaction, so concurrent documents never share a number and a rollback leaves no gap.
+  Counters continue from the highest existing number; the order form shows the next number without
+  taking it. Invoices (B1) use the same counter with their own 10-digit format.
 
 ---
 

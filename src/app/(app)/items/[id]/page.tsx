@@ -464,6 +464,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 <ButtonLink href={`/shipments/new?direction=outbound&item=${id}`} variant="secondary" size="sm">
                   Изпрати
                 </ButtonLink>
+                {item.quantity > 0 && (
+                  <ButtonLink href={`/write-offs/new?item=${id}`} variant="secondary" size="sm">
+                    Брак (протокол)
+                  </ButtonLink>
+                )}
               </CardBody>
             </Card>
           )}

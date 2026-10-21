@@ -12,7 +12,7 @@ export const ITEM_STATUSES = ["active", "archived"] as const;
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
 export const TRACKING_MODES = ["none", "lot", "serial"] as const;
 export type TrackingMode = (typeof TRACKING_MODES)[number];
-export const MOVEMENT_TYPES = ["in", "out", "adjust", "transfer_in", "transfer_out"] as const;
+export const MOVEMENT_TYPES = ["in", "out", "adjust", "transfer_in", "transfer_out", "write_off"] as const;
 export type MovementType = (typeof MOVEMENT_TYPES)[number];
 export const SHIPMENT_DIRECTIONS = ["inbound", "outbound"] as const;
 export type ShipmentDirection = (typeof SHIPMENT_DIRECTIONS)[number];
@@ -402,6 +402,50 @@ export const stockCounts = mysqlTable("stock_counts", {
   appliedBy: varchar("applied_by", { length: 200 }),
 });
 
+// ------------------------------------------------------------------ write-offs
+export const WRITE_OFF_STATUSES = ["draft", "applied", "cancelled"] as const;
+export type WriteOffStatus = (typeof WRITE_OFF_STATUSES)[number];
+
+/** Протокол за брак: стоката се изписва при „Приложи“ (движения write_off по себестойност). */
+export const writeOffs = mysqlTable("write_offs", {
+  id: int("id").autoincrement().primaryKey(),
+  number: varchar("number", { length: 64 }).notNull(),
+  locationId: int("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
+  status: mysqlEnum("status", WRITE_OFF_STATUSES).notNull().default("draft"),
+  /** Причина: изтекъл срок, повреда, кражба… */
+  reason: varchar("reason", { length: 500 }).notNull(),
+  /** Членове на комисията, по един на ред — подписват протокола. */
+  commission: text("commission"),
+  notes: text("notes"),
+  createdBy: varchar("created_by", { length: 200 }),
+  createdAt: createdAt(),
+  appliedAt: ts("applied_at"),
+  appliedBy: varchar("applied_by", { length: 200 }),
+});
+
+export const writeOffLines = mysqlTable("write_off_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  writeOffId: int("write_off_id").notNull().references(() => writeOffs.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+  lotId: int("lot_id").references(() => lots.id, { onDelete: "set null" }),
+  quantity: qty("quantity").notNull(),
+  /** Себестойност и стойност при прилагане (от движението). */
+  unitCost: money("unit_cost"),
+  value: amount("value"),
+});
+
+// ------------------------------------------------------------ document numbers
+/** Поредни номера по вид документ и година: без дупки (броячът се увеличава в транзакцията на документа). */
+export const documentCounters = mysqlTable(
+  "document_counters",
+  {
+    docType: varchar("doc_type", { length: 32 }).notNull(),
+    year: int("year").notNull(),
+    lastNumber: int("last_number").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.docType, t.year] })],
+);
+
 /** Ред: артикул (или партида/сериен номер при проследяване) с очаквано и преброено количество. */
 export const stockCountLines = mysqlTable(
   "stock_count_lines",
@@ -477,6 +521,15 @@ export const stockCountsRelations = relations(stockCounts, ({ one, many }) => ({
   category: one(categories, { fields: [stockCounts.categoryId], references: [categories.id] }),
   lines: many(stockCountLines),
 }));
+export const writeOffsRelations = relations(writeOffs, ({ one, many }) => ({
+  location: one(locations, { fields: [writeOffs.locationId], references: [locations.id] }),
+  lines: many(writeOffLines),
+}));
+export const writeOffLinesRelations = relations(writeOffLines, ({ one }) => ({
+  writeOff: one(writeOffs, { fields: [writeOffLines.writeOffId], references: [writeOffs.id] }),
+  item: one(items, { fields: [writeOffLines.itemId], references: [items.id] }),
+  lot: one(lots, { fields: [writeOffLines.lotId], references: [lots.id] }),
+}));
 export const stockCountLinesRelations = relations(stockCountLines, ({ one }) => ({
   count: one(stockCounts, { fields: [stockCountLines.countId], references: [stockCounts.id] }),
   item: one(items, { fields: [stockCountLines.itemId], references: [items.id] }),
@@ -538,6 +591,7 @@ export type Partner = typeof partners.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type OrderLine = typeof orderLines.$inferSelect;
 export type VatRate = typeof vatRates.$inferSelect;
+export type WriteOff = typeof writeOffs.$inferSelect;
 export type Shipment = typeof shipments.$inferSelect;
 export type ShipmentLine = typeof shipmentLines.$inferSelect;
 export type Collection = typeof collections.$inferSelect;
