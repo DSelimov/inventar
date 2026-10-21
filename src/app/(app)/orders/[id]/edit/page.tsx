@@ -4,7 +4,7 @@ import { OrderForm } from "@/components/orders/order-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateOrder } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
-import { getOrder, listItemOptions, listLocations, listPartners, listVatRates } from "@/lib/queries";
+import { getOrder, listItemOptions, listLocations, listPartners, listSupplierPrices, listVatRates } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Редакция на поръчка" };
 
@@ -12,7 +12,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
   const ctx = await requireContext("write");
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [order, items, locations, partnersList, vatRates] = await Promise.all([getOrder(ctx.db, id), listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), listVatRates(ctx.db)]);
+  const [order, items, locations, partnersList, vatRates, supplierPrices] = await Promise.all([getOrder(ctx.db, id), listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), listVatRates(ctx.db), listSupplierPrices(ctx.db)]);
   if (!order) notFound();
   if (order.status !== "draft") redirect(`/orders/${id}`);
   return (
@@ -27,6 +27,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
         numberPlaceholder={order.number}
         vatRates={vatRates}
         pricesIncludeVat={order.pricesIncludeVat}
+        supplierPrices={supplierPrices}
         action={updateOrder.bind(null, id)}
         cancelHref={`/orders/${id}`}
       />

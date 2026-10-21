@@ -202,8 +202,10 @@ tenant, default `EUR`.
   purchase orders.
 
 ### D3. Multiple suppliers per item
-- `item_suppliers` (supplier, supplier SKU, purchase price, minimum order quantity, lead time, preferred).
-  Purchase orders prefill price and SKU; reorder suggestions use the preferred supplier.
+- **Done.** `item_suppliers` (migration 0012): supplier, supplier SKU, purchase price, minimum order quantity,
+  lead time, one preferred per item. Card "Доставчици" on the item page. Purchase orders prefill each line
+  with the selected supplier's price (else the average cost); "Поръчай от доставчик" preselects the
+  preferred supplier and its minimum quantity.
 
 ### D4. Packaging units
 - Per item: alternative units with a factor (кашон = 12 бр., палет = 48 кашона) and their own barcodes.

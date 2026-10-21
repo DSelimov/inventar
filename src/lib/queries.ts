@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
-import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
+import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 const countExpr = () => n(sql<number>`count(*)`);
@@ -503,4 +503,14 @@ export async function getInvoice(db: Db, id: number) {
 
 export async function listOrderInvoices(db: Db, orderId: number) {
   return db.select().from(invoices).where(eq(invoices.orderId, orderId)).orderBy(desc(invoices.id));
+}
+
+// -------------------------------------------------------------- item suppliers
+export async function listItemSuppliers(db: Db, itemId: number) {
+  return db.query.itemSuppliers.findMany({ where: eq(itemSuppliers.itemId, itemId), with: { partner: true }, orderBy: [desc(itemSuppliers.preferred), asc(itemSuppliers.id)] });
+}
+
+/** Цени и кодове при доставчиците — за поръчката за доставка (попълване на цената по доставчик). */
+export async function listSupplierPrices(db: Db) {
+  return db.select({ itemId: itemSuppliers.itemId, partnerId: itemSuppliers.partnerId, price: itemSuppliers.purchasePrice, sku: itemSuppliers.supplierSku }).from(itemSuppliers);
 }

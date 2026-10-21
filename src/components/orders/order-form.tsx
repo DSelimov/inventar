@@ -26,6 +26,8 @@ export function OrderForm({
   numberPlaceholder,
   vatRates,
   pricesIncludeVat,
+  supplierPrices = [],
+  initialPartnerId,
   action,
   cancelHref,
 }: {
@@ -37,15 +39,22 @@ export function OrderForm({
   initialType?: OrderType;
   numberPlaceholder: string;
   vatRates: VatRateOption[];
+  /** Цени при доставчиците (поръчка за доставка): при избран доставчик се попълва неговата цена. */
+  supplierPrices?: Array<{ itemId: number; partnerId: number; price: number | null }>;
+  initialPartnerId?: number | null;
   /** Цените на редовете са с ДДС (за нова поръчка — от настройките, за съществуваща — от нея). */
   pricesIncludeVat: boolean;
   action: (fd: FormData) => Promise<ActionResult>;
   cancelHref: string;
 }) {
   const [type, setType] = useState<OrderType>(order?.type ?? initialType);
-  const priceFor = (itemId: string, t: OrderType) => {
+  const [partnerId, setPartnerId] = useState<string>(order?.partnerId ? String(order.partnerId) : initialPartnerId ? String(initialPartnerId) : "");
+  const priceFor = (itemId: string, t: OrderType, partner = partnerId) => {
     const it = items.find((i) => String(i.id) === itemId);
-    return it ? String(t === "purchase" ? it.unitCost : it.unitPrice) : "0";
+    if (!it) return "0";
+    if (t !== "purchase") return String(it.unitPrice);
+    const atSupplier = supplierPrices.find((p) => String(p.itemId) === itemId && String(p.partnerId) === partner)?.price;
+    return String(atSupplier ?? it.unitCost);
   };
   const defaultVat = String(vatRates.find((r) => r.isDefault)?.id ?? vatRates[0]?.id ?? "");
   const vatFor = (itemId: string) => String(items.find((i) => String(i.id) === itemId)?.vatRateId ?? defaultVat);
@@ -98,7 +107,16 @@ export function OrderForm({
             <Input name="number" defaultValue={order?.number} placeholder={numberPlaceholder} />
           </Field>
           <Field label={purchase ? "Доставчик" : "Клиент"}>
-            <Select name="partnerId" defaultValue={order?.partnerId ?? ""}>
+            <Select
+              name="partnerId"
+              value={partnerId}
+              onChange={(e) => {
+                const p = e.target.value;
+                setPartnerId(p);
+                // доставчик с договорени цени: редовете вземат неговата цена
+                if (type === "purchase") setLines((ls) => ls.map((l) => (l.itemId ? { ...l, price: priceFor(l.itemId, type, p) } : l)));
+              }}
+            >
               <option value="">— без партньор —</option>
               {partnerList.map((p) => (
                 <option key={p.id} value={p.id}>

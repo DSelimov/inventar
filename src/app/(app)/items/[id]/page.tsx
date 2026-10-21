@@ -14,7 +14,8 @@ import { adjustStock, createVariant, deleteItem, transfer } from "@/lib/actions/
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
-import { getItem, listLocations } from "@/lib/queries";
+import { getItem, listItemSuppliers, listLocations, listPartners } from "@/lib/queries";
+import { removeItemSupplier, saveItemSupplier } from "@/lib/actions/item-suppliers";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { lineTotal } from "@/lib/money";
@@ -30,7 +31,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [item, locations, ownImages] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id)]);
+  const [item, locations, ownImages, suppliers, partnerOptions] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier")]);
   if (!item) notFound();
   const images = ownImages.length || !item.parentId ? ownImages : await listItemImages(ctx.db, item.parentId);
 
@@ -472,6 +473,60 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               </CardBody>
             </Card>
           )}
+
+          <Card>
+            <CardHeader title="Доставчици" description={suppliers.length ? "Цена и код при всеки доставчик; предпочитаният се ползва за предложенията за поръчка." : "Добавете от кого купувате артикула."} />
+            <CardBody className="space-y-3 text-sm">
+              {suppliers.map((s) => (
+                <div key={s.id} className="flex items-start justify-between gap-2 border-b border-line pb-2 last:border-0">
+                  <div>
+                    <Link href={`/partners/${s.partnerId}`} className="font-medium hover:text-accent">
+                      {s.partner.name}
+                    </Link>
+                    {s.preferred && (
+                      <Badge tone="accent" className="ml-2">
+                        предпочитан
+                      </Badge>
+                    )}
+                    <div className="text-xs text-muted">
+                      {[s.supplierSku && `код ${s.supplierSku}`, s.purchasePrice !== null && formatMoney(s.purchasePrice, currency), s.minOrderQuantity && `мин. ${formatNumber(s.minOrderQuantity)} ${item.unit}`, s.leadTimeDays !== null && `${s.leadTimeDays} дни`].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                  {writable && (
+                    <Form action={removeItemSupplier.bind(null, s.id)}>
+                      <ConfirmButton variant="ghost" size="sm" message={`Да премахна ли „${s.partner.name}“ като доставчик на артикула?`} aria-label="Премахни">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </ConfirmButton>
+                    </Form>
+                  )}
+                </div>
+              ))}
+              {writable && partnerOptions.length > 0 && (
+                <Form action={saveItemSupplier.bind(null, id)} className="grid grid-cols-2 gap-2 pt-1">
+                  <Select name="partnerId" required defaultValue="" className="col-span-2" aria-label="Доставчик">
+                    <option value="" disabled>
+                      Доставчик…
+                    </option>
+                    {partnerOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input name="supplierSku" placeholder="Код при доставчика" aria-label="Код при доставчика" />
+                  <Input name="purchasePrice" type="number" min={0} step="0.0001" placeholder="Цена" aria-label="Цена при доставчика" />
+                  <Input name="minOrderQuantity" type="number" min={0} step="any" placeholder="Мин. количество" aria-label="Минимално количество" />
+                  <Input name="leadTimeDays" type="number" min={0} placeholder="Срок, дни" aria-label="Срок на доставка" />
+                  <label className="col-span-2 flex items-center gap-2 text-xs">
+                    <input type="checkbox" name="preferred" /> Предпочитан доставчик
+                  </label>
+                  <SubmitButton variant="secondary" size="sm" className="col-span-2">
+                    Запази доставчика
+                  </SubmitButton>
+                </Form>
+              )}
+            </CardBody>
+          </Card>
 
           <Card>
             <CardHeader title="Етикети с баркод" description={item.barcode ? `Баркод ${item.barcode}` : `Без баркод — ще се използва кодът ${item.sku}.`} />
