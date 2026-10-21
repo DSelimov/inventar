@@ -197,9 +197,12 @@ tenant, default `EUR`.
   shown to the user (never silently applied twice — idempotency key per queued action).
 
 ### D2. Reorder suggestions
-- Per item: average daily consumption over N days, supplier lead time (`partners.lead_time_days` exists),
-  safety stock → suggested order quantity. Page "За поръчка" grouped by supplier; one click creates draft
-  purchase orders.
+- **Done.** `/orders/suggestions` ("Предложения за поръчка", button on Поръчки; `src/lib/replenishment.ts`):
+  sales per day over the analysis window × (lead time of the item's supplier → partner → settings + safety
+  days) + minimum − stock − expected (inbound shipments in transit plus unreceived confirmed purchase
+  orders, without double counting), raised to the supplier's minimum order quantity and rounded up to the
+  item's decimals. Grouped by preferred supplier with its price and SKU; selected lines (editable quantity
+  and price) become one draft purchase order per supplier.
 
 ### D3. Multiple suppliers per item
 - **Done.** `item_suppliers` (migration 0012): supplier, supplier SKU, purchase price, minimum order quantity,

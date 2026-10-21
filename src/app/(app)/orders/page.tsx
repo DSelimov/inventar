@@ -35,12 +35,17 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         title="Поръчки"
         description="Какво е договорено с доставчици и клиенти. Изпълнението се проследява чрез пратки, с частични доставки и остатъци."
         actions={
-          can(ctx.role, "write") && (
-            <ButtonLink href="/orders/new">
-              <Plus className="h-4 w-4" />
-              Нова поръчка
+          <>
+            <ButtonLink href="/orders/suggestions" variant="secondary">
+              Предложения за поръчка
             </ButtonLink>
-          )
+            {can(ctx.role, "write") && (
+              <ButtonLink href="/orders/new">
+                <Plus className="h-4 w-4" />
+                Нова поръчка
+              </ButtonLink>
+            )}
+          </>
         }
       />
 
