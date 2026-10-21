@@ -6,7 +6,9 @@ import { controlDb } from "@/db/control";
 import { memberships, organizations, passwordResets, sessions, users } from "@/db/control-schema";
 import { getTenantDb, provisionTenant, tenantDbName } from "@/db/tenant";
 import { locations } from "@/db/tenant-schema";
-import { createSession, destroySession, getSession, hashPassword, suggestSubdomain, verifyPassword } from "@/lib/auth";
+import { clearTwoFactor, createSession, destroySession, getSession, hashPassword, readTwoFactor, startTwoFactor, suggestSubdomain, verifyPassword } from "@/lib/auth";
+import { decrypt } from "@/lib/crypto";
+import { consumeRecoveryCode, verifyTotp } from "@/lib/totp";
 import { UserError } from "@/lib/errors";
 import { str } from "@/lib/forms";
 import { passwordResetMail, sendMail } from "@/lib/mail";
@@ -39,11 +41,48 @@ export async function login(_prev: string | undefined, fd: FormData): Promise<st
   if (tenant) {
     const [member] = await controlDb.select().from(memberships).where(and(eq(memberships.userId, user.id), eq(memberships.organizationId, tenant.id))).limit(1);
     if (!member) return `Нямате достъп до организация „${tenant.name}“. Помолете администратора ѝ да ви добави.`;
+    if (user.totpEnabledAt) {
+      await startTwoFactor(user.id, tenant.id);
+      redirect("/login/2fa");
+    }
     await createSession(user.id, tenant.id);
     redirect("/");
   }
+  if (user.totpEnabledAt) {
+    await startTwoFactor(user.id, null);
+    redirect("/login/2fa");
+  }
   await createSession(user.id, null);
   redirect("/portal");
+}
+
+/** Втора стъпка: код от приложението или код за възстановяване. До 5 грешни опита за 15 минути. */
+export async function verifyTwoFactor(_prev: string | undefined, fd: FormData): Promise<string | undefined> {
+  const challenge = await readTwoFactor();
+  if (!challenge) redirect("/login?expired=1");
+  const limit = { key: `2fa:user:${challenge.u}`, max: 5, windowMs: 15 * 60_000 };
+  const wait = await retryAfter(limit);
+  if (wait > 0) return `Твърде много грешни кодове. Опитайте отново след ${minutes(wait)} мин.`;
+  const [user] = await controlDb.select().from(users).where(eq(users.id, challenge.u)).limit(1);
+  if (!user?.totpSecretEnc) redirect("/login");
+
+  const code = str(fd, "code");
+  const step = /^\d{6}$/.test(code.replace(/\s/g, "")) ? verifyTotp(decrypt(user.totpSecretEnc), code, user.totpLastStep) : null;
+  if (step !== null) {
+    await controlDb.update(users).set({ totpLastStep: step }).where(eq(users.id, user.id));
+  } else {
+    const rest = consumeRecoveryCode(user.totpRecoveryHashes ?? [], code);
+    if (!rest) {
+      await hit(limit);
+      return "Невалиден код. Въведете 6-цифрения код от приложението или код за възстановяване.";
+    }
+    await controlDb.update(users).set({ totpRecoveryHashes: rest }).where(eq(users.id, user.id));
+    log.warn("auth.recovery_code_used", { userId: user.id, left: rest.length });
+  }
+  await clear(limit.key);
+  await clearTwoFactor();
+  await createSession(user.id, challenge.o);
+  redirect(challenge.o ? "/" : "/portal");
 }
 
 /** Нова организация: създава база, прилага миграциите, прави потребителя собственик. */
@@ -143,6 +182,8 @@ export async function resetPassword(_prev: string | undefined, fd: FormData): Pr
   await controlDb.delete(sessions).where(eq(sessions.userId, user.id));
   await controlDb.delete(passwordResets).where(and(eq(passwordResets.userId, user.id), isNull(passwordResets.usedAt)));
 
+  // с двуфакторна защита новата парола не е достатъчна за вход: нормален вход с код
+  if (user.totpEnabledAt) redirect("/login?reset=1");
   const tenant = await currentTenant();
   const org = tenant && organization?.id === tenant.id ? tenant : null;
   await createSession(user.id, org?.id ?? null);

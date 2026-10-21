@@ -1,5 +1,5 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, gt, ne } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -68,6 +68,37 @@ export async function destroyAllSessions(userId: number) {
 export async function countSessions(userId: number) {
   const rows = await controlDb.select({ id: sessions.id }).from(sessions).where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, new Date())));
   return rows.length;
+}
+
+// ------------------------------------------------------- двуфакторна стъпка
+const CHALLENGE = "inv_2fa";
+const CHALLENGE_SECONDS = 300;
+type Challenge = { u: number; o: number | null; exp: number };
+
+function sign(payload: string) {
+  return createHmac("sha256", `2fa:${process.env.APP_SECRET ?? ""}`).update(payload).digest("base64url");
+}
+
+/** След вярна парола при включена 2FA: подписан cookie за 5 минути вместо сесия. */
+export async function startTwoFactor(userId: number, organizationId: number | null) {
+  const payload = Buffer.from(JSON.stringify({ u: userId, o: organizationId, exp: Date.now() + CHALLENGE_SECONDS * 1000 } satisfies Challenge)).toString("base64url");
+  (await cookies()).set(CHALLENGE, `${payload}.${sign(payload)}`, { httpOnly: true, sameSite: "lax", secure: APP_PROTOCOL === "https", maxAge: CHALLENGE_SECONDS, path: "/" });
+}
+
+export async function readTwoFactor(): Promise<Challenge | null> {
+  const raw = (await cookies()).get(CHALLENGE)?.value;
+  if (!raw) return null;
+  const [payload, sig] = raw.split(".");
+  if (!payload || !sig) return null;
+  const expected = Buffer.from(sign(payload));
+  const given = Buffer.from(sig);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  const c = JSON.parse(Buffer.from(payload, "base64url").toString()) as Challenge;
+  return c.exp > Date.now() ? c : null;
+}
+
+export async function clearTwoFactor() {
+  (await cookies()).set(CHALLENGE, "", { maxAge: 0, path: "/" });
 }
 
 // ------------------------------------------------------------------- session

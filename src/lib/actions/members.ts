@@ -117,7 +117,7 @@ export const changeOwnPassword = act(async (fd: FormData) => {
   if (password.length < 8) throw new UserError("Паролата трябва да е поне 8 знака.");
   await controlDb.update(users).set({ passwordHash: hashPassword(password) }).where(eq(users.id, ctx.user.id));
   await destroyOtherSessions(ctx.user.id);
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return "Паролата е сменена. Излязохте от всички други устройства.";
 });
 
@@ -132,6 +132,6 @@ export const setEmailDigest = act(async (fd: FormData) => {
   const ctx = await requireContext("delete");
   const on = fd.get("emailDigest") === "on";
   await controlDb.update(memberships).set({ emailDigest: on }).where(and(eq(memberships.userId, ctx.user.id), eq(memberships.organizationId, ctx.org.id)));
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return on ? "Ще получавате дневен имейл с известия." : "Дневният имейл е изключен.";
 });

@@ -4,7 +4,7 @@
  * отделна база (tenant-schema.ts).
  */
 import { relations, sql } from "drizzle-orm";
-import { boolean, date, datetime, index, int, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, date, datetime, index, int, json, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const ROLES = ["owner", "admin", "manager", "staff", "viewer"] as const;
 export type Role = (typeof ROLES)[number];
@@ -40,6 +40,15 @@ export const users = mysqlTable("users", {
   canCreateOrganizations: boolean("can_create_organizations").notNull().default(true),
   /** Администратор на платформата: /admin на основния домейн (всички организации, пул от бази). */
   isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
+  /** Двуфакторна автентикация (TOTP): секретът е криптиран с APP_SECRET. */
+  totpSecretEnc: text("totp_secret_enc"),
+  /** Секрет по време на настройката, преди потвърждаване с код. */
+  totpPendingEnc: text("totp_pending_enc"),
+  totpEnabledAt: datetime("totp_enabled_at", { fsp: 3 }),
+  /** Последната използвана 30-секундна стъпка — един код не се приема два пъти. */
+  totpLastStep: int("totp_last_step"),
+  /** sha256 на неизползваните кодове за възстановяване. */
+  totpRecoveryHashes: json("totp_recovery_hashes").$type<string[]>(),
   createdAt: createdAt(),
 });
 

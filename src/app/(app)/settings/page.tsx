@@ -2,11 +2,9 @@ import type { Metadata } from "next";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Checkbox, Field, Input } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { LogOut } from "lucide-react";
-import { ConfirmButton } from "@/components/ui/confirm-button";
-import { changeOwnPassword, logoutEverywhere, setEmailDigest } from "@/lib/actions/members";
+import { ButtonLink } from "@/components/ui/button";
 import { saveCompanyDetails, saveOrganization, saveReportParameters } from "@/lib/actions/settings";
-import { countSessions, findMembership, requireContext } from "@/lib/auth";
+import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getCompanyDetails, getSettings } from "@/lib/settings";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
@@ -16,7 +14,7 @@ export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const [s, sessionCount, company, membership] = await Promise.all([getSettings(ctx.db), countSessions(ctx.user.id), getCompanyDetails(ctx.db), findMembership(ctx.user.id, ctx.org.id)]);
+  const [s, company] = await Promise.all([getSettings(ctx.db), getCompanyDetails(ctx.db)]);
   const manage = can(ctx.role, "manage");
 
   return (
@@ -102,38 +100,11 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader title="Вашият профил" description={`${ctx.user.name} · ${ctx.user.email}`} />
-        <CardBody>
-          <Form action={changeOwnPassword} className="flex flex-wrap items-end gap-3">
-            <Field label="Текуща парола" className="min-w-52 flex-1">
-              <Input name="currentPassword" type="password" required autoComplete="current-password" />
-            </Field>
-            <Field label="Нова парола" className="min-w-52 flex-1">
-              <Input name="password" type="password" minLength={8} required autoComplete="new-password" />
-            </Field>
-            <SubmitButton variant="secondary">Смени паролата</SubmitButton>
-          </Form>
-          <p className="mt-2 text-xs text-muted">След смяна на паролата всички други устройства излизат от акаунта.</p>
-        </CardBody>
-        {can(ctx.role, "delete") && (
-          <CardBody className="border-t border-line">
-            <Form action={setEmailDigest} resetOnSuccess={false} className="flex flex-wrap items-center justify-between gap-3">
-              <Checkbox name="emailDigest" defaultChecked={membership?.emailDigest ?? true} label="Дневен имейл с известия (ниска наличност, закъснели пратки, изтичащи партиди)" />
-              <SubmitButton variant="secondary" size="sm">
-                Запази
-              </SubmitButton>
-            </Form>
-          </CardBody>
-        )}
-        <CardBody className="flex flex-wrap items-center justify-between gap-3 border-t border-line text-sm">
-          <span className="text-muted">
-            Активни сесии: <strong className="text-text">{sessionCount}</strong> (браузъри и устройства, в които сте влезли)
-          </span>
-          <Form action={logoutEverywhere}>
-            <ConfirmButton variant="secondary" size="sm" message="Да изляза ли от всички устройства, включително това?">
-              <LogOut className="h-4 w-4" />
-              Изход от всички устройства
-            </ConfirmButton>
-          </Form>
+        <CardBody className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <span className="text-muted">Име, парола, двуфакторна защита, активни сесии и имейли.</span>
+          <ButtonLink href="/profile" variant="secondary" size="sm">
+            Към профила
+          </ButtonLink>
         </CardBody>
       </Card>
 

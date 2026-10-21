@@ -143,3 +143,9 @@ export function documentHeader(doc: PDFKit.PDFDocument, o: { company: { legalNam
   doc.fillColor("black");
   doc.moveDown(0.8);
 }
+
+/** QR код като data URL (PNG) — напр. за настройка на двуфакторна защита. */
+export async function qrPngDataUrl(text: string) {
+  const png = await bwipjs.toBuffer({ bcid: "qrcode", text, scale: 5, paddingwidth: 2, paddingheight: 2 } as Parameters<typeof bwipjs.toBuffer>[0]);
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
