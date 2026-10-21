@@ -6,7 +6,11 @@ import { Camera, CameraOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/fields";
 
-export function Scanner({ initialCode }: { initialCode?: string }) {
+/**
+ * Сканиране с камера или USB скенер. По подразбиране отваря /scan?code=…; с onCode кодът се подава
+ * нататък (напр. инвентаризация), а с continuous камерата остава включена за следващия артикул.
+ */
+export function Scanner({ initialCode, onCode, continuous = false, hideInput = false }: { initialCode?: string; onCode?: (code: string) => void; continuous?: boolean; hideInput?: boolean }) {
   const router = useRouter();
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +21,8 @@ export function Scanner({ initialCode }: { initialCode?: string }) {
   const go = (value: string) => {
     const v = value.trim();
     if (!v) return;
-    router.push(`/scan?code=${encodeURIComponent(v)}`);
+    if (onCode) onCode(v);
+    else router.push(`/scan?code=${encodeURIComponent(v)}`);
   };
 
   const stop = async () => {
@@ -45,7 +50,8 @@ export function Scanner({ initialCode }: { initialCode?: string }) {
           if (text === lastRef.current.code && now - lastRef.current.at < 3000) return;
           lastRef.current = { code: text, at: now };
           setCode(text);
-          void stop().then(() => go(text));
+          if (continuous) go(text);
+          else void stop().then(() => go(text));
         },
         () => {},
       );
@@ -60,6 +66,7 @@ export function Scanner({ initialCode }: { initialCode?: string }) {
 
   return (
     <div className="space-y-4">
+      {!hideInput && (
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -70,7 +77,8 @@ export function Scanner({ initialCode }: { initialCode?: string }) {
         <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Сканирайте или въведете баркод / код…" className="font-mono" autoFocus autoComplete="off" />
         <Button type="submit">Търси</Button>
       </form>
-      <p className="text-xs text-muted">USB/Bluetooth скенерите пишат в полето като клавиатура и натискат Enter. За камера на телефон използвайте бутона.</p>
+      )}
+      {!hideInput && <p className="text-xs text-muted">USB/Bluetooth скенерите пишат в полето като клавиатура и натискат Enter. За камера на телефон използвайте бутона.</p>}
       <div id="scanner-view" className={active ? "overflow-hidden rounded-2xl border border-line" : "hidden"} />
       {error && <p className="rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning">{error}</p>}
       {active ? (

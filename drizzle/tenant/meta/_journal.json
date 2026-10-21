@@ -15,6 +15,13 @@
       "when": 1792497161697,
       "tag": "0001_item_images",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1792579852090,
+      "tag": "0002_stock_counts",
+      "breakpoints": true
     }
   ]
 }

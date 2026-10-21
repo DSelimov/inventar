@@ -16,6 +16,8 @@ import {
   shipmentLines,
   shipments,
   stockLevels,
+  stockCountLines,
+  stockCounts,
   stockMovements,
   webhooks,
   type ItemStatus,
@@ -314,6 +316,30 @@ export async function listMovementUsers(db: Db) {
     .from(stockMovements)
     .where(sql`${stockMovements.userId} is not null`)
     .orderBy(asc(stockMovements.userName));
+}
+
+// -------------------------------------------------------------- инвентаризации
+export async function listStockCounts(db: Db) {
+  return db
+    .select({
+      count: stockCounts,
+      location: locations.name,
+      category: categories.name,
+      lines: n(sql<number>`(select count(*) from ${stockCountLines} where ${stockCountLines.countId} = ${stockCounts.id})`),
+      counted: n(sql<number>`(select count(*) from ${stockCountLines} where ${stockCountLines.countId} = ${stockCounts.id} and ${stockCountLines.counted} is not null)`),
+      differences: n(sql<number>`(select count(*) from ${stockCountLines} where ${stockCountLines.countId} = ${stockCounts.id} and ${stockCountLines.counted} is not null and ${stockCountLines.counted} <> ${stockCountLines.expected})`),
+    })
+    .from(stockCounts)
+    .innerJoin(locations, eq(locations.id, stockCounts.locationId))
+    .leftJoin(categories, eq(categories.id, stockCounts.categoryId))
+    .orderBy(desc(stockCounts.createdAt), desc(stockCounts.id));
+}
+
+export async function getStockCount(db: Db, id: number) {
+  return db.query.stockCounts.findFirst({
+    where: eq(stockCounts.id, id),
+    with: { location: true, category: true, lines: { with: { item: true, lot: true } } },
+  });
 }
 
 // ---------------------------------------------------------------- collections

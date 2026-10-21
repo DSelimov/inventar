@@ -316,6 +316,43 @@ export const webhookDeliveries = mysqlTable(
   (t) => [index("deliveries_webhook").on(t.webhookId)],
 );
 
+// --------------------------------------------------------------- инвентаризация
+export const COUNT_STATUSES = ["open", "applied", "cancelled"] as const;
+export type CountStatus = (typeof COUNT_STATUSES)[number];
+
+/** Инвентаризация на една локация: снимка на очакваните количества, преброено, разлики, прилагане. */
+export const stockCounts = mysqlTable("stock_counts", {
+  id: int("id").autoincrement().primaryKey(),
+  number: varchar("number", { length: 64 }).notNull(),
+  locationId: int("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
+  /** Само артикулите от тази категория (по избор). */
+  categoryId: int("category_id").references(() => categories.id, { onDelete: "set null" }),
+  status: mysqlEnum("status", COUNT_STATUSES).notNull().default("open"),
+  notes: text("notes"),
+  createdBy: varchar("created_by", { length: 200 }),
+  createdAt: createdAt(),
+  appliedAt: ts("applied_at"),
+  appliedBy: varchar("applied_by", { length: 200 }),
+});
+
+/** Ред: артикул (или партида/сериен номер при проследяване) с очаквано и преброено количество. */
+export const stockCountLines = mysqlTable(
+  "stock_count_lines",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countId: int("count_id").notNull().references(() => stockCounts.id, { onDelete: "cascade" }),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    lotId: int("lot_id").references(() => lots.id, { onDelete: "set null" }),
+    /** Номер на партидата към момента (и за нови партиди, открити при броенето). */
+    lotNumber: varchar("lot_number", { length: 120 }),
+    expected: int("expected").notNull().default(0),
+    /** null = още не е броено */
+    counted: int("counted"),
+    countedAt: ts("counted_at"),
+  },
+  (t) => [index("count_lines_count").on(t.countId)],
+);
+
 export const auditLog = mysqlTable(
   "audit_log",
   {
@@ -361,6 +398,16 @@ export const itemFieldValuesRelations = relations(itemFieldValues, ({ one }) => 
 export const stockLevelsRelations = relations(stockLevels, ({ one }) => ({
   item: one(items, { fields: [stockLevels.itemId], references: [items.id] }),
   location: one(locations, { fields: [stockLevels.locationId], references: [locations.id] }),
+}));
+export const stockCountsRelations = relations(stockCounts, ({ one, many }) => ({
+  location: one(locations, { fields: [stockCounts.locationId], references: [locations.id] }),
+  category: one(categories, { fields: [stockCounts.categoryId], references: [categories.id] }),
+  lines: many(stockCountLines),
+}));
+export const stockCountLinesRelations = relations(stockCountLines, ({ one }) => ({
+  count: one(stockCounts, { fields: [stockCountLines.countId], references: [stockCounts.id] }),
+  item: one(items, { fields: [stockCountLines.itemId], references: [items.id] }),
+  lot: one(lots, { fields: [stockCountLines.lotId], references: [lots.id] }),
 }));
 export const lotsRelations = relations(lots, ({ one }) => ({
   item: one(items, { fields: [lots.itemId], references: [items.id] }),
@@ -423,3 +470,5 @@ export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type ItemImage = typeof itemImages.$inferSelect;
+export type StockCount = typeof stockCounts.$inferSelect;
+export type StockCountLine = typeof stockCountLines.$inferSelect;

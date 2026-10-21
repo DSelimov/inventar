@@ -57,4 +57,5 @@ export const ENTITY_LABELS: Record<string, string> = {
   webhook: "Webhook",
   organization: "Организация",
   lot: "Партида",
+  stock_count: "Инвентаризация",
 };
