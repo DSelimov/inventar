@@ -140,10 +140,13 @@ tenant, default `EUR`.
   VAT-registered companies.
 
 ### B3. Export for the accountant
-- Monthly export of sales and purchase documents (CSV/Excel in the layout accountants import) and a
-  purchase/sales VAT summary per rate. Full accounting-software integrations come in E.
-- **Out of scope:** fiscal receipts and retail checkout. Software that issues fiscal receipts must comply
-  with Наредба Н-18 and be registered with НАП (СУПТО). Document this boundary in the README.
+- **Done.** `/reports/accounting` (month picker, defaults to the previous month): sales — issued invoices
+  and notes by issue date with base and VAT per rate (credit notes negative, cancelled with zeros and the
+  reason, proformas excluded); purchases — delivered receipts at cost, supplier returns negative
+  (`src/lib/accounting.ts`). CSV downloads `/api/export/sales-journal` and `/api/export/purchases` with `;`,
+  BOM and decimal commas for Bulgarian Excel. Supplier invoices themselves are not recorded yet — their
+  number goes into the shipment reference. The ЗДДС journals for НАП stay with the accountant.
+- Fiscal receipts are out of scope and documented in the README.
 
 ---
 
