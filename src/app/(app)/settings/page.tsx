@@ -4,9 +4,9 @@ import { Checkbox, Field, Input } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { LogOut } from "lucide-react";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { changeOwnPassword, logoutEverywhere } from "@/lib/actions/members";
+import { changeOwnPassword, logoutEverywhere, setEmailDigest } from "@/lib/actions/members";
 import { saveCompanyDetails, saveOrganization, saveReportParameters } from "@/lib/actions/settings";
-import { countSessions, requireContext } from "@/lib/auth";
+import { countSessions, findMembership, requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getCompanyDetails, getSettings } from "@/lib/settings";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const [s, sessionCount, company] = await Promise.all([getSettings(ctx.db), countSessions(ctx.user.id), getCompanyDetails(ctx.db)]);
+  const [s, sessionCount, company, membership] = await Promise.all([getSettings(ctx.db), countSessions(ctx.user.id), getCompanyDetails(ctx.db), findMembership(ctx.user.id, ctx.org.id)]);
   const manage = can(ctx.role, "manage");
 
   return (
@@ -114,6 +114,16 @@ export default async function SettingsPage() {
           </Form>
           <p className="mt-2 text-xs text-muted">След смяна на паролата всички други устройства излизат от акаунта.</p>
         </CardBody>
+        {can(ctx.role, "delete") && (
+          <CardBody className="border-t border-line">
+            <Form action={setEmailDigest} resetOnSuccess={false} className="flex flex-wrap items-center justify-between gap-3">
+              <Checkbox name="emailDigest" defaultChecked={membership?.emailDigest ?? true} label="Дневен имейл с известия (ниска наличност, закъснели пратки, изтичащи партиди)" />
+              <SubmitButton variant="secondary" size="sm">
+                Запази
+              </SubmitButton>
+            </Form>
+          </CardBody>
+        )}
         <CardBody className="flex flex-wrap items-center justify-between gap-3 border-t border-line text-sm">
           <span className="text-muted">
             Активни сесии: <strong className="text-text">{sessionCount}</strong> (браузъри и устройства, в които сте влезли)

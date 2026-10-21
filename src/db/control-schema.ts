@@ -4,7 +4,7 @@
  * отделна база (tenant-schema.ts).
  */
 import { relations, sql } from "drizzle-orm";
-import { boolean, datetime, index, int, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, date, datetime, index, int, mysqlEnum, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const ROLES = ["owner", "admin", "manager", "staff", "viewer"] as const;
 export type Role = (typeof ROLES)[number];
@@ -50,6 +50,10 @@ export const memberships = mysqlTable(
     userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     organizationId: int("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
     role: mysqlEnum("role", ROLES).notNull().default("staff"),
+    /** Дневен имейл с известия (за мениджър и нагоре). */
+    emailDigest: boolean("email_digest").notNull().default(true),
+    /** Последна дата на изпратен дневен имейл — не се изпраща два пъти в един ден. */
+    digestSentOn: date("digest_sent_on", { mode: "string" }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("memberships_user_org").on(t.userId, t.organizationId)],

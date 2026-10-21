@@ -93,3 +93,20 @@ export function accessGrantedMail(o: { to: string; name: string; url: string; or
     footer: "Ако не очаквате това писмо, свържете се с администратора на организацията.",
   });
 }
+
+/** Дневен имейл с известия: по един ред на вид известие, с няколко примера. */
+export function digestMail(o: { to: string; name: string; orgName: string; url: string; sections: Array<{ title: string; count: number; examples: string[] }> }) {
+  const total = o.sections.reduce((a, s) => a + s.count, 0);
+  return layout({
+    to: o.to,
+    subject: `${o.orgName}: ${total} ${total === 1 ? "известие" : "известия"} за склада`,
+    brand: brandOf(o.orgName),
+    lines: [
+      `Здравейте, ${o.name}!`,
+      ...o.sections.filter((s) => s.count).map((s) => `${s.title}: ${s.count}${s.examples.length ? ` — ${s.examples.join("; ")}${s.count > s.examples.length ? "…" : ""}` : ""}`),
+    ],
+    button: "Виж всички известия",
+    url: o.url,
+    footer: "Получавате това писмо, защото сте мениджър или администратор. Може да го изключите от Настройки › Вашият профил.",
+  });
+}

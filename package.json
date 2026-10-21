@@ -16,6 +16,7 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts && drizzle-kit generate --config drizzle.tenant.config.ts",
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts",
     "db:backup": "tsx --env-file=.env src/db/backup.ts",
+    "notify:digest": "tsx --conditions=react-server --env-file=.env src/db/digest.ts",
     "db:pool:add": "tsx --env-file=.env src/db/pool-add.ts",
     "platform-admin": "tsx --env-file=.env src/db/platform-admin.ts"
   },

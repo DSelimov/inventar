@@ -126,3 +126,12 @@ export const logoutEverywhere = act(async () => {
   await destroyAllSessions(ctx.user.id);
   redirect(rootUrl("/login"));
 });
+
+/** Дневен имейл с известия за текущата организация (мениджър и нагоре). */
+export const setEmailDigest = act(async (fd: FormData) => {
+  const ctx = await requireContext("delete");
+  const on = fd.get("emailDigest") === "on";
+  await controlDb.update(memberships).set({ emailDigest: on }).where(and(eq(memberships.userId, ctx.user.id), eq(memberships.organizationId, ctx.org.id)));
+  revalidatePath("/settings");
+  return on ? "Ще получавате дневен имейл с известия." : "Дневният имейл е изключен.";
+});

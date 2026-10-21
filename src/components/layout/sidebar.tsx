@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Truck, Users } from "lucide-react";
+import { BarChart3, Bell, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Truck, Users } from "lucide-react";
 import type { Role } from "@/db/schema";
 import { logout } from "@/lib/actions/auth";
 import { ROLE_LABELS } from "@/lib/permissions";
@@ -30,6 +30,7 @@ export function Sidebar({
   currentOrgId,
   organizations,
   portalUrl,
+  alertCount = 0,
 }: {
   companyName: string;
   userName: string;
@@ -37,6 +38,8 @@ export function Sidebar({
   currentOrgId: number;
   organizations: Array<{ id: number; name: string; url: string }>;
   portalUrl: string;
+  /** Брой известия (ниска наличност, закъснели пратки, изтичащи партиди). */
+  alertCount?: number;
 }) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -72,10 +75,23 @@ export function Sidebar({
           ) : (
             <div className="truncate text-sm font-semibold leading-tight">{companyName}</div>
           )}
-          <a href={portalUrl} className="text-xs text-muted hover:text-accent">
+          <a href={portalUrl} className="block truncate whitespace-nowrap text-xs text-muted hover:text-accent">
             Инвентар · портал
           </a>
         </div>
+        <Link
+          href="/notifications"
+          aria-label={alertCount ? `Известия: ${alertCount}` : "Известия"}
+          title="Известия"
+          className={cn("relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors", isActive("/notifications") ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-2 hover:text-text")}
+        >
+          <Bell className="h-4 w-4" />
+          {alertCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
+              {alertCount > 99 ? "99+" : alertCount}
+            </span>
+          )}
+        </Link>
       </div>
 
       <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:overflow-y-auto md:pb-0">

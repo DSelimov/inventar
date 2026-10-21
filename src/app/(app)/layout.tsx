@@ -1,9 +1,12 @@
 import { Sidebar } from "@/components/layout/sidebar";
+import { alertCounts } from "@/lib/alerts";
 import { requireContext } from "@/lib/auth";
+import { todayIso } from "@/lib/utils";
 import { rootUrl, tenantUrl } from "@/lib/tenant";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireContext();
+  const alerts = await alertCounts(ctx.db, todayIso());
   return (
     <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-hidden md:flex-row">
       <Sidebar
@@ -13,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         currentOrgId={ctx.org.id}
         organizations={ctx.memberships.map((m) => ({ id: m.organizationId, name: m.organization.name, url: tenantUrl(m.organization.subdomain) }))}
         portalUrl={rootUrl("/portal")}
+        alertCount={alerts.total}
       />
       <main className="min-w-0 flex-1">
         <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</div>
