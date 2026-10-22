@@ -47,7 +47,9 @@ export default defineConfig({
     globalSetup: ["tests/support/global-setup.ts"],
     env,
     pool: "forks",
+    // всеки файл създава и мигрира своя база; повече паралелни миграции претоварват MySQL
+    maxWorkers: 6,
     testTimeout: 30_000,
-    hookTimeout: 60_000,
+    hookTimeout: 120_000,
   },
 });

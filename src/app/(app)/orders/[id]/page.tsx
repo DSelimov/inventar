@@ -6,6 +6,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader } from "@/components/ui/page-header";
+import { PROVIDERS, type ProviderId } from "@/lib/integrations/core";
 import { Table } from "@/components/ui/table";
 import { createReturnForOrder, createShipmentForRemaining, deleteOrder, setOrderStatus } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
@@ -62,6 +63,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </Link>
             )}
             {order.location && <span className="text-muted">· {order.location.name}</span>}
+            {order.externalSource && <Badge tone="info">от {PROVIDERS[order.externalSource as ProviderId]?.name ?? order.externalSource}</Badge>}
           </span>
         }
         actions={

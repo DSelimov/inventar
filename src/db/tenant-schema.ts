@@ -258,7 +258,9 @@ export const itemSuppliers = mysqlTable(
 );
 
 // ---------------------------------------------------------------------- orders
-export const orders = mysqlTable("orders", {
+export const orders = mysqlTable(
+  "orders",
+  {
   id: int("id").autoincrement().primaryKey(),
   type: mysqlEnum("type", ORDER_TYPES).notNull(),
   number: varchar("number", { length: 64 }).notNull(),
@@ -272,9 +274,14 @@ export const orders = mysqlTable("orders", {
   pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
   /** Валутата, в която е издадена поръчката, ако е превалутирана (напр. BGN → EUR от 1.1.2026). */
   originalCurrency: varchar("original_currency", { length: 3 }),
+  /** Поръчка от онлайн магазин: източник (woocommerce, shopify) и id там — пази от двоен внос. */
+  externalSource: varchar("external_source", { length: 32 }),
+  externalId: varchar("external_id", { length: 64 }),
   createdBy: int("created_by"),
   createdAt: createdAt(),
-});
+  },
+  (t) => [uniqueIndex("orders_external").on(t.externalSource, t.externalId)],
+);
 
 export const orderLines = mysqlTable("order_lines", {
   id: int("id").autoincrement().primaryKey(),
@@ -578,6 +585,22 @@ export const integrations = mysqlTable("integrations", {
   lastSyncAt: ts("last_sync_at"),
   updatedAt: ts("updated_at"),
 });
+
+/** Връзка артикул ↔ продукт/вариант в онлайн магазин (по SKU) и последно изпратената наличност. */
+export const shopProducts = mysqlTable(
+  "shop_products",
+  {
+    provider: varchar("provider", { length: 32 }).notNull(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    externalId: varchar("external_id", { length: 128 }).notNull(),
+    /** Вариант (WooCommerce variation id) или inventoryItem gid (Shopify). */
+    variantId: varchar("variant_id", { length: 128 }),
+    sku: varchar("sku", { length: 64 }).notNull(),
+    syncedQuantity: qty("synced_quantity"),
+    syncedAt: ts("synced_at"),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.itemId] })],
+);
 
 /** Дневник на заявките към външните услуги (за поддръжка и откриване на грешки). */
 export const integrationLogs = mysqlTable(

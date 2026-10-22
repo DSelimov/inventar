@@ -6,6 +6,8 @@ import { requireContext } from "@/lib/auth";
 import { int, optional, str } from "@/lib/forms";
 import { assertIntegrationsAllowed, PROVIDERS, saveIntegration, type ProviderId } from "@/lib/integrations/core";
 import { isCourier } from "@/lib/integrations/couriers";
+import { isShop } from "@/lib/integrations/shops";
+import { linkProducts, syncShops } from "@/lib/integrations/shops/sync";
 import { courierOffices, createWaybill, syncCarrierStatuses } from "@/lib/integrations/waybills";
 import { parseMoney } from "@/lib/money";
 import { act } from "@/lib/action";
@@ -29,12 +31,19 @@ export const saveIntegrationAction = act(async (id: string, fd: FormData) => {
   return `${p.name}: настройките са запазени.`;
 });
 
-/** Проверка на връзката: заявка за списъка с офиси (куриери). */
+/** Проверка на връзката: списъкът с офиси (куриери) или свързване на продуктите по SKU (магазини). */
 export const testIntegrationAction = act(async (id: string) => {
   const ctx = await requireContext("manage");
   await assertIntegrationsAllowed(ctx.org);
   const p = provider(id);
-  if (!isCourier(p)) throw new UserError("Проверката е за куриерите; магазините се проверяват със „Синхронизирай сега“.");
+  if (isShop(p)) {
+    const r = await linkProducts(ctx.db, p);
+    await audit(ctx, "update", "settings", null, { integration: p, linked: r.linked });
+    revalidatePath("/settings/integrations");
+    const tail = r.unknown.length ? ` Без съвпадение в Инвентар: ${r.unknown.slice(0, 10).join(", ")}${r.unknown.length > 10 ? ` и още ${r.unknown.length - 10}` : ""}.` : "";
+    return `${PROVIDERS[p].name}: свързани ${r.linked} артикула по SKU.${tail}`;
+  }
+  if (!isCourier(p)) throw new UserError("Непозната интеграция.");
   const offices = await courierOffices(ctx.db, p, `${ctx.org.id}:test:${Date.now()}`);
   revalidatePath("/settings/integrations");
   return `${PROVIDERS[p].name}: връзката работи — ${offices.length} офиса/автомата.`;
@@ -77,4 +86,20 @@ export const syncCarriersAction = act(async () => {
   revalidatePath("/shipments");
   if (r.errors.length) throw new UserError(`Проверени ${r.checked}; грешки: ${r.errors.join("; ")}`);
   return `Проверени ${r.checked} товарителници: доставени ${r.delivered}, върнати ${r.returned}.`;
+});
+
+/** Наличност към магазините и внос на новите поръчки (същото прави pnpm shops:sync). */
+export const syncShopsAction = act(async (id: string) => {
+  const ctx = await requireContext("write");
+  await assertIntegrationsAllowed(ctx.org);
+  const p = provider(id);
+  if (!isShop(p)) throw new UserError("Синхронизацията е за онлайн магазините.");
+  const [r] = await syncShops(ctx.db, ctx.user, { only: p, currency: ctx.org.currency });
+  if (!r) throw new UserError(`Интеграцията с ${PROVIDERS[p].name} не е включена.`);
+  await audit(ctx, "update", "settings", null, { integration: p, sync: { pushed: r.pushed, orders: r.created } });
+  revalidatePath("/settings/integrations");
+  revalidatePath("/orders");
+  const msg = `${PROVIDERS[p].name}: изпратена наличност за ${r.pushed} артикула, внесени ${r.created.length} поръчки${r.created.length ? ` (${r.created.join(", ")})` : ""}.`;
+  if (r.errors.length) throw new UserError(`${msg} Грешки: ${r.errors.join("; ")}`);
+  return msg;
 });

@@ -17,6 +17,7 @@
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts",
     "db:backup": "tsx --env-file=.env src/db/backup.ts",
     "carriers:sync": "tsx --conditions=react-server --env-file=.env src/db/carriers-sync.ts",
+    "shops:sync": "tsx --conditions=react-server --env-file=.env src/db/shops-sync.ts",
     "orgs:purge": "tsx --conditions=react-server --env-file=.env src/db/purge.ts",
     "db:euro": "tsx --conditions=react-server --env-file=.env src/db/euro.ts",
     "notify:digest": "tsx --conditions=react-server --env-file=.env src/db/digest.ts",

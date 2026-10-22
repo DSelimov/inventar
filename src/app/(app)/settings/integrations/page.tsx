@@ -1,10 +1,12 @@
+import { count } from "drizzle-orm";
 import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Checkbox, Field, Input } from "@/components/ui/fields";
 import { Form } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { saveIntegrationAction, testIntegrationAction } from "@/lib/actions/integrations";
+import { saveIntegrationAction, syncShopsAction, testIntegrationAction } from "@/lib/actions/integrations";
+import { shopProducts } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { getIntegration, PROVIDERS, recentLogs, type ProviderId } from "@/lib/integrations/core";
 import { planOf } from "@/lib/plans";
@@ -16,6 +18,9 @@ export default async function IntegrationsPage() {
   const ctx = await requireContext("manage");
   const plan = await planOf(ctx.org);
   const ids = Object.keys(PROVIDERS) as ProviderId[];
+  const links = Object.fromEntries(
+    (await ctx.db.select({ provider: shopProducts.provider, n: count() }).from(shopProducts).groupBy(shopProducts.provider)).map((r) => [r.provider, r.n]),
+  ) as Partial<Record<ProviderId, number>>;
   const configs = await Promise.all(ids.map(async (id) => ({ id, cfg: await getIntegration(ctx.db, id), logs: await recentLogs(ctx.db, id, 5) })));
 
   return (
@@ -59,6 +64,25 @@ export default async function IntegrationsPage() {
                       Провери връзката
                     </SubmitButton>
                   </Form>
+                )}
+                {p.kind === "shop" && cfg.enabled && (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Form action={testIntegrationAction.bind(null, id)}>
+                        <SubmitButton variant="ghost" size="sm">
+                          Свържи продуктите по SKU
+                        </SubmitButton>
+                      </Form>
+                      <Form action={syncShopsAction.bind(null, id)}>
+                        <SubmitButton variant="ghost" size="sm">
+                          Синхронизирай сега
+                        </SubmitButton>
+                      </Form>
+                    </div>
+                    <p className="text-xs text-muted">
+                      {links[id] ?? 0} свързани артикула · последен внос на поръчки: {cfg.lastSyncAt ? formatDateTime(cfg.lastSyncAt) : "никога"}. Автоматично — с pnpm shops:sync по график.
+                    </p>
+                  </div>
                 )}
                 {logs.length > 0 && (
                   <ul className="space-y-1 border-t border-line pt-3 text-xs">

@@ -381,6 +381,8 @@ const schemas: Record<string, Schema> = {
       notes: nullable(str("Бележки")),
       pricesIncludeVat: bool("Цените на редовете са с ДДС"),
       originalCurrency: nullable(str("Валутата на издаване, ако поръчката е превалутирана (BGN)")),
+      externalSource: nullable(str("Онлайн магазин, от който е внесена (woocommerce, shopify)")),
+      externalId: nullable(str("Идентификатор на поръчката в магазина")),
       createdAt: datetime("Създадена"),
       partner: nullable(ref("Partner")),
       location: nullable(ref("Location")),

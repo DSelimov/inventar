@@ -113,6 +113,13 @@
       "when": 1792652921919,
       "tag": "0015_integrations",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1792654649862,
+      "tag": "0016_shops",
+      "breakpoints": true
     }
   ]
 }

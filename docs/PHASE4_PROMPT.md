@@ -258,6 +258,22 @@ plan (C1).
 - WooCommerce and Shopify: two-way sync — products/variants mapped by SKU, stock pushed on every movement
   (debounced), orders imported as sales orders. eMAG Marketplace: stock and order import.
 - Conflict rule: Инвентар is the source of truth for stock; the store is the source for orders.
+- **Done (WooCommerce, Shopify; eMAG not yet).** `src/lib/integrations/shops/` (one `Shop` interface:
+  products, pushStock, orders) and `shops/sync.ts`:
+  - linking by SKU (case-insensitive, simple products and variations) into `shop_products`; unmatched shop
+    SKUs are listed; first sync links automatically, „Свържи продуктите по SKU“ relinks;
+  - stock = on hand (chosen location or total) − unfulfilled confirmed/partial sales orders; only values
+    that differ from the last pushed `synced_quantity` are sent, so failures retry on the next run. No
+    queue per movement: the batch runs from `pnpm shops:sync` (cron every 5 min) or „Синхронизирай
+    сега“. Woo: `products/batch`, `variations/batch`; Shopify GraphQL 2026-10 `inventorySetQuantities`
+    with `changeFromQuantity: null` and `@idempotent`;
+  - orders since the last run (1 h overlap, first run 7 days) → confirmed sales orders with
+    `external_source` + `external_id` (unique), customer found by email/name or created, VAT assigned;
+    lines with unknown SKUs go into the notes, orders with none are reported. Orders are imported before
+    the stock push, so the imported quantity is reserved at once.
+  - Not covered: order cancellations/edits in the shop after import, product creation from Инвентар.
+  Mocked tests `tests/db/shops.test.ts`; UI verified against a local WooCommerce mock (no public demo API
+  for Woo or Shopify — verify with a real store before the first client).
 
 ### E3. Accounting software
 - Export / import formats for Microinvest Склад Pro, Ajur L and Плюс-Минус (verify each product's current
