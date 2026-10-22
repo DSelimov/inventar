@@ -239,10 +239,20 @@ Build each integration as a module under `src/lib/integrations/<name>/` with per
 plan (C1).
 
 ### E1. Couriers: Econt, Speedy, BOX NOW
-- From an outbound shipment: create the waybill (sender office/address, receiver, COD amount, declared
-  value, weight), print the label, store the tracking number; poll or receive status updates and move the
-  shipment to `in_transit` / `delivered` automatically (delivery goes through `shipment-service.ts`).
-- Offices and lockers lists cached and searchable in the shipment form; COD reconciliation report.
+- **Done.** `src/lib/integrations/core.ts`: provider registry, `integrations` (credentials encrypted with
+  `crypto.ts`, settings, enabled) and `integration_logs`; `http()` with timeout, retries on network errors and
+  502/503/504 only, every call logged; allowed only when the plan has integrations (C1). Settings ›
+  Интеграции: credentials, settings, connection test, last calls.
+- Couriers in `src/lib/integrations/couriers/` behind one interface (create waybill, label, track, offices):
+  Econt (`demo.econt.com` when „демо“ is on; company receivers get `receiverAgent` = contact or name),
+  Speedy (`api.speedy.bg/v1`), BOX NOW (lockers only; COD field names and state names not verified against
+  their docs, check with real credentials). The shipment page has a waybill card: courier, office/locker
+  (cached 12 h, searchable datalist) or address, phone, COD (defaults to the order's gross for sales),
+  weight, parcels; the label opens from `/print/carrier-label/[id]`.
+- Status: `pnpm carriers:sync` (cron, also a button) moves shipments to `in_transit`, `delivered` (through
+  `shipment-service.ts`) or cancelled on return, and stores COD collected / paid. Reports › Наложен платеж
+  reconciles COD. Verified live against the Econt demo (waybill, PDF label, status sync); Speedy and BOX NOW
+  are covered by mocked tests (`tests/db/couriers.test.ts`).
 
 ### E2. Online stores and marketplaces
 - WooCommerce and Shopify: two-way sync — products/variants mapped by SKU, stock pushed on every movement

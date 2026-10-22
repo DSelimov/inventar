@@ -306,6 +306,17 @@ export const shipments = mysqlTable("shipments", {
   partner: varchar("partner", { length: 200 }),
   carrier: varchar("carrier", { length: 120 }),
   trackingNumber: varchar("tracking_number", { length: 120 }),
+  /** Товарителница през интеграция (econt, speedy, boxnow): етикет, последен статус и наложен платеж. */
+  carrierProvider: varchar("carrier_provider", { length: 16 }),
+  carrierLabelUrl: varchar("carrier_label_url", { length: 1000 }),
+  /** Номерата на пакетите при куриера (Speedy печата етикетите по тях). */
+  carrierParcelIds: json("carrier_parcel_ids").$type<string[]>(),
+  carrierStatus: varchar("carrier_status", { length: 200 }),
+  carrierStatusAt: ts("carrier_status_at"),
+  codAmount: money("cod_amount"),
+  codCollectedAmount: money("cod_collected_amount"),
+  codCollectedAt: ts("cod_collected_at"),
+  codPaidAt: ts("cod_paid_at"),
   expectedDate: date("expected_date", { mode: "string" }),
   deliveredAt: ts("delivered_at"),
   notes: text("notes"),
@@ -556,6 +567,33 @@ export const invoicePayments = mysqlTable("invoice_payments", {
   createdBy: varchar("created_by", { length: 200 }),
   createdAt: createdAt(),
 });
+
+// ---------------------------------------------------------------- integrations
+/** Връзки към външни услуги (куриери, онлайн магазини): данните за достъп са криптирани с APP_SECRET. */
+export const integrations = mysqlTable("integrations", {
+  provider: varchar("provider", { length: 32 }).primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  credentialsEnc: text("credentials_enc"),
+  settings: json("settings").$type<Record<string, unknown>>(),
+  lastSyncAt: ts("last_sync_at"),
+  updatedAt: ts("updated_at"),
+});
+
+/** Дневник на заявките към външните услуги (за поддръжка и откриване на грешки). */
+export const integrationLogs = mysqlTable(
+  "integration_logs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    action: varchar("action", { length: 64 }).notNull(),
+    ok: boolean("ok").notNull(),
+    httpStatus: int("http_status"),
+    message: varchar("message", { length: 1000 }),
+    durationMs: int("duration_ms"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("integration_logs_provider").on(t.provider, t.createdAt)],
+);
 
 // -------------------------------------------------------------- offline actions
 /**

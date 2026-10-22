@@ -15,6 +15,10 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, label, plural, t
 import { Form } from "@/components/ui/form";
 import { lineTotal, sumLines } from "@/lib/money";
 import { sumQty } from "@/lib/quantity";
+import { eq } from "drizzle-orm";
+import { orderLines } from "@/db/tenant-schema";
+import { orderVat } from "@/lib/vat";
+import { WaybillCard } from "@/components/shipments/waybill-card";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext();
@@ -38,6 +42,8 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
   const inbound = shipment.direction === "inbound";
   const missingLots = shipment.lines.filter((l) => l.item.tracking !== "none" && (inbound ? !l.lotNumber : !l.lotId));
   const partnerName = shipment.partnerRecord?.name ?? shipment.partner;
+  // наложен платеж по подразбиране: стойността с ДДС на клиентската поръчка
+  const codDefault = shipment.order?.type === "sales" ? orderVat(shipment.order, (await ctx.db.query.orderLines.findMany({ where: eq(orderLines.orderId, shipment.order.id) }))).gross : null;
 
   return (
     <>
@@ -197,6 +203,8 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
               {!writable && open && <p className="text-sm text-muted">Нямате права да променяте статуса.</p>}
             </CardBody>
           </Card>
+
+          <WaybillCard shipment={shipment} db={ctx.db} org={ctx.org} phone={shipment.partnerRecord?.phone ?? ""} cod={codDefault} writable={writable} />
 
           <Card>
             <CardHeader title="Детайли" />

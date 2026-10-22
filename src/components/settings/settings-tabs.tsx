@@ -9,6 +9,7 @@ const TABS = [
   { href: "/settings/users", label: "Потребители" },
   { href: "/settings/locations", label: "Локации" },
   { href: "/settings/vat", label: "ДДС" },
+  { href: "/settings/integrations", label: "Интеграции" },
   { href: "/settings/import", label: "Импорт / Експорт" },
   { href: "/settings/api", label: "API" },
   { href: "/settings/webhooks", label: "Webhooks" },

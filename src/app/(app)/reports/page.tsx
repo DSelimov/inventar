@@ -43,6 +43,11 @@ export default async function ReportsPage() {
                 За счетоводителя
               </ButtonLink>
             )}
+            {can(ctx.role, "write") && (
+              <ButtonLink href="/reports/cod" variant="secondary">
+                Наложени платежи
+              </ButtonLink>
+            )}
             <a href="/print/stock" target="_blank" rel="noreferrer" className={buttonClasses("secondary")}>
               <Printer className="h-4 w-4" /> Справка за наличност (PDF)
             </a>
