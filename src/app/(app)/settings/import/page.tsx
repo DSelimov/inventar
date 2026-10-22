@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Download } from "lucide-react";
 import { ImportForm } from "@/components/settings/import-form";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { importItems } from "@/lib/actions/import";
+import { PartnerImportForm } from "@/components/settings/partner-import-form";
+import { importItems, importPartners } from "@/lib/actions/import";
 import { requireContext } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Импорт / Експорт" };
@@ -19,7 +20,10 @@ export default async function ImportPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="lg:col-span-2">
-        <CardHeader title="Импорт на артикули от CSV" description="Колони: sku, name, barcode, category, quantity, min, unit, cost, price, location, description (български заглавия също се разпознават)." />
+        <CardHeader
+          title="Импорт на артикули от CSV"
+          description="Колони: sku, name, barcode, category, quantity, min, unit, cost, price, location, description. Разпознават се и българските заглавия, и списъкът със стоки, експортиран от Microinvest Склад Pro (Код, Име, Баркод1, Мярка, Група, Доставна цена, Цена на дребно, Количество)."
+        />
         <CardBody>
           <ImportForm action={importItems} />
         </CardBody>
@@ -39,6 +43,12 @@ export default async function ImportPage() {
             </li>
           ))}
         </ul>
+      </Card>
+      <Card className="lg:col-span-2">
+        <CardHeader title="Импорт на партньори от CSV" description="Клиенти и доставчици — напр. списъкът с партньори от Microinvest Склад Pro (Фирма, Булстат, Данъчен номер, МОЛ, Град, Адрес, Телефон)." />
+        <CardBody>
+          <PartnerImportForm action={importPartners} />
+        </CardBody>
       </Card>
     </div>
   );

@@ -279,6 +279,20 @@ plan (C1).
 - Export / import formats for Microinvest Склад Pro, Ajur L and Плюс-Минус (verify each product's current
   import format with a real installation or the vendor's docs). Import from Microinvest Склад Pro for
   onboarding clients who switch (items, partners, opening stock).
+- **Done (generic, mapped once).** None of the three vendors publishes an import specification (checked
+  their sites, the Microinvest wiki and manuals, and third-party exporters such as barsy and Rila.Tools):
+  each program imports CSV/TXT/Excel through an import filter where the columns are mapped once. So
+  Отчети › За счетоводителя › „Файл за счетоводна програма“ gives one stable layout
+  (`src/lib/accounting-export.ts`, `SALES_COLUMNS`: document code 01/02/03, type, number, dates, partner,
+  ЕИК, ДДС №, country, rate, base, VAT, total, currency, payment, due date, status, 0 % basis, related
+  document — one row per document and VAT rate; deliveries separately) with encoding Windows-1251 or UTF-8,
+  separator `;` `,` or tab, decimal comma/point and date format. New columns go only at the end.
+- Import for clients switching from Microinvest Склад Pro: item import reads Windows-1251 and tab-separated
+  files and knows its goods-list headers (Код, Име, Баркод1, Мярка, Група, Доставна цена, Цена на дребно);
+  new partner import (Фирма, Булстат, Данъчен номер, МОЛ, Град, Адрес…) matches by ЕИК or name, validates
+  ЕИК/ДДС № and lists skipped rows. Opening stock = the quantity column of the item import.
+- Still to do with a real installation: confirm the Microinvest header names against an actual export and
+  save ready-made filter settings for Делта Pro / Ажур / Плюс-Минус.
 
 ### E4. SAF-T
 - НАП is introducing SAF-T reporting in stages by company size. Check the current schedule and the

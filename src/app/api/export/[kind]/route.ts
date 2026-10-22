@@ -6,6 +6,7 @@ import { toCsv } from "@/lib/csv";
 import { label } from "@/lib/utils";
 import { lineTotal } from "@/lib/money";
 import { purchasesList, RATES, salesJournal } from "@/lib/accounting";
+import { encodeCsv, purchaseExportRows, PURCHASE_COLUMNS, readFormat, salesExportRows, SALES_COLUMNS } from "@/lib/accounting-export";
 
 function csvResponse(name: string, rows: Array<Array<string | number | null | undefined>>) {
   return new Response(toCsv(rows), {
@@ -45,6 +46,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       ["date", "sku", "name", "location", "type", "delta", "quantity_after", "lot", "reason", "user"],
       ...rows.map((r) => [r.createdAt.toISOString(), r.item.sku, r.item.name, r.location?.name, label(r.type), r.delta, r.quantityAfter, r.lot?.lotNumber, r.reason, r.userName]),
     ]);
+  }
+  if (kind === "accounting-sales" || kind === "accounting-purchases") {
+    // за внос в счетоводна програма: кодировка, разделител, десетичен знак и дата по избор
+    if (!can(ctx.role, "write")) return new Response("Forbidden", { status: 403 });
+    const sp = new URL(req.url).searchParams;
+    const iso = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+    const from = iso(sp.get("from"));
+    const to = iso(sp.get("to"));
+    if (!from || !to) return new Response("from и to (ГГГГ-ММ-ДД) са задължителни", { status: 400 });
+    const f = readFormat(sp);
+    const sales = kind === "accounting-sales";
+    const rows = sales ? [SALES_COLUMNS, ...(await salesExportRows(db, from, to, f))] : [PURCHASE_COLUMNS, ...(await purchaseExportRows(db, from, to, f))];
+    const ext = f.separator === "\t" ? "txt" : "csv";
+    return new Response(Buffer.from(encodeCsv(rows, f)), {
+      headers: {
+        "Content-Type": `${ext === "txt" ? "text/plain" : "text/csv"}; charset=${f.encoding === "cp1251" ? "windows-1251" : "utf-8"}`,
+        "Content-Disposition": `attachment; filename="${sales ? "prodajbi" : "dostavki"}-${from}-${to}-${f.encoding}.${ext}"`,
+      },
+    });
   }
   if (kind === "sales-journal" || kind === "purchases") {
     // за счетоводителя: суми с десетична запетая (Excel на български ги чете като числа)

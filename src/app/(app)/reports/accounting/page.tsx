@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { Download } from "lucide-react";
 import { buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/fields";
+import { Input, Select } from "@/components/ui/fields";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/search-form";
 import { Table } from "@/components/ui/table";
 import { purchasesList, RATES, salesJournal } from "@/lib/accounting";
+import { SALES_COLUMNS } from "@/lib/accounting-export";
 import { requireContext } from "@/lib/auth";
 import { localTodayIso } from "@/lib/dates";
 import { param, type SearchParams } from "@/lib/paging";
@@ -99,6 +100,55 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
           </CardBody>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader
+          title="Файл за счетоводна програма"
+          description="За Microinvest Делта Pro, Ажур, Плюс-Минус и др.: един ред на документ и ставка ДДС. Колоните се съпоставят веднъж в импортния филтър на програмата; после всеки месец файлът се внася директно."
+        />
+        <CardBody>
+          <form method="get" className="flex flex-wrap items-end gap-3 text-xs text-muted">
+            <input type="hidden" name="from" value={from} />
+            <input type="hidden" name="to" value={to} />
+            <label>
+              Кодировка
+              <Select name="enc" defaultValue="cp1251" className="mt-1 w-auto">
+                <option value="cp1251">Windows-1251 (по-стари програми)</option>
+                <option value="utf8">UTF-8</option>
+              </Select>
+            </label>
+            <label>
+              Разделител
+              <Select name="sep" defaultValue=";" className="mt-1 w-auto">
+                <option value=";">точка и запетая „;“</option>
+                <option value=",">запетая „,“</option>
+                <option value="tab">табулация (TXT)</option>
+              </Select>
+            </label>
+            <label>
+              Десетичен знак
+              <Select name="dec" defaultValue="," className="mt-1 w-auto">
+                <option value=",">запетая 12,50</option>
+                <option value=".">точка 12.50</option>
+              </Select>
+            </label>
+            <label>
+              Дата
+              <Select name="date" defaultValue="dd.MM.yyyy" className="mt-1 w-auto">
+                <option value="dd.MM.yyyy">31.10.2026</option>
+                <option value="yyyy-MM-dd">2026-10-31</option>
+              </Select>
+            </label>
+            <button formAction="/api/export/accounting-sales" className={buttonClasses("secondary", "sm")}>
+              <Download className="h-4 w-4" /> Продажби
+            </button>
+            <button formAction="/api/export/accounting-purchases" className={buttonClasses("secondary", "sm")}>
+              <Download className="h-4 w-4" /> Доставки
+            </button>
+          </form>
+          <p className="mt-3 text-xs text-muted">Колони на продажбите: {SALES_COLUMNS.join(" · ")}.</p>
+        </CardBody>
+      </Card>
     </>
   );
 }

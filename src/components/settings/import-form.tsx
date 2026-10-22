@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { ImportRow } from "@/lib/actions/import";
 import { mapHeader, parseCsv } from "@/lib/csv";
+import { decodeText } from "@/lib/encoding";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
 
@@ -25,7 +26,7 @@ export function ImportForm({ action }: { action: (fd: FormData) => Promise<Actio
     setRows([]);
     if (!file) return;
     setFileName(file.name);
-    const text = await file.text();
+    const text = decodeText(await file.arrayBuffer()); // UTF-8 или Windows-1251 (експорт от Microinvest)
     const table = parseCsv(text);
     if (table.length < 2) return setError("Файлът няма редове с данни.");
     const map = mapHeader(table[0]);
@@ -54,8 +55,8 @@ export function ImportForm({ action }: { action: (fd: FormData) => Promise<Actio
       <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface-2/50 p-8 text-center text-sm hover:border-accent/50">
         <Upload className="h-6 w-6 text-muted" />
         <span className="font-medium">{fileName || "Изберете CSV файл"}</span>
-        <span className="text-xs text-muted">Разделител „;“ или „,“, UTF-8. Първият ред са заглавията.</span>
-        <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
+        <span className="text-xs text-muted">Разделител „;“, „,“ или табулация; UTF-8 или Windows-1251. Първият ред са заглавията.</span>
+        <input type="file" accept=".csv,.txt,text/csv,text/plain" className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
       </label>
       {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
       {rows.length > 0 && (

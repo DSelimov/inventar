@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { categories, items, locations } from "@/db/tenant-schema";
+import { categories, items, locations, partners, PARTNER_TYPES } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { str } from "@/lib/forms";
@@ -13,6 +13,7 @@ import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
 import { decimalsOf, itemDecimals, MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
 import { assertWithinLimit } from "@/lib/plans";
+import { readTaxFields } from "@/lib/tax-ids";
 
 export type ImportRow = {
   sku: string;
@@ -97,4 +98,82 @@ export const importItems = act(async (fd: FormData) => {
   revalidatePath("/items");
   revalidatePath("/");
   return redirectWith(`/items?imported=${created + updated}`, "Импортът приключи.");
+});
+
+export type PartnerImportRow = {
+  name: string;
+  eik?: string;
+  vatNumber?: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  type?: string;
+  notes?: string;
+};
+
+const PARTNER_TYPE_WORDS: Record<string, (typeof PARTNER_TYPES)[number]> = { supplier: "supplier", доставчик: "supplier", customer: "customer", клиент: "customer", both: "both", двата: "both" };
+
+/**
+ * Партньори от CSV (напр. списъкът от Microinvest Склад Pro). Съвпадение по ЕИК, иначе по име: съществуващият
+ * се допълва само с попълнените полета. Редовете с невалиден ЕИК/ДДС № се пропускат и се изброяват.
+ */
+export const importPartners = act(async (fd: FormData) => {
+  const ctx = await requireContext("manage");
+  let rows: PartnerImportRow[];
+  try {
+    rows = JSON.parse(str(fd, "rows")) as PartnerImportRow[];
+  } catch {
+    throw new UserError("Невалидни данни за импорт.");
+  }
+  if (!rows.length) throw new UserError("Няма редове за импорт.");
+  const all = await ctx.db.select({ id: partners.id, name: partners.name, eik: partners.eik }).from(partners);
+  const byEik = new Map(all.filter((p) => p.eik).map((p) => [p.eik!, p.id]));
+  const byName = new Map(all.map((p) => [p.name.trim().toLowerCase(), p.id]));
+  let created = 0;
+  let updated = 0;
+  const skipped: string[] = [];
+  await ctx.db.transaction(async (tx) => {
+    for (const r of rows) {
+      const name = r.name?.trim();
+      if (!name) continue;
+      let tax: ReturnType<typeof readTaxFields>;
+      try {
+        // Microinvest пише ДДС номера понякога без „BG“
+        const vat = r.vatNumber?.trim().replace(/\s/g, "");
+        tax = readTaxFields({ eik: r.eik, vatNumber: vat && /^\d+$/.test(vat) ? `BG${vat}` : vat });
+      } catch (e) {
+        skipped.push(`${name}: ${(e as Error).message}`);
+        continue;
+      }
+      const address = [r.city?.trim(), r.address?.trim()].filter(Boolean).join(", ") || null;
+      const data = {
+        name: name.slice(0, 200),
+        contactName: r.contactName?.trim() || null,
+        email: r.email?.trim() || null,
+        phone: r.phone?.trim() || null,
+        address: address?.slice(0, 500) ?? null,
+        notes: r.notes?.trim() || null,
+        ...tax,
+      };
+      const type = PARTNER_TYPE_WORDS[(r.type ?? "").trim().toLowerCase()] ?? "both";
+      const id = (tax.eik && byEik.get(tax.eik)) || byName.get(name.toLowerCase());
+      if (id) {
+        // само попълнените полета; празно във файла не трие съществуващото
+        const set = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== false));
+        await tx.update(partners).set(set).where(eq(partners.id, id));
+        updated++;
+      } else {
+        const [row] = await tx.insert(partners).values({ ...data, type }).$returningId();
+        if (tax.eik) byEik.set(tax.eik, row.id);
+        byName.set(name.toLowerCase(), row.id);
+        created++;
+      }
+    }
+  });
+  await audit(ctx, "import", "partner", null, { created, updated, skipped: skipped.length });
+  revalidatePath("/partners");
+  const msg = `Партньори: нови ${created}, обновени ${updated}.`;
+  return skipped.length ? `${msg} Пропуснати ${skipped.length}: ${skipped.slice(0, 5).join("; ")}${skipped.length > 5 ? "…" : ""}` : msg;
 });
