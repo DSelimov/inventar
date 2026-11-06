@@ -97,6 +97,7 @@ export const importItems = act(async (fd: FormData) => {
   await audit(ctx, "import", "item", null, { created, updated, rows: rows.length });
   revalidatePath("/items");
   revalidatePath("/");
+  revalidatePath("/dashboard");
   return redirectWith(`/items?imported=${created + updated}`, "Импортът приключи.");
 });
 

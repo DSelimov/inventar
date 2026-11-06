@@ -16,6 +16,7 @@ export const createEvent = act(async (fd: FormData) => {
   await ctx.db.insert(calendarEvents).values({ title, date, type: oneOf(fd, "type", EVENT_TYPES, "event"), notes: optional(fd, "notes") });
   revalidatePath("/calendar");
   revalidatePath("/");
+  revalidatePath("/dashboard");
   return "Събитието е добавено.";
 });
 
@@ -24,5 +25,6 @@ export const deleteEvent = act(async (id: number) => {
   await ctx.db.delete(calendarEvents).where(eq(calendarEvents.id, id));
   revalidatePath("/calendar");
   revalidatePath("/");
+  revalidatePath("/dashboard");
   return "Събитието е изтрито.";
 });

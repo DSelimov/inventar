@@ -20,6 +20,7 @@ import { assignVat } from "@/lib/vat-rates";
 
 function revalidate(id?: number) {
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/orders");
   revalidatePath("/reports");
   if (id) revalidatePath(`/orders/${id}`);

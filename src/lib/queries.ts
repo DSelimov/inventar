@@ -529,3 +529,39 @@ export async function listItemSuppliers(db: Db, itemId: number) {
 export async function listSupplierPrices(db: Db) {
   return db.select({ itemId: itemSuppliers.itemId, partnerId: itemSuppliers.partnerId, price: itemSuppliers.purchasePrice, sku: itemSuppliers.supplierSku }).from(itemSuppliers);
 }
+
+/** Броячи за плочките на началния екран — по една заявка на таблица. */
+export async function getHomeCounts(db: Db) {
+  const n = (v: unknown) => Number(v ?? 0);
+  const [[o], [s], [i], [c], [w], [v]] = await Promise.all([
+    db
+      .select({
+        draft: sql<number>`coalesce(sum(case when ${orders.status} = 'draft' then 1 else 0 end), 0)`,
+        open: sql<number>`coalesce(sum(case when ${orders.status} in ('confirmed','partial') then 1 else 0 end), 0)`,
+      })
+      .from(orders),
+    db
+      .select({
+        inbound: sql<number>`coalesce(sum(case when ${shipments.status} in ('pending','in_transit') and ${shipments.direction} = 'inbound' then 1 else 0 end), 0)`,
+        outbound: sql<number>`coalesce(sum(case when ${shipments.status} in ('pending','in_transit') and ${shipments.direction} = 'outbound' then 1 else 0 end), 0)`,
+      })
+      .from(shipments),
+    db
+      .select({ unpaid: sql<number>`coalesce(sum(case when ${invoices.status} = 'issued' and ${invoices.paymentStatus} <> 'paid' then 1 else 0 end), 0)` })
+      .from(invoices),
+    db.select({ open: sql<number>`coalesce(sum(case when ${stockCounts.status} = 'open' then 1 else 0 end), 0)` }).from(stockCounts),
+    db.select({ draft: sql<number>`coalesce(sum(case when ${writeOffs.status} = 'draft' then 1 else 0 end), 0)` }).from(writeOffs),
+    // Същата оценка като таблото: наличност × доставна цена, сумирани в MySQL (decimal, без JS аритметика).
+    db.select({ stockValue: sql<string>`coalesce(sum(${items.quantity} * ${items.unitCost}), 0)` }).from(items).where(eq(items.status, "active")),
+  ]);
+  return {
+    draftOrders: n(o.draft),
+    openOrders: n(o.open),
+    inboundShipments: n(s.inbound),
+    outboundShipments: n(s.outbound),
+    unpaidInvoices: n(i.unpaid),
+    openCounts: n(c.open),
+    draftWriteOffs: n(w.draft),
+    stockValue: n(v.stockValue),
+  };
+}

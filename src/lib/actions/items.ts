@@ -20,6 +20,7 @@ import { assertWithinLimit } from "@/lib/plans";
 
 function revalidateItems(id?: number) {
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/items");
   revalidatePath("/reports");
   if (id) revalidatePath(`/items/${id}`);

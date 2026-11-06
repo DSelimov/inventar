@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, Boxes, CircleHelp, Building2, CalendarDays, ClipboardCheck, ClipboardList, FileText, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Trash, Truck, Users } from "lucide-react";
+import { BarChart3, Bell, House, Boxes, CircleHelp, Building2, CalendarDays, ClipboardCheck, ClipboardList, FileText, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Trash, Truck, Users } from "lucide-react";
 import type { Role } from "@/db/schema";
 import { logout } from "@/lib/actions/auth";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Табло", icon: LayoutDashboard },
+  { href: "/", label: "Начало", icon: House },
+  { href: "/dashboard", label: "Табло", icon: LayoutDashboard },
   { href: "/items", label: "Артикули", icon: Package },
   { href: "/categories", label: "Категории", icon: Tags },
   { href: "/orders", label: "Поръчки", icon: ClipboardList },

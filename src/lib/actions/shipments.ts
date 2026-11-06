@@ -18,6 +18,7 @@ import { parseMoney } from "@/lib/money";
 
 function revalidate(id?: number) {
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/shipments");
   revalidatePath("/orders");
   revalidatePath("/calendar");

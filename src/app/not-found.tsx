@@ -6,7 +6,7 @@ export default function NotFound() {
       <h1 className="text-lg font-semibold">Не е намерено</h1>
       <p className="mt-2 text-sm text-muted">Страницата или записът, който търсите, не съществува.</p>
       <div className="mt-6">
-        <ButtonLink href="/">Към таблото</ButtonLink>
+        <ButtonLink href="/">Към началото</ButtonLink>
       </div>
     </div>
   );

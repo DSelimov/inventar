@@ -72,6 +72,7 @@ export const applyCount = act(async (countId: number, fd: FormData) => {
   revalidate(countId);
   revalidatePath("/items");
   revalidatePath("/");
+  revalidatePath("/dashboard");
   return `${r.number} е приложена: ${r.adjusted} корекции, разлика в стойността ${formatMoney(r.valueDelta, ctx.org.currency)}.`;
 });
 
