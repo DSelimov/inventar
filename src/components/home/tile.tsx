@@ -4,14 +4,23 @@ import { cn } from "@/lib/utils";
 
 export type TileTone = "accent" | "success" | "warning" | "danger" | "info" | "neutral";
 
-/** Мек цвят само за иконата — плочката е бяла. */
+/** Тънка цветна линия отгоре — единственият цвят на плочката, освен иконата. */
+const TOP: Record<TileTone, string> = {
+  accent: "border-t-accent",
+  success: "border-t-success",
+  warning: "border-t-warning",
+  danger: "border-t-danger",
+  info: "border-t-info",
+  neutral: "border-t-muted/50",
+};
+
 const ICON: Record<TileTone, string> = {
-  accent: "bg-accent-soft text-accent",
-  success: "bg-success-soft text-success",
-  warning: "bg-warning-soft text-warning",
-  danger: "bg-danger-soft text-danger",
-  info: "bg-info-soft text-info",
-  neutral: "bg-surface-2 text-muted ring-1 ring-inset ring-line",
+  accent: "text-accent",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+  info: "text-info",
+  neutral: "text-muted",
 };
 
 const BADGE: Record<TileTone, string> = {
@@ -36,29 +45,30 @@ export type TileProps = {
   badgeLabel?: string;
 };
 
-/** Бяла квадратна плочка на началния екран: голяма зона за натискане, удобна и на таблет/телефон. */
+/**
+ * Плочка на началния екран: бяла карта с цветна линия отгоре, заглавие и описание горе вляво,
+ * голяма икона долу вдясно и мека сянка.
+ */
 export function Tile({ href, label, hint, icon: Icon, tone = "accent", badge, badgeTone = "danger", badgeLabel }: TileProps) {
   return (
     <Link
       href={href}
       aria-label={badge ? `${label} — ${badgeLabel ?? badge}` : label}
-      className="group relative flex aspect-square flex-col items-center justify-center gap-3 rounded-3xl border border-line bg-surface p-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-accent/30 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:gap-4"
-    >
-      {!!badge && (
-        <span
-          title={badgeLabel}
-          className={cn("absolute top-3 right-3 flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-sm font-bold tabular-nums sm:top-4 sm:right-4", BADGE[badgeTone])}
-        >
-          {badge > 99 ? "99+" : badge}
-        </span>
+      className={cn(
+        "group relative flex aspect-square flex-col rounded-xl border-t-[3px] bg-surface p-5 shadow-[0_12px_30px_-14px_rgba(17,24,39,0.22)] ring-1 ring-line/60 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_22px_40px_-16px_rgba(17,24,39,0.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:aspect-[5/4] sm:p-6",
+        TOP[tone],
       )}
-      <div className={cn("flex h-16 w-16 items-center justify-center rounded-2xl transition-transform duration-200 group-hover:scale-110 sm:h-20 sm:w-20", ICON[tone])}>
-        <Icon className="h-8 w-8 sm:h-10 sm:w-10" strokeWidth={1.75} />
+    >
+      <div className="flex min-h-7 items-start justify-between gap-2">
+        <div className="text-base font-semibold leading-tight tracking-tight sm:text-xl">{label}</div>
+        {!!badge && (
+          <span title={badgeLabel} className={cn("flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-2 text-sm font-bold tabular-nums", BADGE[badgeTone])}>
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
       </div>
-      <div className="min-w-0">
-        <div className="text-base font-semibold leading-tight sm:text-lg">{label}</div>
-        {hint && <div className="mt-1 line-clamp-2 text-xs text-muted sm:text-sm">{hint}</div>}
-      </div>
+      {hint && <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted sm:mt-3 sm:text-sm">{hint}</p>}
+      <Icon aria-hidden className={cn("mt-auto h-10 w-10 self-end transition-transform duration-200 group-hover:scale-110 sm:h-14 sm:w-14", ICON[tone])} strokeWidth={1.5} />
     </Link>
   );
 }
