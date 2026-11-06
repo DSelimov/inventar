@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
-import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, itemUnits, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
+import { apiKeys, calendarEvents, itemPrices, priceChanges, priceGroups, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, itemUnits, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 const countExpr = () => n(sql<number>`count(*)`);
@@ -168,6 +168,8 @@ const partnerColumns = {
   vatRegistered: partners.vatRegistered,
   country: partners.country,
   leadTimeDays: partners.leadTimeDays,
+  priceGroupId: partners.priceGroupId,
+  discountPercent: partners.discountPercent,
   orderCount: n(sql<number>`(select count(*) from ${orders} where ${orders.partnerId} = ${partners.id})`),
 };
 const partnerTypeWhere = (type?: PartnerType | "all") => (type && type !== "all" ? or(eq(partners.type, type), eq(partners.type, "both")) : undefined);
@@ -564,4 +566,42 @@ export async function getHomeCounts(db: Db) {
     draftWriteOffs: n(w.draft),
     stockValue: n(v.stockValue),
   };
+}
+
+// ------------------------------------------------------------------ ценови групи
+
+export async function listPriceGroups(db: Db, includeInactive = false) {
+  return db.query.priceGroups.findMany({
+    where: includeInactive ? undefined : eq(priceGroups.active, true),
+    orderBy: [asc(priceGroups.sortOrder), asc(priceGroups.name)],
+  });
+}
+
+/** Брой артикули с цена и партньори/локации по група — за страницата с групите. */
+export async function priceGroupUsage(db: Db) {
+  const [prices, partnerRows, locationRows] = await Promise.all([
+    db.select({ id: itemPrices.priceGroupId, n: sql<number>`count(*)` }).from(itemPrices).groupBy(itemPrices.priceGroupId),
+    db.select({ id: partners.priceGroupId, n: sql<number>`count(*)` }).from(partners).groupBy(partners.priceGroupId),
+    db.select({ id: locations.priceGroupId, n: sql<number>`count(*)` }).from(locations).groupBy(locations.priceGroupId),
+  ]);
+  const map = (rows: Array<{ id: number | null; n: unknown }>) => new Map(rows.filter((r) => r.id).map((r) => [r.id as number, Number(r.n)]));
+  return { items: map(prices), partners: map(partnerRows), locations: map(locationRows) };
+}
+
+/** Всички цени по групи (формата за поръчка избира според клиента). */
+export async function listGroupPrices(db: Db) {
+  return db.select({ itemId: itemPrices.itemId, priceGroupId: itemPrices.priceGroupId, price: itemPrices.price }).from(itemPrices);
+}
+
+export async function getItemGroupPrices(db: Db, itemId: number) {
+  return db.select().from(itemPrices).where(eq(itemPrices.itemId, itemId));
+}
+
+export async function listPriceChanges(db: Db, itemId: number, limit = 20) {
+  return db.query.priceChanges.findMany({
+    where: eq(priceChanges.itemId, itemId),
+    with: { priceGroup: true },
+    orderBy: [desc(priceChanges.createdAt), desc(priceChanges.id)],
+    limit,
+  });
 }

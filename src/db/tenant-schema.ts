@@ -51,6 +51,23 @@ const qty = (name: string) => decimal(name, { precision: 14, scale: 3, mode: "nu
 const createdAt = () => datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`);
 const ts = (name: string) => datetime(name, { fsp: 3 });
 
+// ---------------------------------------------------------------- price groups
+/**
+ * Ценови групи (Едро, Дилър, Ценова група 1…). Цената „на дребно“ е items.unit_price; група без
+ * цена за даден артикул връща към нея. Групата идва от партньора, после от локацията на продажбата.
+ */
+export const priceGroups = mysqlTable(
+  "price_groups",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("price_groups_name").on(t.name)],
+);
+
 // ------------------------------------------------------------------- locations
 export const locations = mysqlTable("locations", {
   id: int("id").autoincrement().primaryKey(),
@@ -59,6 +76,8 @@ export const locations = mysqlTable("locations", {
   address: varchar("address", { length: 500 }),
   isDefault: boolean("is_default").notNull().default(false),
   active: boolean("active").notNull().default(true),
+  /** Ценова група за продажби от този обект (магазин на едро); партньорът с група има предимство. */
+  priceGroupId: int("price_group_id").references(() => priceGroups.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 });
 
@@ -224,9 +243,46 @@ export const partners = mysqlTable("partners", {
   /** Държава по ISO 3166-1 alpha-2; ЕС/извън ЕС определя 0 % и обратното начисляване. */
   country: varchar("country", { length: 2 }).notNull().default("BG"),
   leadTimeDays: int("lead_time_days"),
+  /** Ценова група на клиента; празно = групата на локацията или цената на дребно. */
+  priceGroupId: int("price_group_id").references(() => priceGroups.id, { onDelete: "set null" }),
+  /** Постоянна отстъпка в % върху цената от групата (клиентски поръчки). */
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2, mode: "number" }).notNull().default(0),
   notes: text("notes"),
   createdAt: createdAt(),
 });
+
+/** Цена на артикул в ценова група (без ред = цената на дребно на артикула). */
+export const itemPrices = mysqlTable(
+  "item_prices",
+  {
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    priceGroupId: int("price_group_id").notNull().references(() => priceGroups.id, { onDelete: "cascade" }),
+    price: money("price").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.itemId, t.priceGroupId] })],
+);
+
+export const PRICE_TARGETS = ["retail", "cost", "group"] as const;
+export type PriceTarget = (typeof PRICE_TARGETS)[number];
+
+/** История на цените: всяка промяна на цена на дребно, доставна цена или цена в група. */
+export const priceChanges = mysqlTable(
+  "price_changes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    target: mysqlEnum("target", PRICE_TARGETS).notNull(),
+    priceGroupId: int("price_group_id").references(() => priceGroups.id, { onDelete: "cascade" }),
+    oldPrice: money("old_price"),
+    newPrice: money("new_price"),
+    /** „Смяна на цени“, „Редакция на артикул“, импорт… */
+    source: varchar("source", { length: 64 }).notNull(),
+    userId: int("user_id"),
+    userName: varchar("user_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("price_changes_item").on(t.itemId, t.createdAt)],
+);
 
 /** Опаковки на артикул (кашон = 12 бр., палет = 48 кашона в бр.): фактор в основната мерна единица и баркод. */
 export const itemUnits = mysqlTable(
@@ -690,7 +746,19 @@ export const auditLog = mysqlTable(
 );
 
 // ------------------------------------------------------------------- relations
-export const locationsRelations = relations(locations, ({ many }) => ({ stockLevels: many(stockLevels) }));
+export const locationsRelations = relations(locations, ({ one, many }) => ({
+  stockLevels: many(stockLevels),
+  priceGroup: one(priceGroups, { fields: [locations.priceGroupId], references: [priceGroups.id] }),
+}));
+export const priceGroupsRelations = relations(priceGroups, ({ many }) => ({ prices: many(itemPrices) }));
+export const itemPricesRelations = relations(itemPrices, ({ one }) => ({
+  item: one(items, { fields: [itemPrices.itemId], references: [items.id] }),
+  priceGroup: one(priceGroups, { fields: [itemPrices.priceGroupId], references: [priceGroups.id] }),
+}));
+export const priceChangesRelations = relations(priceChanges, ({ one }) => ({
+  item: one(items, { fields: [priceChanges.itemId], references: [items.id] }),
+  priceGroup: one(priceGroups, { fields: [priceChanges.priceGroupId], references: [priceGroups.id] }),
+}));
 export const vatRatesRelations = relations(vatRates, ({ many }) => ({ items: many(items), categories: many(categories) }));
 export const categoriesRelations = relations(categories, ({ one, many }) => ({
   fields: many(fieldDefinitions),
@@ -716,6 +784,7 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   orderLines: many(orderLines),
   suppliers: many(itemSuppliers),
   packUnits: many(itemUnits),
+  groupPrices: many(itemPrices),
 }));
 export const itemImagesRelations = relations(itemImages, ({ one }) => ({
   item: one(items, { fields: [itemImages.itemId], references: [items.id] }),
@@ -777,7 +846,11 @@ export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
   lot: one(lots, { fields: [stockMovements.lotId], references: [lots.id] }),
   shipment: one(shipments, { fields: [stockMovements.shipmentId], references: [shipments.id] }),
 }));
-export const partnersRelations = relations(partners, ({ many }) => ({ orders: many(orders), shipments: many(shipments) }));
+export const partnersRelations = relations(partners, ({ one, many }) => ({
+  orders: many(orders),
+  shipments: many(shipments),
+  priceGroup: one(priceGroups, { fields: [partners.priceGroupId], references: [priceGroups.id] }),
+}));
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   partner: one(partners, { fields: [orders.partnerId], references: [partners.id] }),
   location: one(locations, { fields: [orders.locationId], references: [locations.id] }),
@@ -812,6 +885,8 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
 }));
 
 // Row types
+export type PriceGroup = typeof priceGroups.$inferSelect;
+export type PriceChange = typeof priceChanges.$inferSelect;
 export type Location = typeof locations.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type FieldDefinition = typeof fieldDefinitions.$inferSelect;

@@ -66,4 +66,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   vat_rate: "Ставка ДДС",
   write_off: "Протокол за брак",
   invoice: "Фактура / известие",
+  price_group: "Ценова група",
+  item_prices: "Цени по групи",
+  prices_bulk: "Смяна на цени",
 };

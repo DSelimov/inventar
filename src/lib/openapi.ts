@@ -161,9 +161,29 @@ const schemas: Record<string, Schema> = {
         lots: arr(ref("Lot"), "Партиди/серийни номера с наличност > 0."),
         fieldValues: arr(ref("ItemFieldValue"), "Стойности на персонализираните полета."),
         variants: arr(ref("Item"), "Варианти (дъщерни артикули)."),
+        groupPrices: arr(ref("ItemGroupPrice"), "Цени по ценови групи; група без ред = цената на дребно (unitPrice)."),
       }),
     ],
   },
+
+  PriceGroup: obj(
+    {
+      id: int("Идентификатор", { example: 1 }),
+      name: str("Име", { example: "Едро" }),
+      sortOrder: int("Подредба"),
+      active: bool("Активна"),
+    },
+    ["id", "name", "sortOrder", "active"],
+  ),
+
+  ItemGroupPrice: obj(
+    {
+      itemId: int("Артикул"),
+      priceGroupId: int("Ценова група (GET /price-groups)"),
+      price: money("Цена в групата", { example: 19.9 }),
+    },
+    ["itemId", "priceGroupId", "price"],
+  ),
 
   ItemCreate: obj(
     {
@@ -254,6 +274,8 @@ const schemas: Record<string, Schema> = {
       vatRegistered: bool("Регистриран по ЗДДС"),
       country: str("Държава, ISO 3166-1 alpha-2", { example: "BG" }),
       leadTimeDays: nullable(int("Срок на доставка в дни")),
+      priceGroupId: nullable(int("Ценова група на клиента; null = цена на дребно")),
+      discountPercent: num("Постоянна отстъпка в % върху цената от групата", { example: 5 }),
       orderCount: int("Брой поръчки"),
     },
     ["id", "name", "type"],
@@ -673,6 +695,15 @@ export function buildOpenApi(serverUrl: string) {
       },
       "/api/v1/partners": {
         get: { tags: ["Справочни данни"], summary: "Партньори", operationId: "listPartners", responses: { ...ok(data(arr(ref("Partner")))), ...errorResponses() } },
+      },
+      "/api/v1/price-groups": {
+        get: {
+          tags: ["Справочни данни"],
+          summary: "Ценови групи",
+          description: "Групи цени (Едро, Дилър…). Продажна цена: групата на клиента, после на локацията, иначе unitPrice на артикула; отстъпката на клиента се прилага отгоре.",
+          operationId: "listPriceGroups",
+          responses: { ...ok(data(arr(ref("PriceGroup")))), ...errorResponses() },
+        },
       },
       "/api/v1/categories": {
         get: { tags: ["Справочни данни"], summary: "Категории с полета", operationId: "listCategories", responses: { ...ok(data(arr(ref("Category")))), ...errorResponses() } },

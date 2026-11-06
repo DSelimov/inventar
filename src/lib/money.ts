@@ -98,3 +98,13 @@ export function unitCostOf(value: number, quantity: number) {
   // стойност в десетохилядни × 1000 / количество в хилядни → десетохилядни
   return Number(bigDivRound(BigInt(units(value)) * BigInt(1000), q)) / SCALE;
 }
+
+/**
+ * Цена ± процент (надценка +10, отстъпка −5), точно: десетохилядни × (10000 + стотни от процента).
+ * Резултатът е до 4 знака; закръглянето до стотинки или „завършва на ,99“ е в src/lib/pricing.ts.
+ */
+export function applyPercent(price: number, percent: number) {
+  const p = BigInt(Math.sign(percent) * Math.round(Math.abs(percent) * 100) || 0); // стотни от процента
+  const result = bigDivRound(BigInt(units(price)) * (BigInt(10_000) + p), BigInt(10_000));
+  return Math.max(0, Number(result)) / SCALE;
+}

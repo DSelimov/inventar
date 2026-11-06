@@ -10,6 +10,7 @@ import { act, redirectWith } from "@/lib/action";
 import { readTaxFields } from "@/lib/tax-ids";
 import { checkVies } from "@/lib/vies";
 import { UserError } from "@/lib/errors";
+import { parsePercent } from "@/lib/pricing";
 
 function read(fd: FormData) {
   return {
@@ -21,6 +22,8 @@ function read(fd: FormData) {
     address: optional(fd, "address"),
     ...readTaxFields({ eik: str(fd, "eik"), vatNumber: str(fd, "vatNumber"), vatRegistered: bool(fd, "vatRegistered"), country: str(fd, "country") }),
     leadTimeDays: optionalInt(fd, "leadTimeDays"),
+    priceGroupId: optionalInt(fd, "priceGroupId"),
+    discountPercent: parsePercent(str(fd, "discountPercent"), "Отстъпка", { min: 0, max: 100 }),
     notes: optional(fd, "notes"),
   };
 }

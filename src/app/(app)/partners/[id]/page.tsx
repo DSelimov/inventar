@@ -10,7 +10,7 @@ import { Table } from "@/components/ui/table";
 import { checkPartnerVies, deletePartner, updatePartner } from "@/lib/actions/partners";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { getPartner } from "@/lib/queries";
+import { getPartner, listPriceGroups } from "@/lib/queries";
 import { formatDate, formatMoney, label } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -28,6 +28,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
   if (!Number.isInteger(id)) notFound();
   const partner = await getPartner(ctx.db, id);
   if (!partner) notFound();
+  const priceGroups = await listPriceGroups(ctx.db, true);
   const writable = can(ctx.role, "write");
 
   return (
@@ -39,6 +40,8 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
           <span className="flex items-center gap-2">
             <Badge tone="neutral">{label(partner.type)}</Badge>
             {partner.leadTimeDays ? <span className="text-muted">Срок на доставка {partner.leadTimeDays} дни</span> : null}
+            {partner.priceGroupId ? <Badge tone="accent">Цени: {priceGroups.find((g) => g.id === partner.priceGroupId)?.name}</Badge> : null}
+            {partner.discountPercent > 0 ? <Badge tone="success">Отстъпка {partner.discountPercent} %</Badge> : null}
           </span>
         }
         actions={
@@ -129,7 +132,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
           <CardBody>
             {writable ? (
               <Form action={updatePartner.bind(null, id)}>
-                <PartnerFields partner={partner} submitLabel="Запази" />
+                <PartnerFields partner={partner} submitLabel="Запази" priceGroups={priceGroups} />
               </Form>
             ) : (
               <dl className="space-y-2 text-sm">

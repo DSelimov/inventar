@@ -120,6 +120,13 @@
       "when": 1792654649862,
       "tag": "0016_shops",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1793957904544,
+      "tag": "0017_price_groups",
+      "breakpoints": true
     }
   ]
 }

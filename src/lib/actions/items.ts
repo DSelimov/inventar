@@ -9,6 +9,7 @@ import { requireContext } from "@/lib/auth";
 import { deleteItemFiles } from "@/lib/item-images";
 import { int, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { getDefaultLocation } from "@/lib/queries";
+import { recordPriceChanges } from "@/lib/price-groups";
 import { applyMovement, assertFitsDecimals, transferStock } from "@/lib/stock";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
@@ -114,6 +115,10 @@ export const updateItem = act(async (id: number, fd: FormData) => {
   // при наличност доставната цена е средната от движенията — ръчната промяна би разминала оценката
   if (existing.quantity > 0) data.unitCost = existing.unitCost;
   await ctx.db.update(items).set({ ...data, updatedAt: new Date() }).where(eq(items.id, id));
+  await recordPriceChanges(ctx.db, ctx.user, "Редакция на артикул", [
+    { itemId: id, target: "retail", oldPrice: existing.unitPrice, newPrice: data.unitPrice },
+    { itemId: id, target: "cost", oldPrice: existing.unitCost, newPrice: data.unitCost },
+  ]);
   await saveFieldValues(ctx.db, id, data.categoryId, fd);
   await audit(ctx, "update", "item", id, { name: data.name });
   emit(ctx.db, "item.updated", { id, ...data });

@@ -11,10 +11,12 @@ import type { ActionResult } from "@/lib/action";
 import { PackQuantity, type PackOption } from "@/components/items/pack-quantity";
 import { itemDecimals, mulQty, quantityStep } from "@/lib/quantity";
 import { orderVat } from "@/lib/vat";
+import { effectivePriceGroup, salesPrice } from "@/lib/pricing";
 
 export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; quantityDecimals: number; tracking: string; vatRateId: number | null };
 export type VatRateOption = { id: number; name: string; rate: number; isDefault: boolean };
-export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null };
+export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null; priceGroupId?: number | null; discountPercent?: number };
+export type GroupPriceOption = { itemId: number; priceGroupId: number; price: number };
 type Line = { key: number; itemId: string; quantity: string; price: string; vat: string; packId: string };
 
 export function OrderForm({
@@ -30,6 +32,8 @@ export function OrderForm({
   supplierPrices = [],
   initialPartnerId,
   packUnits = [],
+  groupPrices = [],
+  priceGroupNames = {},
   action,
   cancelHref,
 }: {
@@ -45,6 +49,9 @@ export function OrderForm({
   supplierPrices?: Array<{ itemId: number; partnerId: number; price: number | null }>;
   initialPartnerId?: number | null;
   packUnits?: PackOption[];
+  /** Цени по ценови групи (клиентска поръчка): групата на клиента, после на локацията, иначе цената на дребно. */
+  groupPrices?: GroupPriceOption[];
+  priceGroupNames?: Record<number, string>;
   /** Цените на редовете са с ДДС (за нова поръчка — от настройките, за съществуваща — от нея). */
   pricesIncludeVat: boolean;
   action: (fd: FormData) => Promise<ActionResult>;
@@ -52,10 +59,20 @@ export function OrderForm({
 }) {
   const [type, setType] = useState<OrderType>(order?.type ?? initialType);
   const [partnerId, setPartnerId] = useState<string>(order?.partnerId ? String(order.partnerId) : initialPartnerId ? String(initialPartnerId) : "");
-  const priceFor = (itemId: string, t: OrderType, partner = partnerId) => {
+  const [locationId, setLocationId] = useState<string>(String(order?.locationId ?? locations.find((l) => l.isDefault)?.id ?? ""));
+  const salesTerms = (partner: string, location: string) => {
+    const p = partners.find((x) => String(x.id) === partner);
+    const l = locations.find((x) => String(x.id) === location);
+    return { groupId: effectivePriceGroup(p?.priceGroupId, l?.priceGroupId), discount: p?.discountPercent ?? 0 };
+  };
+  const priceFor = (itemId: string, t: OrderType, partner = partnerId, location = locationId) => {
     const it = items.find((i) => String(i.id) === itemId);
     if (!it) return "0";
-    if (t !== "purchase") return String(it.unitPrice);
+    if (t !== "purchase") {
+      const { groupId, discount } = salesTerms(partner, location);
+      const groupPrice = groupId ? (groupPrices.find((g) => g.itemId === it.id && g.priceGroupId === groupId)?.price ?? null) : null;
+      return String(salesPrice({ retail: it.unitPrice, groupPrice, discountPercent: discount }));
+    }
     const atSupplier = supplierPrices.find((p) => String(p.itemId) === itemId && String(p.partnerId) === partner)?.price;
     return String(atSupplier ?? it.unitCost);
   };
@@ -122,8 +139,8 @@ export function OrderForm({
               onChange={(e) => {
                 const p = e.target.value;
                 setPartnerId(p);
-                // доставчик с договорени цени: редовете вземат неговата цена
-                if (type === "purchase") setLines((ls) => ls.map((l) => (l.itemId ? { ...l, price: priceFor(l.itemId, type, p) } : l)));
+                // доставчик с договорени цени или клиент с ценова група/отстъпка: редовете вземат неговата цена
+                setLines((ls) => ls.map((l) => (l.itemId ? { ...l, price: priceFor(l.itemId, type, p) } : l)));
               }}
             >
               <option value="">— без партньор —</option>
@@ -134,9 +151,18 @@ export function OrderForm({
                 </option>
               ))}
             </Select>
+            {!purchase && <SalesTermsHint {...salesTerms(partnerId, locationId)} names={priceGroupNames} />}
           </Field>
           <Field label={purchase ? "Локация на получаване" : "Локация на изпращане"}>
-            <Select name="locationId" defaultValue={order?.locationId ?? locations.find((l) => l.isDefault)?.id ?? ""}>
+            <Select
+              name="locationId"
+              value={locationId}
+              onChange={(e) => {
+                const loc = e.target.value;
+                setLocationId(loc);
+                if (type === "sales") setLines((ls) => ls.map((l) => (l.itemId ? { ...l, price: priceFor(l.itemId, type, partnerId, loc) } : l)));
+              }}
+            >
               {locations.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name}
@@ -239,5 +265,15 @@ export function OrderForm({
         )}
       </FormActions>
     </Form>
+  );
+}
+
+function SalesTermsHint({ groupId, discount, names }: { groupId: number | null; discount: number; names: Record<number, string> }) {
+  if (!groupId && !discount) return null;
+  return (
+    <p className="mt-1 text-xs text-accent">
+      Цени: {groupId ? (names[groupId] ?? "ценова група") : "на дребно"}
+      {discount ? ` · отстъпка ${discount} %` : ""}
+    </p>
   );
 }

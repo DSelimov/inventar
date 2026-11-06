@@ -8,6 +8,7 @@ const TABS = [
   { href: "/settings", label: "Организация" },
   { href: "/settings/users", label: "Потребители" },
   { href: "/settings/locations", label: "Локации" },
+  { href: "/settings/prices", label: "Ценови групи" },
   { href: "/settings/vat", label: "ДДС" },
   { href: "/settings/integrations", label: "Интеграции" },
   { href: "/settings/import", label: "Импорт / Експорт" },

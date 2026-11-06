@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, ImageOff, Package, Plus, Printer } from "lucide-react";
+import { Download, ImageOff, Package, Plus, Printer, Tags } from "lucide-react";
 import type { Metadata } from "next";
 import { Badge, ColorBadge } from "@/components/ui/badge";
 import { buttonClasses, ButtonLink } from "@/components/ui/button";
@@ -57,6 +57,12 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
               <Download className="h-4 w-4" />
               CSV
             </ButtonLink>
+            {can(ctx.role, "manage") && (
+              <ButtonLink href="/items/prices" variant="secondary">
+                <Tags className="h-4 w-4" />
+                Смяна на цени
+              </ButtonLink>
+            )}
             {can(ctx.role, "write") && (
               <ButtonLink href="/items/new">
                 <Plus className="h-4 w-4" />

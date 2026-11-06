@@ -3,18 +3,19 @@ import { Plus, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { Checkbox, Field, Input } from "@/components/ui/fields";
+import { Checkbox, Field, Input, Select } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createLocation, deleteLocation, setDefaultLocation, updateLocation } from "@/lib/actions/locations";
 import { requireContext } from "@/lib/auth";
-import { listLocations } from "@/lib/queries";
+import { listLocations, listPriceGroups } from "@/lib/queries";
+import type { PriceGroup } from "@/db/schema";
 import { Form } from "@/components/ui/form";
 
 export const metadata: Metadata = { title: "Локации" };
 
 export default async function LocationsPage() {
   const ctx = await requireContext("manage");
-  const locations = await listLocations(ctx.db, true);
+  const [locations, priceGroups] = await Promise.all([listLocations(ctx.db, true), listPriceGroups(ctx.db)]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -38,6 +39,7 @@ export default async function LocationsPage() {
                   </SubmitButton>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 sm:col-span-4">
+                  <PriceGroupSelect groups={priceGroups} value={l.priceGroupId} />
                   <Checkbox name="active" defaultChecked={l.active} label="Активна" />
                   {l.isDefault && <Badge tone="accent">По подразбиране</Badge>}
                 </div>
@@ -73,6 +75,7 @@ export default async function LocationsPage() {
             <Field label="Адрес">
               <Input name="address" />
             </Field>
+            <PriceGroupSelect groups={priceGroups} value={null} />
             <SubmitButton className="w-full">
               <Plus className="h-4 w-4" /> Добави локация
             </SubmitButton>
@@ -80,5 +83,23 @@ export default async function LocationsPage() {
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/** Ценова група на обекта (напр. склад на едро); скрита, докато няма групи. */
+function PriceGroupSelect({ groups, value }: { groups: PriceGroup[]; value: number | null }) {
+  if (groups.length === 0) return value ? <input type="hidden" name="priceGroupId" value={value} /> : null;
+  return (
+    <label className="flex items-center gap-2 text-sm text-muted">
+      Цени
+      <Select name="priceGroupId" defaultValue={value ?? ""} className="w-auto">
+        <option value="">на дребно</option>
+        {groups.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.name}
+          </option>
+        ))}
+      </Select>
+    </label>
   );
 }

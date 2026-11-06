@@ -1,8 +1,8 @@
-import type { Partner } from "@/db/schema";
+import type { Partner, PriceGroup } from "@/db/schema";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 
-export function PartnerFields({ partner, submitLabel }: { partner?: Partner; submitLabel: string }) {
+export function PartnerFields({ partner, submitLabel, priceGroups = [] }: { partner?: Partner; submitLabel: string; priceGroups?: PriceGroup[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Име" className="sm:col-span-2">
@@ -17,6 +17,21 @@ export function PartnerFields({ partner, submitLabel }: { partner?: Partner; sub
       </Field>
       <Field label="Срок на доставка (дни)" hint="За предложенията за поръчка в Отчети.">
         <Input name="leadTimeDays" type="number" min={0} defaultValue={partner?.leadTimeDays ?? ""} />
+      </Field>
+      <Field label="Ценова група" hint="За клиентски поръчки; празно = цена на дребно (или групата на склада).">
+        <Select name="priceGroupId" defaultValue={partner?.priceGroupId ?? ""}>
+          <option value="">Цена на дребно</option>
+          {priceGroups
+            .filter((g) => g.active || g.id === partner?.priceGroupId)
+            .map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+        </Select>
+      </Field>
+      <Field label="Отстъпка (%)" hint="Постоянна отстъпка върху цената от групата.">
+        <Input name="discountPercent" type="number" min={0} max={100} step="0.01" defaultValue={partner?.discountPercent ?? 0} />
       </Field>
       <Field label="Лице за контакт">
         <Input name="contactName" defaultValue={partner?.contactName ?? ""} />

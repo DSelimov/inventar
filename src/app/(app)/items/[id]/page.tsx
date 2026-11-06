@@ -14,7 +14,8 @@ import { adjustStock, createVariant, deleteItem, transfer } from "@/lib/actions/
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
-import { getItem, listItemSuppliers, listItemUnits, listLocations, listPartners } from "@/lib/queries";
+import { getItem, getItemGroupPrices, listItemSuppliers, listItemUnits, listLocations, listPartners, listPriceChanges, listPriceGroups } from "@/lib/queries";
+import { saveItemGroupPrices } from "@/lib/actions/pricing";
 import { addItemUnit, removeItemUnit } from "@/lib/actions/item-units";
 import { removeItemSupplier, saveItemSupplier } from "@/lib/actions/item-suppliers";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
@@ -33,6 +34,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const [item, locations, ownImages, suppliers, partnerOptions, packUnits] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier"), listItemUnits(ctx.db, id)]);
+  const [priceGroups, groupPrices, priceHistory] = await Promise.all([listPriceGroups(ctx.db), getItemGroupPrices(ctx.db, id), listPriceChanges(ctx.db, id, 10)]);
   if (!item) notFound();
   const images = ownImages.length || !item.parentId ? ownImages : await listItemImages(ctx.db, item.parentId);
 
@@ -474,6 +476,78 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               </CardBody>
             </Card>
           )}
+
+          <Card>
+            <CardHeader title="Цени" description={priceGroups.length ? "Празна цена в група = цената на дребно." : undefined} />
+            <CardBody className="space-y-4 text-sm">
+              <dl className="grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-xs text-muted">На дребно</dt>
+                  <dd className="font-semibold tabular-nums">{formatMoney(item.unitPrice, ctx.org.currency)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">Доставна</dt>
+                  <dd className="font-semibold tabular-nums">{formatMoney(item.unitCost, ctx.org.currency)}</dd>
+                </div>
+              </dl>
+              {priceGroups.length > 0 ? (
+                <Form action={saveItemGroupPrices.bind(null, id)} className="space-y-2">
+                  {priceGroups.map((g) => (
+                    <label key={g.id} className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 truncate">{g.name}</span>
+                      <Input
+                        name={`price_${g.id}`}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="w-32 text-right tabular-nums"
+                        defaultValue={groupPrices.find((p) => p.priceGroupId === g.id)?.price ?? ""}
+                        placeholder={String(item.unitPrice)}
+                        disabled={!writable}
+                        aria-label={`Цена ${g.name}`}
+                      />
+                    </label>
+                  ))}
+                  {writable && (
+                    <div className="flex justify-end pt-1">
+                      <SubmitButton variant="secondary" size="sm">
+                        Запази цените
+                      </SubmitButton>
+                    </div>
+                  )}
+                </Form>
+              ) : (
+                can(ctx.role, "manage") && (
+                  <p className="text-xs text-muted">
+                    Различни цени за едро, дилъри или ключови клиенти —{" "}
+                    <Link href="/settings/prices" className="font-medium text-accent hover:underline">
+                      добавете ценови групи
+                    </Link>
+                    .
+                  </p>
+                )
+              )}
+              {priceHistory.length > 0 && (
+                <div>
+                  <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">История на цените</div>
+                  <ul className="space-y-1.5">
+                    {priceHistory.map((h) => (
+                      <li key={h.id} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="min-w-0 truncate">
+                          <span className="font-medium">{h.target === "retail" ? "Дребно" : h.target === "cost" ? "Доставна" : (h.priceGroup?.name ?? "Група")}</span>
+                          <span className="text-muted"> · {formatDate(h.createdAt)}{h.userName ? ` · ${h.userName}` : ""}</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          <span className="text-muted line-through">{h.oldPrice === null ? "—" : formatMoney(h.oldPrice, ctx.org.currency)}</span>{" "}
+                          {h.newPrice === null ? "—" : formatMoney(h.newPrice, ctx.org.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardBody>
+          </Card>
 
           <Card>
             <CardHeader title="Доставчици" description={suppliers.length ? "Цена и код при всеки доставчик; предпочитаният се ползва за предложенията за поръчка." : "Добавете от кого купувате артикула."} />
