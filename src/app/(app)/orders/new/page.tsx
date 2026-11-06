@@ -3,6 +3,7 @@ import { OrderForm } from "@/components/orders/order-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { createOrder } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
+import { listCurrencies } from "@/lib/fx";
 import { peekNumber } from "@/lib/numbering";
 import { listAllItemUnits, listGroupPrices, listItemOptions, listItemSuppliers, listLocationsFor, listPartners, listPriceGroups, listSupplierPrices, listVatRates } from "@/lib/queries";
 import { getSettings } from "@/lib/settings";
@@ -14,7 +15,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const type = sp.type === "sales" ? "sales" : "purchase";
   const [items, locations, partnersList, number, vatRates, settings, supplierPrices] = await Promise.all([listItemOptions(ctx.db), listLocationsFor(ctx), listPartners(ctx.db), peekNumber(ctx.db, type), listVatRates(ctx.db), getSettings(ctx.db), listSupplierPrices(ctx.db)]);
-  const [packUnits, groupPrices, priceGroups] = await Promise.all([listAllItemUnits(ctx.db), listGroupPrices(ctx.db), listPriceGroups(ctx.db, true)]);
+  const [packUnits, groupPrices, priceGroups, currencies] = await Promise.all([listAllItemUnits(ctx.db), listGroupPrices(ctx.db), listPriceGroups(ctx.db, true), listCurrencies(ctx.db)]);
   const priceGroupNames = Object.fromEntries(priceGroups.map((g) => [g.id, g.name]));
   const itemId = Number(sp.item);
   const initialLines = Number.isInteger(itemId) && itemId > 0 ? [{ itemId, quantity: 1 }] : undefined;
@@ -26,7 +27,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Нова поръчка" back={{ href: "/orders", label: "Поръчки" }} />
-      <OrderForm packUnits={packUnits} groupPrices={groupPrices} priceGroupNames={priceGroupNames} items={items} locations={locations} partners={partners} initialType={type} initialLines={initialLines} numberPlaceholder={number} vatRates={vatRates} pricesIncludeVat={settings.pricesIncludeVat} supplierPrices={supplierPrices} initialPartnerId={preferred?.partnerId} action={createOrder} cancelHref="/orders" />
+      <OrderForm currencies={currencies} baseCurrency={ctx.org.currency} packUnits={packUnits} groupPrices={groupPrices} priceGroupNames={priceGroupNames} items={items} locations={locations} partners={partners} initialType={type} initialLines={initialLines} numberPlaceholder={number} vatRates={vatRates} pricesIncludeVat={settings.pricesIncludeVat} supplierPrices={supplierPrices} initialPartnerId={preferred?.partnerId} action={createOrder} cancelHref="/orders" />
     </div>
   );
 }

@@ -118,7 +118,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <td className="text-right tabular-nums">
                       {done} / {ordered}
                     </td>
-                    <td className="text-right tabular-nums">{formatMoney(value, ctx.org.currency)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(value, o.currency ?? ctx.org.currency)}</td>
                   </tr>
                 );
               })}

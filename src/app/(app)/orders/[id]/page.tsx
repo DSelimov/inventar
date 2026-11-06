@@ -33,7 +33,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const [order, orderInvoices] = await Promise.all([getOrder(ctx.db, id), listOrderInvoices(ctx.db, id)]);
   if (!order) notFound();
 
-  const currency = ctx.org.currency;
+  // поръчка в чужда валута: сумите са във валутата ѝ (курсът е в описанието)
+  const currency = order.currency ?? ctx.org.currency;
   const writable = can(ctx.role, "write");
   const purchase = order.type === "purchase";
   const vat = orderVat(order, order.lines.map((l) => ({ ...l, legalBasis: l.vatRateRecord?.legalBasis ?? null })));
@@ -63,6 +64,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </Link>
             )}
             {order.location && <span className="text-muted">· {order.location.name}</span>}
+            {order.currency && order.exchangeRate && (
+              <Badge tone="info">
+                {order.currency} · 1 {order.currency} = {order.exchangeRate} {ctx.org.currency}
+              </Badge>
+            )}
             {order.externalSource && <Badge tone="info">от {PROVIDERS[order.externalSource as ProviderId]?.name ?? order.externalSource}</Badge>}
           </span>
         }

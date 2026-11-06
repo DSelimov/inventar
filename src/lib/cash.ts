@@ -17,6 +17,7 @@ import { sumMoney } from "./money";
 import { nextNumber } from "./numbering";
 import { addQty, subQty } from "./quantity";
 import { orderVat } from "./vat";
+import { toBase } from "./fx";
 
 type Actor = { id: number; name: string } | null;
 
@@ -143,7 +144,7 @@ async function deliveredOrders(db: Db, partnerIds?: number[]) {
       const quantity = o.type === "sales" ? subQty(net, invoiced.get(l.id) ?? 0) : net;
       return { quantity: Math.max(0, quantity), unitPrice: l.unitPrice, vatRate: l.vatRate };
     });
-    const delivered = orderVat(o, lines).gross;
+    const delivered = toBase(orderVat(o, lines).gross, o, 2); // салдата са в основната валута
     if (delivered > 0) out.push({ id: o.id, number: o.number, type: o.type, partnerId: o.partnerId, date: o.orderDate, delivered });
   }
   return out;

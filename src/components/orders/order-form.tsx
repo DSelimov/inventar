@@ -12,6 +12,7 @@ import { PackQuantity, type PackOption } from "@/components/items/pack-quantity"
 import { itemDecimals, mulQty, quantityStep } from "@/lib/quantity";
 import { orderVat } from "@/lib/vat";
 import { effectivePriceGroup, salesPrice } from "@/lib/pricing";
+import { roundMoney } from "@/lib/money";
 
 export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; quantityDecimals: number; tracking: string; vatRateId: number | null };
 export type VatRateOption = { id: number; name: string; rate: number; isDefault: boolean };
@@ -34,6 +35,8 @@ export function OrderForm({
   packUnits = [],
   groupPrices = [],
   priceGroupNames = {},
+  currencies = [],
+  baseCurrency = "EUR",
   action,
   cancelHref,
 }: {
@@ -52,6 +55,9 @@ export function OrderForm({
   /** Цени по ценови групи (клиентска поръчка): групата на клиента, после на локацията, иначе цената на дребно. */
   groupPrices?: GroupPriceOption[];
   priceGroupNames?: Record<number, string>;
+  /** Чуждестранни валути (Настройки › Валути); цените в поръчката са във валутата ѝ. */
+  currencies?: Array<{ code: string; name: string; rate: number }>;
+  baseCurrency?: string;
   /** Цените на редовете са с ДДС (за нова поръчка — от настройките, за съществуваща — от нея). */
   pricesIncludeVat: boolean;
   action: (fd: FormData) => Promise<ActionResult>;
@@ -59,22 +65,33 @@ export function OrderForm({
 }) {
   const [type, setType] = useState<OrderType>(order?.type ?? initialType);
   const [partnerId, setPartnerId] = useState<string>(order?.partnerId ? String(order.partnerId) : initialPartnerId ? String(initialPartnerId) : "");
+  const [currency, setCurrency] = useState<string>(order?.currency ?? "");
+  const [rate, setRate] = useState<string>(order?.exchangeRate ? String(order.exchangeRate) : "");
+  // цените на артикулите са в основната валута; в чужда — по курса
+  const inCurrency = (base: number, cur = currency, r = rate) => {
+    const x = Number(r.replace(",", "."));
+    return cur && x > 0 ? String(roundMoney(base / x, 4)) : String(base);
+  };
   const [locationId, setLocationId] = useState<string>(String(order?.locationId ?? locations.find((l) => l.isDefault)?.id ?? ""));
   const salesTerms = (partner: string, location: string) => {
     const p = partners.find((x) => String(x.id) === partner);
     const l = locations.find((x) => String(x.id) === location);
     return { groupId: effectivePriceGroup(p?.priceGroupId, l?.priceGroupId), discount: p?.discountPercent ?? 0 };
   };
-  const priceFor = (itemId: string, t: OrderType, partner = partnerId, location = locationId) => {
+  /** Цената по подразбиране в основната валута. */
+  const basePriceFor = (itemId: string, t: OrderType, partner = partnerId, location = locationId): number | null => {
     const it = items.find((i) => String(i.id) === itemId);
-    if (!it) return "0";
+    if (!it) return null;
     if (t !== "purchase") {
       const { groupId, discount } = salesTerms(partner, location);
       const groupPrice = groupId ? (groupPrices.find((g) => g.itemId === it.id && g.priceGroupId === groupId)?.price ?? null) : null;
-      return String(salesPrice({ retail: it.unitPrice, groupPrice, discountPercent: discount }));
+      return salesPrice({ retail: it.unitPrice, groupPrice, discountPercent: discount });
     }
-    const atSupplier = supplierPrices.find((p) => String(p.itemId) === itemId && String(p.partnerId) === partner)?.price;
-    return String(atSupplier ?? it.unitCost);
+    return supplierPrices.find((p) => String(p.itemId) === itemId && String(p.partnerId) === partner)?.price ?? it.unitCost;
+  };
+  const priceFor = (itemId: string, t: OrderType, partner = partnerId, location = locationId) => {
+    const base = basePriceFor(itemId, t, partner, location);
+    return base === null ? "0" : inCurrency(base);
   };
   const defaultVat = String(vatRates.find((r) => r.isDefault)?.id ?? vatRates[0]?.id ?? "");
   const vatFor = (itemId: string) => String(items.find((i) => String(i.id) === itemId)?.vatRateId ?? defaultVat);
@@ -170,6 +187,33 @@ export function OrderForm({
               ))}
             </Select>
           </Field>
+          {currencies.length > 0 && (
+            <Field label="Валута" hint={currency ? `1 ${currency} = ${rate || "?"} ${baseCurrency}; себестойност, салда и фактура — в ${baseCurrency}.` : undefined}>
+              <div className="flex gap-2">
+                <Select
+                  name="currency"
+                  value={currency}
+                  onChange={(e) => {
+                    const c = e.target.value;
+                    const r = c ? String(currencies.find((x) => x.code === c)?.rate ?? "") : "";
+                    setCurrency(c);
+                    setRate(r);
+                    // цените на редовете се преизчисляват във валутата
+                    setLines((ls) => ls.map((l) => (l.itemId ? { ...l, price: inCurrency(basePriceFor(l.itemId, type) ?? 0, c, r) } : l)));
+                  }}
+                  className="w-28"
+                >
+                  <option value="">{baseCurrency}</option>
+                  {currencies.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code}
+                    </option>
+                  ))}
+                </Select>
+                {currency && <Input name="exchangeRate" type="number" step="0.00000001" min={0} value={rate} onChange={(e) => setRate(e.target.value)} aria-label="Курс" />}
+              </div>
+            </Field>
+          )}
           <Field label="Дата на поръчка">
             <Input name="orderDate" type="date" defaultValue={order?.orderDate ?? new Date().toISOString().slice(0, 10)} />
           </Field>
@@ -186,7 +230,7 @@ export function OrderForm({
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold">Редове</h2>
           <span className="text-xs text-muted tabular-nums">
-            Основа {totals.net.toFixed(2)} · ДДС {totals.vat.toFixed(2)} · Общо {totals.gross.toFixed(2)}
+            Основа {totals.net.toFixed(2)} · ДДС {totals.vat.toFixed(2)} · Общо {totals.gross.toFixed(2)} {currency || baseCurrency}
           </span>
         </div>
         <div className="space-y-2">
@@ -219,7 +263,7 @@ export function OrderForm({
                   step={stepFor(line.itemId)}
                   onChange={(patch) => update(line.key, patch)}
                 />
-                <Input name="linePrice" type="number" min={0} step="0.01" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label={`Цена за ${chosen?.unit ?? "единица"}`} />
+                <Input name="linePrice" type="number" min={0} step="0.0001" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label={`Цена за ${chosen?.unit ?? "единица"}`} />
                 <Select name="lineVatRateId" value={line.vat} onChange={(e) => update(line.key, { vat: e.target.value })} aria-label="ДДС">
                   {vatRates.map((r) => (
                     <option key={r.id} value={r.id}>

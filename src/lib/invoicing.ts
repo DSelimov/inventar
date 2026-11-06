@@ -7,6 +7,7 @@ import { UserError } from "./errors";
 import { sumMoney } from "./money";
 import { nextInvoiceNumber } from "./numbering";
 import { recordCashEntry } from "./cash";
+import { toBase } from "./fx";
 import { addQty, subQty } from "./quantity";
 import { getCompanyDetails, getSettings } from "./settings";
 import { lineAmounts, vatSummary } from "./vat";
@@ -127,7 +128,8 @@ export async function draftFromOrder(db: TenantDb, orderId: number, currency: st
         description: l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name,
         quantity: Math.max(0, subQty(base, invoiced.get(l.id) ?? 0)),
         unit: l.item.unit,
-        unitPrice: l.unitPrice,
+        // фактурата е в основната валута (ЗДДС): цените от поръчка в чужда валута — по курса ѝ
+        unitPrice: toBase(l.unitPrice, order),
         vatRateId: l.vatRateId,
       };
     })

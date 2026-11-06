@@ -6,6 +6,7 @@ import type { Db } from "@/db/tenant";
 import { lots, ORDER_TYPES, orderLines, orders, shipmentLines, shipments, type OrderStatus } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { readDocumentCurrency } from "@/lib/fx";
 import { oneOf, optional, optionalInt, str } from "@/lib/forms";
 import { nextNumber } from "@/lib/numbering";
 import { getDefaultLocation } from "@/lib/queries";
@@ -73,6 +74,7 @@ export const createOrder = act(async (fd: FormData) => {
         expectedDate: optional(fd, "expectedDate"),
         notes: optional(fd, "notes"),
         pricesIncludeVat: (await getSettings(ctx.db)).pricesIncludeVat,
+        ...(await readDocumentCurrency(ctx.db, ctx.org.currency, optional(fd, "currency"), optional(fd, "exchangeRate"))),
         createdBy: ctx.user.id,
       })
       .$returningId();
@@ -101,6 +103,7 @@ export const updateOrder = act(async (id: number, fd: FormData) => {
         locationId: (assertLocationAccess(ctx.user, optionalInt(fd, "locationId")), optionalInt(fd, "locationId")),
         orderDate: optional(fd, "orderDate"),
         expectedDate: optional(fd, "expectedDate"),
+        ...(await readDocumentCurrency(ctx.db, ctx.org.currency, optional(fd, "currency"), optional(fd, "exchangeRate"))),
         notes: optional(fd, "notes"),
       })
       .where(eq(orders.id, id));

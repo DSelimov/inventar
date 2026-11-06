@@ -80,7 +80,7 @@ export function ConsignmentForm({
                       ))}
                     </Select>
                     <Input name="lineQuantity" type="number" min={0} max={it?.available} step={quantityStep(it ? itemDecimals(it) : 0)} value={line.quantity} onChange={(e) => update(line.key, { quantity: e.target.value })} aria-label="Количество" />
-                    {kind === "report" && <Input name="linePrice" type="number" min={0} step="0.01" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label="Цена" placeholder="Цена" />}
+                    {kind === "report" && <Input name="linePrice" type="number" min={0} step="0.0001" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label="Цена" placeholder="Цена" />}
                     <Button variant="ghost" onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== line.key) : ls))} disabled={lines.length === 1} aria-label="Премахни реда">
                       <Trash2 className="h-4 w-4" />
                     </Button>

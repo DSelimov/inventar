@@ -7,6 +7,7 @@ import { emit } from "./webhooks";
 import { UserError } from "@/lib/errors";
 import { addQty, subQty, sumQty } from "./quantity";
 import { orderMovementCost } from "./valuation";
+import { toBase } from "./fx";
 
 async function fulfilOrder(tx: Db, orderId: number, delivered: Array<{ itemId: number; quantity: number }>) {
   const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId), with: { lines: true } });
@@ -89,8 +90,13 @@ export async function changeShipmentStatus(db: TenantDb, actor: Actor, id: numbe
       const orderPrices = new Map<number, number>();
       // цените на поръчка за доставка са доставни; на клиентска — продажни и не са себестойност
       if (shipment.orderId) {
-        const lines = await tx.select({ itemId: orderLines.itemId, unitPrice: orderLines.unitPrice }).from(orderLines).innerJoin(orders, eq(orders.id, orderLines.orderId)).where(and(eq(orderLines.orderId, shipment.orderId), eq(orders.type, "purchase")));
-        for (const l of lines) if (!orderPrices.has(l.itemId)) orderPrices.set(l.itemId, l.unitPrice);
+        const lines = await tx
+          .select({ itemId: orderLines.itemId, unitPrice: orderLines.unitPrice, currency: orders.currency, exchangeRate: orders.exchangeRate })
+          .from(orderLines)
+          .innerJoin(orders, eq(orders.id, orderLines.orderId))
+          .where(and(eq(orderLines.orderId, shipment.orderId), eq(orders.type, "purchase")));
+        // поръчка в чужда валута: себестойността е в основната валута по курса на поръчката
+        for (const l of lines) if (!orderPrices.has(l.itemId)) orderPrices.set(l.itemId, toBase(l.unitPrice, l));
       }
       for (const line of shipment.lines) {
         await applyMovement(tx, {

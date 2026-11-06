@@ -51,6 +51,17 @@ const qty = (name: string) => decimal(name, { precision: 14, scale: 3, mode: "nu
 const createdAt = () => datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`);
 const ts = (name: string) => datetime(name, { fsp: 3 });
 
+// ---------------------------------------------------------------- currencies
+/** Чуждестранни валути и текущият им курс към основната валута на организацията (ръчно или от ЕЦБ). */
+export const currencies = mysqlTable("currencies", {
+  code: varchar("code", { length: 3 }).primaryKey(),
+  name: varchar("name", { length: 64 }).notNull(),
+  /** Колко единици основна валута е 1 единица от тази валута. */
+  rate: decimal("rate", { precision: 18, scale: 8, mode: "number" }).notNull(),
+  source: varchar("source", { length: 16 }).notNull().default("manual"),
+  updatedAt: ts("updated_at").notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+});
+
 // ---------------------------------------------------------------- price groups
 /**
  * Ценови групи (Едро, Дилър, Ценова група 1…). Цената „на дребно“ е items.unit_price; група без
@@ -332,6 +343,10 @@ export const orders = mysqlTable(
   pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
   /** Валутата, в която е издадена поръчката, ако е превалутирана (напр. BGN → EUR от 1.1.2026). */
   originalCurrency: varchar("original_currency", { length: 3 }),
+  /** Чуждестранна валута на поръчката (цените на редовете са в нея); null = основната валута. */
+  currency: varchar("currency", { length: 3 }),
+  /** Курс при създаването: колко единици основна валута е 1 единица от currency. */
+  exchangeRate: decimal("exchange_rate", { precision: 18, scale: 8, mode: "number" }),
   /** Поръчка от онлайн магазин: източник (woocommerce, shopify) и id там — пази от двоен внос. */
   externalSource: varchar("external_source", { length: 32 }),
   externalId: varchar("external_id", { length: 64 }),
@@ -1074,6 +1089,7 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
 
 // Row types
 export type PriceGroup = typeof priceGroups.$inferSelect;
+export type Currency = typeof currencies.$inferSelect;
 export type CashAccount = typeof cashAccounts.$inferSelect;
 export type Recipe = typeof recipes.$inferSelect;
 export type Consignment = typeof consignments.$inferSelect;
