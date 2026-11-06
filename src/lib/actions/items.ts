@@ -6,6 +6,7 @@ import type { Db } from "@/db/tenant";
 import { fieldDefinitions, itemFieldValues, items, ITEM_STATUSES, TRACKING_MODES, type MovementType } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { applyBarcodeType } from "@/lib/barcodes";
 import { deleteItemFiles } from "@/lib/item-images";
 import { int, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { getDefaultLocation } from "@/lib/queries";
@@ -88,6 +89,7 @@ export const createItem = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
   await assertWithinLimit(ctx, "items");
+  await applyBarcodeType(ctx.db, fd, data);
   await assertUniqueSku(ctx.db, data.sku, undefined, data.plu);
   const parentId = optionalInt(fd, "parentId");
   const quantity = parseQuantity(str(fd, "quantity"), data.quantityDecimals, "Начална наличност");
@@ -121,6 +123,7 @@ export const createItem = act(async (fd: FormData) => {
 export const updateItem = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
+  await applyBarcodeType(ctx.db, fd, data, id);
   await assertUniqueSku(ctx.db, data.sku, id, data.plu);
   const existing = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
   if (!existing) throw new UserError("Артикулът не е намерен.");

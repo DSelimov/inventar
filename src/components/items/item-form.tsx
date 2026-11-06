@@ -8,6 +8,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
 import { quantityStep } from "@/lib/quantity";
+import { BARCODE_TYPE_LABELS, BARCODE_TYPES, barcodeTypeOf, type BarcodeType } from "@/lib/scale-barcode";
 
 type CategoryWithFields = Category & { fields: FieldDefinition[] };
 
@@ -37,6 +38,17 @@ export function ItemForm({
   const [tracking, setTracking] = useState<string>(item?.tracking ?? "none");
   const [quantity, setQuantity] = useState<string>("0");
   const [decimals, setDecimals] = useState<number>(item?.quantityDecimals ?? 0);
+  const [unit, setUnit] = useState<string>(item?.unit ?? "бр.");
+  const [barcodeType, setBarcodeType] = useState<BarcodeType>(item ? barcodeTypeOf(item) : "standard");
+  // теглови → кг с 3 знака; количествен → цели бройки
+  const changeBarcodeType = (t: BarcodeType) => {
+    setBarcodeType(t);
+    if (t === "weight") {
+      if (decimals === 0) setDecimals(3);
+      if (unit === "бр.") setUnit("кг");
+    }
+    if (t === "count") setDecimals(0);
+  };
   const step = quantityStep(tracking === "serial" ? 0 : decimals);
   const category = categories.find((c) => String(c.id) === categoryId);
   const trackingLocked = Boolean(item && item.quantity > 0);
@@ -57,12 +69,30 @@ export function ItemForm({
           <Field label="Код (SKU)" hint="Оставете празно за автоматично генериране.">
             <Input name="sku" defaultValue={item?.sku} placeholder="MISHKA-001" className="font-mono" />
           </Field>
-          <Field label="Баркод" hint="EAN / QR; използва се при сканиране.">
-            <Input name="barcode" defaultValue={item?.barcode ?? defaultBarcode ?? ""} className="font-mono" inputMode="numeric" />
+          <Field label="Тип баркод" hint={barcodeType === "standard" ? "Всяко сканиране е 1 бр. (или опаковка)." : barcodeType === "weight" ? "Етикет от везна с тегло (28…) или цена (29…)." : "Етикет с брой в баркода (27…), напр. торбичка 5 бр."}>
+            <Select name="barcodeType" value={barcodeType} onChange={(e) => changeBarcodeType(e.target.value as BarcodeType)} disabled={tracking === "serial"}>
+              {BARCODE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {BARCODE_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </Select>
           </Field>
-          <Field label="PLU (везна)" hint="Код на артикула във везната; етикетът с тегло/цена се разпознава при сканиране.">
-            <Input name="plu" defaultValue={item?.plu ?? ""} className="font-mono" inputMode="numeric" maxLength={7} />
-          </Field>
+          {barcodeType === "standard" ? (
+            <Field label="Баркод" hint="EAN / QR; празно + отметка = вътрешен баркод.">
+              <Input name="barcode" defaultValue={item?.barcode ?? defaultBarcode ?? ""} className="font-mono" inputMode="numeric" />
+              {!item?.barcode && (
+                <div className="mt-1.5">
+                  <Checkbox name="generateBarcode" value="1" label="Генерирай вътрешен баркод (EAN-13)" />
+                </div>
+              )}
+            </Field>
+          ) : (
+            <Field label="PLU (код във везната)" hint="Празно = следващият свободен номер.">
+              <Input name="plu" defaultValue={item?.plu ?? ""} className="font-mono" inputMode="numeric" maxLength={7} placeholder="автоматично" />
+              <input type="hidden" name="barcode" value={item?.barcode ?? ""} />
+            </Field>
+          )}
           <Field label="Категория">
             <Select name="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">— Без категория —</option>
@@ -120,7 +150,7 @@ export function ItemForm({
             <Input name="minQuantity" type="number" min={0} step={step} defaultValue={item?.minQuantity ?? 0} />
           </Field>
           <Field label="Мерна единица">
-            <Input name="unit" defaultValue={item?.unit ?? "бр."} placeholder="бр., кг, кашон…" />
+            <Input name="unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="бр., кг, кашон…" />
           </Field>
           <Field label="Количества" hint={tracking === "serial" ? "Серийните номера са винаги цели бройки." : "Цели бройки или дробни за кг, л, м."}>
             <Select name="quantityDecimals" value={tracking === "serial" ? 0 : decimals} onChange={(e) => setDecimals(Number(e.target.value))} disabled={tracking === "serial"}>

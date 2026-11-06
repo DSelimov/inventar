@@ -7,7 +7,7 @@ import { Scanner } from "@/components/scan/scanner";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/fields";
 import { divideToQuantity, itemDecimals, mulQty } from "@/lib/quantity";
-import { parseScaleBarcode, pluCandidates, type ScaleFormat } from "@/lib/scale-barcode";
+import { BARCODE_TYPE_LABELS, barcodeTypeOf, labelFits, parseScaleBarcode, pluCandidates, type ScaleFormat } from "@/lib/scale-barcode";
 import { cn, formatNumber } from "@/lib/utils";
 
 type CatalogItem = { id: number; sku: string; barcode: string | null; plu?: string | null; unitPrice?: number; name: string; variantLabel: string | null; unit: string; quantityDecimals: number; tracking: string; quantity: number };
@@ -134,10 +134,15 @@ export function MobileScan({ orgName }: { orgName: string }) {
     const pack = c.packs.find((p) => p.barcode?.toLowerCase() === key);
     let item = c.items.find((i) => (pack ? i.id === pack.itemId : i.barcode?.toLowerCase() === key || i.sku.toLowerCase() === key));
     let qty = Number(quantity.replace(",", ".")) || 1;
+    const fail = (message: string) => {
+      feedback(false);
+      setLog((l) => [{ id: crypto.randomUUID(), label: code, ok: false, message }, ...l].slice(0, 50));
+    };
     // етикет от везна: PLU + тегло/цена → артикулът и количеството от етикета
     if (!item && !pack && c.scaleFormats?.length) {
       const reading = parseScaleBarcode(code, c.scaleFormats);
       const byPlu = reading ? c.items.find((i) => i.plu && pluCandidates(reading.plu).includes(i.plu)) : undefined;
+      if (reading && byPlu && !labelFits(barcodeTypeOf(byPlu), reading.kind)) return fail(`Етикетът не подхожда на „${byPlu.name}“ (${BARCODE_TYPE_LABELS[barcodeTypeOf(byPlu)].toLowerCase()}).`);
       if (reading && byPlu) {
         const decimals = itemDecimals(byPlu);
         const fromLabel = reading.kind === "price" ? (byPlu.unitPrice ? divideToQuantity(reading.value, byPlu.unitPrice, decimals) : null) : divideToQuantity(reading.value, 1, decimals);
@@ -147,10 +152,6 @@ export function MobileScan({ orgName }: { orgName: string }) {
         }
       }
     }
-    const fail = (message: string) => {
-      feedback(false);
-      setLog((l) => [{ id: crypto.randomUUID(), label: code, ok: false, message }, ...l].slice(0, 50));
-    };
     if (!item && mode !== "count") return fail("Няма такъв артикул в каталога.");
     if (item && item.tracking !== "none" && mode !== "count") return fail(`„${item.name}“ е с партиди — направете движението от пълния режим.`);
     if (mode === "count" && !countId) return fail("Няма отворена инвентаризация.");

@@ -76,7 +76,7 @@ export async function recordCount(db: Db, countId: number, code: string, quantit
   // етикет от везна (PLU + тегло/цена): количеството идва от етикета
   const scaled = !match && !pack ? await scaleLookup(db, code) : null;
   if (scaled) {
-    if (!scaled.quantity) throw new UserError(`„${scaled.item.name}“ няма продажна цена — етикетът с цена не може да се преобразува в количество.`);
+    if (scaled.error || !scaled.quantity) throw new UserError(scaled.error ?? "Етикетът не може да се разчете.");
     quantity = scaled.quantity;
     match = lines.find((l) => l.item.id === scaled.item.id && l.line.lotId === null) ?? match;
   }

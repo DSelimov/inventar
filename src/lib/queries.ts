@@ -154,7 +154,7 @@ export async function findItemByCode(db: Db, code: string) {
   const scale = await scaleLookup(db, code);
   if (!scale) return undefined;
   const byPlu = await db.query.items.findFirst({ where: eq(items.id, scale.item.id), with: { category: true, stockLevels: { with: { location: true } }, packUnits: true } });
-  return byPlu ? { ...byPlu, pack: null, scale: { quantity: scale.quantity, kind: scale.reading.kind, value: scale.reading.value } } : undefined;
+  return byPlu ? { ...byPlu, pack: null, scale: { quantity: scale.quantity, kind: scale.reading.kind, value: scale.reading.value, error: scale.error } } : undefined;
 }
 
 export async function listItemUnits(db: Db, itemId: number) {

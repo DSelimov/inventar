@@ -3,9 +3,16 @@ import { eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { items, settings, type Item } from "@/db/tenant-schema";
 import { divideToQuantity, itemDecimals } from "./quantity";
-import { parseScaleBarcode, pluCandidates, readScaleFormats, type ScaleReading } from "./scale-barcode";
+import { BARCODE_TYPE_LABELS, barcodeTypeOf, labelFits, parseScaleBarcode, pluCandidates, readScaleFormats, type ScaleReading } from "./scale-barcode";
 
 export const SCALE_FORMATS_KEY = "scale.formats";
+export const INTERNAL_PREFIX_KEY = "barcode.internalPrefix";
+
+/** Префикс на генерираните вътрешни EAN-13 (по подразбиране 20). */
+export async function getInternalPrefix(db: Db) {
+  const [row] = await db.select().from(settings).where(eq(settings.key, INTERNAL_PREFIX_KEY));
+  return row?.value || "20";
+}
 
 export async function getScaleFormats(db: Db) {
   const [row] = await db.select().from(settings).where(eq(settings.key, SCALE_FORMATS_KEY));
@@ -27,5 +34,12 @@ export async function scaleLookup(db: Db, code: string) {
   if (!reading) return null;
   const [item] = await db.select().from(items).where(inArray(items.plu, pluCandidates(reading.plu)));
   if (!item) return null;
-  return { item, reading, quantity: scaleQuantity(item, reading) };
+  // теглови етикет на артикул в бройки (или обратно) би изписал 1250 бр. вместо 1,25 кг
+  const type = barcodeTypeOf(item);
+  if (!labelFits(type, reading.kind)) {
+    const what = reading.kind === "weight" ? "с тегло" : reading.kind === "count" ? "с брой" : "с цена";
+    return { item, reading, quantity: null, error: `Етикетът е ${what}, а „${item.name}“ е ${BARCODE_TYPE_LABELS[type].toLowerCase()}.` };
+  }
+  const quantity = scaleQuantity(item, reading);
+  return { item, reading, quantity, error: quantity === null ? `„${item.name}“ няма продажна цена — етикетът с цена не може да се преобразува в количество.` : null };
 }

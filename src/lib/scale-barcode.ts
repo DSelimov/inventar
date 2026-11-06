@@ -14,7 +14,41 @@ export type ScaleFormat = { prefix: string; pluLength: number; kind: ScaleKind }
 export const DEFAULT_SCALE_FORMATS: ScaleFormat[] = [
   { prefix: "28", pluLength: 5, kind: "weight" },
   { prefix: "29", pluLength: 5, kind: "price" },
+  { prefix: "27", pluLength: 5, kind: "count" },
 ];
+
+/**
+ * Как се продава артикулът (типът на баркода му), според PLU и знаците след запетаята:
+ *  - standard — обикновен баркод, всяко сканиране е 1 бр. (без PLU);
+ *  - weight   — теглови/ценови: етикет с тегло или с цена, дробно количество (кг);
+ *  - count    — количествен: етикет с брой в баркода, цели бройки.
+ */
+export const BARCODE_TYPES = ["standard", "weight", "count"] as const;
+export type BarcodeType = (typeof BARCODE_TYPES)[number];
+export const BARCODE_TYPE_LABELS: Record<BarcodeType, string> = { standard: "Обикновен (бр.)", weight: "Теглови / ценови (кг)", count: "Количествен (брой в етикета)" };
+
+export function barcodeTypeOf(item: { plu?: string | null; quantityDecimals?: number | null }): BarcodeType {
+  if (!item.plu) return "standard";
+  return (item.quantityDecimals ?? 0) > 0 ? "weight" : "count";
+}
+
+/** Етикетът подхожда ли на артикула: тегло/цена за тегловите, брой/цена за количествените. */
+export function labelFits(type: BarcodeType, kind: ScaleKind) {
+  if (type === "weight") return kind === "weight" || kind === "price";
+  if (type === "count") return kind === "count" || kind === "price";
+  return false;
+}
+
+/** Етикет с количество/тегло в баркода: префикс + PLU + стойност + контролна цифра (или null при неподходящ формат). */
+export function buildScaleBarcode(format: ScaleFormat, plu: string, value: number) {
+  const valueLength = 12 - format.prefix.length - format.pluLength;
+  const units = format.kind === "weight" ? Math.round(value * 1000) : format.kind === "price" ? Math.round(value * 100) : Math.round(value);
+  const p = plu.padStart(format.pluLength, "0");
+  const v = String(units).padStart(valueLength, "0");
+  if (p.length !== format.pluLength || v.length !== valueLength || units < 0) return null;
+  const first12 = format.prefix + p + v;
+  return first12 + eanCheckDigit(first12);
+}
 
 /** Контролна цифра на EAN-13 от първите 12 цифри. */
 export function eanCheckDigit(first12: string) {

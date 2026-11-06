@@ -16,6 +16,7 @@ import { can } from "@/lib/permissions";
 import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
 import { getItem, getItemGroupPrices, listItemSuppliers, listItemUnits, listLocationsFor, listPartners, listPriceChanges, listPriceGroups } from "@/lib/queries";
 import { saveItemGroupPrices } from "@/lib/actions/pricing";
+import { BARCODE_TYPE_LABELS, barcodeTypeOf } from "@/lib/scale-barcode";
 import { addItemUnit, removeItemUnit } from "@/lib/actions/item-units";
 import { removeItemSupplier, saveItemSupplier } from "@/lib/actions/item-suppliers";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
@@ -642,7 +643,10 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           </Card>
 
           <Card>
-            <CardHeader title="Етикети с баркод" description={item.barcode ? `Баркод ${item.barcode}` : `Без баркод — ще се използва кодът ${item.sku}.`} />
+            <CardHeader
+              title="Етикети с баркод"
+              description={`${BARCODE_TYPE_LABELS[barcodeTypeOf(item)]}${item.plu ? ` · PLU ${item.plu}` : ""} · ${item.barcode ? `баркод ${item.barcode}` : `без баркод — кодът ${item.sku}`}`}
+            />
             <CardBody>
               <form action="/print/labels" method="get" target="_blank" className="grid grid-cols-2 gap-3">
                 <input type="hidden" name="item" value={id} />
@@ -652,6 +656,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 <Field label="Пропусни" hint="Вече използвани места на листа.">
                   <Input name="skip" type="number" min={0} max={23} defaultValue={0} />
                 </Field>
+                {barcodeTypeOf(item) !== "standard" && (
+                  <Field label={barcodeTypeOf(item) === "weight" ? `Тегло в пакета (${item.unit})` : `Брой в пакета (${item.unit})`} hint="По избор: етикет с количеството в баркода (пакетиране без везна)." className="col-span-2">
+                    <Input name="qty" type="number" min={0} step={quantityStep(itemDecimals(item))} placeholder={barcodeTypeOf(item) === "weight" ? "0,500" : "5"} />
+                  </Field>
+                )}
                 <label className="col-span-2 flex items-center gap-2 text-sm">
                   <input type="checkbox" name="price" value="0" className="h-4 w-4 rounded border-line" />
                   Без цена

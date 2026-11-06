@@ -5,7 +5,7 @@ import { act } from "@/lib/action";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
 import { UserError } from "@/lib/errors";
-import { SCALE_FORMATS_KEY } from "@/lib/scale";
+import { INTERNAL_PREFIX_KEY, SCALE_FORMATS_KEY } from "@/lib/scale";
 import { DEFAULT_SCALE_FORMATS, SCALE_KINDS, type ScaleFormat, type ScaleKind } from "@/lib/scale-barcode";
 import { setSetting } from "@/lib/settings";
 
@@ -26,7 +26,11 @@ export const saveScaleFormats = act(async (fd: FormData) => {
       if (formats.some((f) => f.prefix === prefix)) throw new UserError(`Префикс ${prefix} е въведен два пъти.`);
       formats.push({ prefix, pluLength, kind });
     }
+  const internalPrefix = String(fd.get("internalPrefix") ?? "").trim() || "20";
+  if (!/^2\d{1,2}$/.test(internalPrefix)) throw new UserError("Префиксът за вътрешни баркодове е 2–3 цифри, започващ с 2 (20–25 по GS1).");
+  if (formats.some((f) => internalPrefix.startsWith(f.prefix) || f.prefix.startsWith(internalPrefix))) throw new UserError(`Префикс ${internalPrefix} съвпада с формат на везна — изберете друг (напр. 20).`);
   await setSetting(ctx.db, SCALE_FORMATS_KEY, JSON.stringify(formats));
+  await setSetting(ctx.db, INTERNAL_PREFIX_KEY, internalPrefix);
   await audit(ctx, "update", "settings", null, { scaleFormats: formats });
   revalidatePath("/settings");
   return formats.length ? "Форматите на везните са запазени." : "Разпознаването на етикети от везни е изключено.";

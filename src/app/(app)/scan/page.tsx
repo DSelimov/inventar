@@ -83,9 +83,10 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                     {item.scale && (
                       <Badge tone="accent">
                         етикет от везна: {item.scale.kind === "price" ? `${formatNumber(item.scale.value)} ${ctx.org.currency}` : `${formatNumber(item.scale.value)} ${item.scale.kind === "weight" ? "кг" : item.unit}`}
-                        {item.scale.quantity !== null ? ` → ${formatNumber(item.scale.quantity)} ${item.unit}` : " (артикулът няма продажна цена)"}
+                        {item.scale.quantity !== null ? ` → ${formatNumber(item.scale.quantity)} ${item.unit}` : ""}
                       </Badge>
                     )}
+                    {item.scale?.error && <p className="w-full text-sm text-danger">{item.scale.error}</p>}
                   </span>
                 }
                 actions={<ButtonLink href={`/items/${item.id}`} variant="secondary" size="sm">Отвори</ButtonLink>}

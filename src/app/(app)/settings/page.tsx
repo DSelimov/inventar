@@ -18,14 +18,14 @@ import { Download, Trash2 } from "lucide-react";
 import { DELETION_GRACE_DAYS } from "@/lib/legal";
 import { formatDate } from "@/lib/utils";
 import { saveScaleFormats } from "@/lib/actions/scale";
-import { getScaleFormats } from "@/lib/scale";
+import { getInternalPrefix, getScaleFormats } from "@/lib/scale";
 import { SCALE_KIND_LABELS, SCALE_KINDS } from "@/lib/scale-barcode";
 
 export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const scaleFormats = await getScaleFormats(ctx.db);
+  const [scaleFormats, internalPrefix] = await Promise.all([getScaleFormats(ctx.db), getInternalPrefix(ctx.db)]);
   const [s, company, method, [moved]] = await Promise.all([getSettings(ctx.db), getCompanyDetails(ctx.db), getValuationMethod(ctx.db), ctx.db.select({ n: count() }).from(stockMovements)]);
   const methodLocked = moved.n > 0;
   const manage = can(ctx.role, "manage");
@@ -120,8 +120,8 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader
-          title="Везни (етикети с тегло или цена)"
-          description="Баркод 2x PPPPP VVVVV C от везната: по PLU на артикула се намира артикулът, а количеството е теглото (или цената ÷ продажната цена). Работи при сканиране, инвентаризация и в мобилния режим."
+          title="Баркодове и везни"
+          description="Типът баркод е на всеки артикул (обикновен, теглови/ценови, количествен). Етикет 2x PPPPP VVVVV C: по PLU се намира артикулът, а количеството е теглото, броят или цената ÷ продажната цена — при сканиране, инвентаризация и в мобилния режим."
           actions={
             <ButtonLink href="/api/export/scale-plu" variant="secondary" size="sm">
               <Download className="h-3.5 w-3.5" /> PLU за везната (CSV)
@@ -151,11 +151,14 @@ export default async function SettingsPage() {
                 </div>
               );
             })}
+            <Field label="Префикс за вътрешни баркодове" hint="За генерирани EAN-13 на стоки без собствен баркод (20–25, различен от тези на везните).">
+              <Input name="internalPrefix" defaultValue={internalPrefix} inputMode="numeric" maxLength={3} className="w-24 font-mono" disabled={!manage} />
+            </Field>
             {manage && (
               <div className="flex flex-wrap justify-end gap-2">
                 {scaleFormats.length === 0 && (
                   <SubmitButton variant="ghost" name="preset" value="1">
-                    Стандартни (28 — тегло, 29 — цена)
+                    Стандартни (28 тегло, 29 цена, 27 брой)
                   </SubmitButton>
                 )}
                 <SubmitButton variant="secondary">Запази форматите</SubmitButton>

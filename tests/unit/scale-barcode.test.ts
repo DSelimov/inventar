@@ -30,3 +30,27 @@ describe("баркодове от везни", () => {
     expect(readScaleFormats("not json")).toEqual([]);
   });
 });
+
+import { barcodeTypeOf, buildScaleBarcode, labelFits } from "@/lib/scale-barcode";
+
+describe("типове баркод", () => {
+  it("типът идва от PLU и знаците; етикетът трябва да подхожда", () => {
+    expect(barcodeTypeOf({ plu: null, quantityDecimals: 3 })).toBe("standard");
+    expect(barcodeTypeOf({ plu: "12", quantityDecimals: 3 })).toBe("weight");
+    expect(barcodeTypeOf({ plu: "12", quantityDecimals: 0 })).toBe("count");
+    expect(labelFits("weight", "weight")).toBe(true);
+    expect(labelFits("weight", "price")).toBe(true);
+    expect(labelFits("weight", "count")).toBe(false);
+    expect(labelFits("count", "weight")).toBe(false);
+    expect(labelFits("standard", "price")).toBe(false);
+  });
+
+  it("етикет с количество: построяване и обратно разчитане", () => {
+    const weight = buildScaleBarcode({ prefix: "28", pluLength: 5, kind: "weight" }, "123", 0.5)!;
+    expect(weight).toMatch(/^280012300500\d$/); // 28 · PLU 00123 · 00500 г · контролна цифра
+    expect(parseScaleBarcode(weight, DEFAULT_SCALE_FORMATS)).toMatchObject({ plu: "00123", kind: "weight", value: 0.5 });
+    const count = buildScaleBarcode({ prefix: "27", pluLength: 5, kind: "count" }, "77", 5)!;
+    expect(parseScaleBarcode(count, DEFAULT_SCALE_FORMATS)).toMatchObject({ plu: "00077", kind: "count", value: 5 });
+    expect(buildScaleBarcode({ prefix: "28", pluLength: 5, kind: "weight" }, "123", 120)).toBeNull(); // 120 кг не се събират в 5 цифри
+  });
+});
