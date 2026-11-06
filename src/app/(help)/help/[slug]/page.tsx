@@ -15,7 +15,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
   const a = helpArticle((await params).slug);
   if (!a) notFound();
   return (
-    <article className="space-y-4 rounded-2xl border border-line bg-surface p-6 text-sm leading-relaxed shadow-sm md:p-8">
+    <article className="space-y-4 rounded-lg border border-line bg-surface p-6 text-sm leading-relaxed md:p-8">
       <Link href="/help" className="text-xs text-muted hover:text-accent">
         ← Всички статии
       </Link>
@@ -27,7 +27,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
         ))}
       </ol>
       {a.tips && (
-        <div className="rounded-xl bg-accent-soft p-4 text-accent">
+        <div className="rounded-lg bg-accent-soft p-4 text-accent">
           {a.tips.map((t) => (
             <p key={t}>{t}</p>
           ))}

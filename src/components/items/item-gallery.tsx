@@ -37,12 +37,12 @@ export function ItemGallery({
   return (
     <div>
       {selected ? (
-        <a href={selected.full} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-line bg-surface-2" title="Отвори в пълен размер">
+        <a href={selected.full} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line bg-surface-2" title="Отвори в пълен размер">
           {/* eslint-disable-next-line @next/next/no-img-element -- защитени файлове, без оптимизатора на Next */}
           <img src={selected.full} alt={title} width={selected.width} height={selected.height} className="aspect-square w-full object-contain" />
         </a>
       ) : (
-        <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line bg-surface-2 text-muted">
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface-2 text-muted">
           <ImageOff className="h-8 w-8" />
           <span className="text-sm">Няма снимки</span>
         </div>

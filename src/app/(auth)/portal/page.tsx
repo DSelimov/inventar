@@ -23,9 +23,9 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       {sp.denied && <p className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">Нямате достъп до организация „{sp.denied}“. Помолете нейния администратор да ви добави.</p>}
 
       {session.memberships.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-line bg-surface-2 p-4 text-sm text-muted">Все още не сте член на организация. Създайте своя по-долу или помолете колега да ви добави.</p>
+        <p className="mt-6 rounded-lg border border-line bg-surface-2 p-4 text-sm text-muted">Все още не сте член на организация. Създайте своя по-долу или помолете колега да ви добави.</p>
       ) : (
-        <ul className="mt-6 divide-y divide-line rounded-xl border border-line">
+        <ul className="mt-6 divide-y divide-line rounded-lg border border-line">
           {session.memberships.map((m) => (
             <li key={m.organizationId}>
               <a href={tenantUrl(m.organization.subdomain)} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface-2">
@@ -47,7 +47,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       )}
 
       {session.user.canCreateOrganizations && (
-        <details className="mt-6 rounded-xl border border-line bg-surface-2/60 p-4">
+        <details className="mt-6 rounded-lg border border-line bg-surface-2/60 p-4">
           <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <Plus className="h-4 w-4" /> Нова организация
           </summary>
@@ -63,7 +63,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       )}
 
       {session.user.isPlatformAdmin && (
-        <a href="/admin" className="mt-6 block rounded-xl border border-line px-4 py-3 text-center text-sm font-medium text-accent hover:bg-surface-2">
+        <a href="/admin" className="mt-6 block rounded-lg border border-line px-4 py-3 text-center text-sm font-medium text-accent hover:bg-surface-2">
           Администрация на платформата →
         </a>
       )}

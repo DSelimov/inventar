@@ -39,7 +39,7 @@ export default async function ApiPage() {
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
         {newKey && (
-          <div className="rounded-2xl border border-success/30 bg-success-soft p-4 text-sm">
+          <div className="rounded-lg border border-success/30 bg-success-soft p-4 text-sm">
             <div className="font-medium text-success">Новият ключ е създаден. Копирайте го сега — няма да бъде показан отново.</div>
             <code className="mt-2 block select-all break-all rounded-lg bg-surface px-3 py-2 font-mono text-xs">{newKey}</code>
           </div>
@@ -92,7 +92,7 @@ export default async function ApiPage() {
             ["/docs/api/swagger", "Swagger UI", "Стандартният интерактивен интерфейс: Authorize + Try it out с вашия ключ."],
             ["/api/v1/openapi.json", "OpenAPI 3.1 (JSON)", "За Postman, Insomnia и генератори на клиенти."],
           ].map(([href, title, hint]) => (
-            <a key={href} href={href} target={href.endsWith(".json") ? "_blank" : undefined} rel="noreferrer" className="rounded-2xl border border-line bg-surface p-4 shadow-sm transition-colors hover:border-accent/40">
+            <a key={href} href={href} target={href.endsWith(".json") ? "_blank" : undefined} rel="noreferrer" className="rounded-lg border border-line bg-surface p-4 transition-colors hover:border-accent/40">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <BookOpen className="h-4 w-4 text-accent" /> {title}
               </div>

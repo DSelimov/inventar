@@ -73,7 +73,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="rounded-lg border border-line bg-surface p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-muted">Преброени</div>
           <div className="mt-1 text-xl font-semibold tabular-nums">
             {counted.length} / {lines.length}
@@ -82,11 +82,11 @@ export default async function CountPage({ params, searchParams }: { params: Prom
             <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
           </div>
         </div>
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="rounded-lg border border-line bg-surface p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-muted">Редове с разлика</div>
           <div className={cn("mt-1 text-xl font-semibold tabular-nums", diffs.length > 0 && "text-warning")}>{diffs.length}</div>
         </div>
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="rounded-lg border border-line bg-surface p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-muted">Разлика в стойността</div>
           <div className={cn("mt-1 text-xl font-semibold tabular-nums", valueDelta < 0 ? "text-danger" : valueDelta > 0 ? "text-success" : "")}>
             {valueDelta > 0 ? "+" : ""}
@@ -216,7 +216,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
               </CardBody>
             </Card>
           )}
-          {open && !canApply && <p className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">Разликите се прилагат от мениджър или администратор.</p>}
+          {open && !canApply && <p className="rounded-lg bg-surface-2 px-4 py-3 text-sm text-muted">Разликите се прилагат от мениджър или администратор.</p>}
 
           {writable && tracked.length > 0 && (
             <Card>
@@ -259,7 +259,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
           )}
 
           {count.status === "applied" && (
-            <p className="rounded-xl bg-success-soft px-4 py-3 text-sm text-success">
+            <p className="rounded-lg bg-success-soft px-4 py-3 text-sm text-success">
               Приложена {formatDateTime(count.appliedAt)}
               {count.appliedBy && ` от ${count.appliedBy}`}.{" "}
               <Link href={`/movements?q=${encodeURIComponent(count.number)}`} className="font-medium underline">

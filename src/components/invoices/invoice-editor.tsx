@@ -39,7 +39,7 @@ export function InvoiceEditor(props: {
 
   return (
     <Form action={props.action} className="space-y-6">
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Получател" className="sm:col-span-3">
             <Select name="partnerId" defaultValue={invoice.partnerId ?? ""} required>
@@ -84,7 +84,7 @@ export function InvoiceEditor(props: {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Редове</h2>
           <span className="text-xs tabular-nums text-muted">
@@ -93,7 +93,7 @@ export function InvoiceEditor(props: {
         </div>
         <div className="space-y-3">
           {lines.map((l) => (
-            <div key={l.key} className="rounded-xl border border-line p-3">
+            <div key={l.key} className="rounded-lg border border-line p-3">
               <input type="hidden" name="lineItemId" value={l.itemId} />
               <input type="hidden" name="lineOrderLineId" value={l.orderLineId} />
               <div className="grid gap-2 sm:grid-cols-[14rem_1fr_2.5rem]">

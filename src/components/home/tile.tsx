@@ -4,32 +4,13 @@ import { cn } from "@/lib/utils";
 
 export type TileTone = "accent" | "success" | "warning" | "danger" | "info" | "neutral";
 
-/** Тънка цветна линия отгоре — единственият цвят на плочката, освен иконата. */
-const TOP: Record<TileTone, string> = {
-  accent: "border-t-accent",
-  success: "border-t-success",
-  warning: "border-t-warning",
-  danger: "border-t-danger",
-  info: "border-t-info",
-  neutral: "border-t-muted/50",
-};
-
-const ICON: Record<TileTone, string> = {
-  accent: "text-accent",
-  success: "text-success",
-  warning: "text-warning",
-  danger: "text-danger",
-  info: "text-info",
-  neutral: "text-muted",
-};
-
 const BADGE: Record<TileTone, string> = {
-  accent: "bg-accent text-white",
-  success: "bg-success text-white",
-  warning: "bg-warning text-white",
-  danger: "bg-danger text-white",
-  info: "bg-info text-white",
-  neutral: "bg-surface-2 text-muted",
+  accent: "border-line bg-surface-2 text-text",
+  success: "border-green-200 bg-success-soft text-success",
+  warning: "border-yellow-200 bg-warning-soft text-warning",
+  danger: "border-red-200 bg-danger-soft text-danger",
+  info: "border-blue-200 bg-info-soft text-info",
+  neutral: "border-line bg-surface-2 text-muted",
 };
 
 export type TileProps = {
@@ -46,29 +27,26 @@ export type TileProps = {
 };
 
 /**
- * Плочка на началния екран: бяла карта с цветна линия отгоре, заглавие и описание горе вляво,
- * голяма икона долу вдясно и мека сянка.
+ * Плочка на началния екран: компактен бял ред с монохромна икона, заглавие, описание и брояч.
+ * Цветът се използва само за брояча, когато нещо изисква внимание.
  */
-export function Tile({ href, label, hint, icon: Icon, tone = "accent", badge, badgeTone = "danger", badgeLabel }: TileProps) {
+export function Tile({ href, label, hint, icon: Icon, badge, badgeTone = "danger", badgeLabel }: TileProps) {
   return (
     <Link
       href={href}
       aria-label={badge ? `${label} — ${badgeLabel ?? badge}` : label}
-      className={cn(
-        "group relative flex aspect-square flex-col rounded-xl border-t-[3px] bg-surface p-5 shadow-[0_12px_30px_-14px_rgba(17,24,39,0.22)] ring-1 ring-line/60 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_22px_40px_-16px_rgba(17,24,39,0.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:aspect-[5/4] sm:p-6",
-        TOP[tone],
-      )}
+      className="group flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-zinc-300 hover:bg-surface-2/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
-      <div className="flex min-h-7 items-start justify-between gap-2">
-        <div className="text-base font-semibold leading-tight tracking-tight sm:text-xl">{label}</div>
-        {!!badge && (
-          <span title={badgeLabel} className={cn("flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-2 text-sm font-bold tabular-nums", BADGE[badgeTone])}>
-            {badge > 99 ? "99+" : badge}
-          </span>
-        )}
+      <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-muted group-hover:text-text" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium leading-5">{label}</div>
+        {hint && <p className="mt-0.5 truncate text-xs text-muted">{hint}</p>}
       </div>
-      {hint && <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted sm:mt-3 sm:text-sm">{hint}</p>}
-      <Icon aria-hidden className={cn("mt-auto h-10 w-10 self-end transition-transform duration-200 group-hover:scale-110 sm:h-14 sm:w-14", ICON[tone])} strokeWidth={1.5} />
+      {!!badge && (
+        <span title={badgeLabel} className={cn("shrink-0 rounded-md border px-1.5 py-px text-xs font-medium tabular-nums", BADGE[badgeTone])}>
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </Link>
   );
 }

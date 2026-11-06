@@ -44,7 +44,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
           )
         }
       />
-      <div className="mb-4 flex w-fit gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+      <div className="mb-4 flex w-fit gap-1 rounded-lg border border-line bg-surface p-1">
         {[
           ["all", "Всички"],
           ["supplier", "Доставчици"],

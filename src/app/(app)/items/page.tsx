@@ -73,10 +73,10 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
         }
       />
 
-      {imported > 0 && <p className="mb-4 rounded-xl bg-success-soft px-4 py-2 text-sm text-success">Импортирани са {imported} артикула.</p>}
+      {imported > 0 && <p className="mb-4 rounded-lg bg-success-soft px-4 py-2 text-sm text-success">Импортирани са {imported} артикула.</p>}
 
       <FilterBar action="/items" resetHref={hasFilters ? "/items" : undefined}>
-        <div className="min-w-56 flex-1">
+        <div className="min-w-40 flex-1">
           <Input name="q" placeholder="Търсене по име, код, баркод…" defaultValue={q} />
         </div>
         <Select name="category" defaultValue={categoryId ?? ""} className="w-auto">

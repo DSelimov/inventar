@@ -127,6 +127,20 @@
       "when": 1793957904544,
       "tag": "0017_price_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1793958734636,
+      "tag": "0018_cash_book",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1793958902952,
+      "tag": "0019_cash_reversal",
+      "breakpoints": true
     }
   ]
 }

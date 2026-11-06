@@ -631,6 +631,55 @@ export const invoicePayments = mysqlTable("invoice_payments", {
   createdAt: createdAt(),
 });
 
+// ---------------------------------------------------------------- cash book
+export const CASH_ACCOUNT_KINDS = ["cash", "bank"] as const;
+export type CashAccountKind = (typeof CASH_ACCOUNT_KINDS)[number];
+
+/** Каси и банкови сметки на организацията. */
+export const cashAccounts = mysqlTable("cash_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  kind: mysqlEnum("kind", CASH_ACCOUNT_KINDS).notNull().default("cash"),
+  iban: varchar("iban", { length: 34 }),
+  isDefault: boolean("is_default").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+});
+
+export const CASH_DIRECTIONS = ["in", "out"] as const;
+export type CashDirection = (typeof CASH_DIRECTIONS)[number];
+
+/**
+ * Касова книга: всяко постъпление и плащане (каса или банка). Плащане по фактура има invoiceId (и ред в
+ * invoice_payments); по поръчка без фактура — orderId; без документ — аванс или друг приход/разход.
+ * Касовите записи имат пореден номер ПКО/РКО; банковите — без номер.
+ */
+export const cashEntries = mysqlTable(
+  "cash_entries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }),
+    direction: mysqlEnum("direction", CASH_DIRECTIONS).notNull(),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    accountId: int("account_id").notNull().references(() => cashAccounts.id),
+    amount: amount("amount").notNull(),
+    partnerId: int("partner_id").references(() => partners.id, { onDelete: "set null" }),
+    invoiceId: int("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+    orderId: int("order_id").references(() => orders.id, { onDelete: "set null" }),
+    invoicePaymentId: int("invoice_payment_id").references(() => invoicePayments.id, { onDelete: "set null" }),
+    /** Плащане от клиент, към доставчик, аванс, разход… — свободен текст с предложения. */
+    category: varchar("category", { length: 64 }),
+    note: varchar("note", { length: 255 }),
+    /** Сторно: обратният запис сочи оригинала; и двата не участват в салдата (в касата се неутрализират). */
+    reversalOfId: int("reversal_of_id"),
+    reversedAt: ts("reversed_at"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("cash_entries_date").on(t.entryDate), index("cash_entries_partner").on(t.partnerId), index("cash_entries_order").on(t.orderId)],
+);
+
 // ---------------------------------------------------------------- integrations
 /** Връзки към външни услуги (куриери, онлайн магазини): данните за достъп са криптирани с APP_SECRET. */
 export const integrations = mysqlTable("integrations", {
@@ -810,6 +859,13 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   related: one(invoices, { fields: [invoices.relatedInvoiceId], references: [invoices.id], relationName: "notes" }),
   notesFor: many(invoices, { relationName: "notes" }),
 }));
+export const cashAccountsRelations = relations(cashAccounts, ({ many }) => ({ entries: many(cashEntries) }));
+export const cashEntriesRelations = relations(cashEntries, ({ one }) => ({
+  account: one(cashAccounts, { fields: [cashEntries.accountId], references: [cashAccounts.id] }),
+  partner: one(partners, { fields: [cashEntries.partnerId], references: [partners.id] }),
+  invoice: one(invoices, { fields: [cashEntries.invoiceId], references: [invoices.id] }),
+  order: one(orders, { fields: [cashEntries.orderId], references: [orders.id] }),
+}));
 export const invoiceLinesRelations = relations(invoiceLines, ({ one }) => ({
   invoice: one(invoices, { fields: [invoiceLines.invoiceId], references: [invoices.id] }),
   item: one(items, { fields: [invoiceLines.itemId], references: [items.id] }),
@@ -886,6 +942,8 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
 
 // Row types
 export type PriceGroup = typeof priceGroups.$inferSelect;
+export type CashAccount = typeof cashAccounts.$inferSelect;
+export type CashEntry = typeof cashEntries.$inferSelect;
 export type PriceChange = typeof priceChanges.$inferSelect;
 export type Location = typeof locations.$inferSelect;
 export type Category = typeof categories.$inferSelect;

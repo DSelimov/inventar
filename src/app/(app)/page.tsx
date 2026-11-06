@@ -6,6 +6,7 @@ import {
   ArrowRight,
   ArrowUpFromLine,
   BarChart3,
+  CalendarDays,
   CircleHelp,
   ClipboardCheck,
   ClipboardList,
@@ -21,12 +22,14 @@ import {
   ScanLine,
   Search,
   Settings,
+  Scale,
   ShoppingCart,
   Smartphone,
   Tags,
   Trash,
   Truck,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Tile, type TileTone } from "@/components/home/tile";
@@ -110,7 +113,11 @@ export default async function HomePage() {
           badgeTone: alerts.overdueInvoices ? "danger" : "warning",
           badgeLabel: alerts.overdueInvoices ? `${alerts.overdueInvoices} просрочени` : `${c.unpaidInvoices} неплатени`,
         },
+        { href: "/cash", label: "Каса и банка", hint: "Плащания, приходи и разходи", icon: Wallet, tone: "success" },
+        { href: "/reports/balances", label: "Салда", hint: "Кой колко дължи", icon: Scale, tone: "danger" },
         { href: "/movements", label: "Движения", hint: "История на наличностите", icon: History, tone: "neutral" },
+        { href: "/orders/suggestions", label: "Предложения", hint: "Какво да се поръча", icon: Lightbulb, tone: "warning" },
+        { href: "/write-offs", label: "Протоколи за брак", hint: "Чернови и приложени", icon: Trash, tone: "danger" },
       ],
     },
     {
@@ -135,7 +142,7 @@ export default async function HomePage() {
       tiles: [
         { href: "/dashboard", label: "Табло", hint: "Показатели и активност", icon: LayoutDashboard, tone: "accent" },
         { href: "/reports", label: "Отчети", hint: "Стойност, оборот, марж", icon: BarChart3, tone: "info" },
-        { href: "/orders/suggestions", label: "Предложения", hint: "Какво да се поръча", icon: Lightbulb, tone: "warning" },
+        { href: "/calendar", label: "Календар", hint: "Срокове и събития", icon: CalendarDays, tone: "warning" },
         { href: "/reports/accounting", label: "За счетоводителя", hint: "Експорт на документи", icon: FileSpreadsheet, tone: "success", level: "write" },
       ],
     },
@@ -163,33 +170,26 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-7">
-        <div className="relative flex flex-wrap items-end justify-between gap-5">
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-accent first-letter:uppercase">{format(now, "EEEE, d MMMM yyyy", { locale: LOCALE })}</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <p className="text-xs text-muted first-letter:uppercase">{format(now, "EEEE, d MMMM yyyy", { locale: LOCALE })}</p>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight">
               {greeting(now.getHours())}, {ctx.user.name.split(" ")[0]}
             </h1>
-            <p className="mt-1 truncate text-sm text-muted">{ctx.org.name}</p>
           </div>
-          <form action="/items" role="search" className="relative w-full md:w-96">
-            <Search className="pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-muted" />
-            <input
-              type="search"
-              name="q"
-              aria-label="Търсене на артикул"
-              placeholder="Търсене на артикул по име, код или баркод…"
-              className="h-12 w-full rounded-2xl border border-line bg-surface pr-4 pl-11 text-sm shadow-sm placeholder:text-muted focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/15"
-            />
+          <form action="/items" role="search" className="relative w-full md:w-80">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" />
+            <input type="search" name="q" aria-label="Търсене на артикул" placeholder="Търсене на артикул…" className="control pl-9" />
           </form>
         </div>
-        <dl className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <dl className="mt-5 grid grid-cols-2 divide-line overflow-hidden rounded-lg border border-line bg-surface lg:grid-cols-4 lg:divide-x">
           {kpis.map((k) => (
-            <Link key={k.label} href={k.href} className="group rounded-2xl bg-surface-2 px-4 py-3 ring-1 ring-line transition hover:ring-accent/30">
-              <dt className="text-xs font-medium text-muted">{k.label}</dt>
-              <dd className="mt-0.5 flex items-center justify-between gap-2 text-lg font-semibold tabular-nums tracking-tight">
+            <Link key={k.label} href={k.href} className="group px-4 py-3 transition-colors hover:bg-surface-2/50">
+              <dt className="text-xs text-muted">{k.label}</dt>
+              <dd className="mt-1 flex items-center justify-between gap-2 text-lg font-semibold tabular-nums tracking-tight">
                 <span className="truncate">{k.value}</span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition group-hover:opacity-100" />
               </dd>
             </Link>
           ))}
@@ -198,10 +198,10 @@ export default async function HomePage() {
 
       {visible.map((g) => (
         <section key={g.title} aria-labelledby={`home-${g.title}`}>
-          <h2 id={`home-${g.title}`} className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
+          <h2 id={`home-${g.title}`} className="mb-2 text-xs font-medium text-muted">
             {g.title}
           </h2>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {g.tiles.map((t) => (
               <Tile
                 key={t.href}

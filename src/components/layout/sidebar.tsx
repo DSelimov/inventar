@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, House, Boxes, CircleHelp, Building2, CalendarDays, ClipboardCheck, ClipboardList, FileText, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Trash, Truck, Users } from "lucide-react";
+import { BarChart3, Bell, House, Boxes, CircleHelp, Building2, CalendarDays, ClipboardCheck, ClipboardList, FileText, History, Layers, LayoutDashboard, LogOut, Package, ScanLine, Settings, Tags, Trash, Truck, Users, Wallet } from "lucide-react";
 import type { Role } from "@/db/schema";
 import { logout } from "@/lib/actions/auth";
 import { ROLE_LABELS } from "@/lib/permissions";
@@ -16,6 +16,7 @@ const NAV = [
   { href: "/orders", label: "Поръчки", icon: ClipboardList },
   { href: "/shipments", label: "Пратки", icon: Truck },
   { href: "/invoices", label: "Фактури", icon: FileText },
+  { href: "/cash", label: "Каса и банка", icon: Wallet },
   { href: "/movements", label: "Движения", icon: History },
   { href: "/counts", label: "Инвентаризация", icon: ClipboardCheck },
   { href: "/write-offs", label: "Брак", icon: Trash },
@@ -48,15 +49,15 @@ export function Sidebar({
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const linkClass = (href: string) =>
     cn(
-      "flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-      isActive(href) ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-2 hover:text-text",
+      "flex shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+      isActive(href) ? "bg-surface-2 font-medium text-text" : "text-muted hover:bg-surface-2/60 hover:text-text",
     );
 
   return (
-    <aside className="flex w-full min-w-0 shrink-0 flex-col overflow-hidden border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:w-60 md:border-b-0 md:border-r">
-      <div className="flex items-center gap-3 px-5 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-white">
-          <Boxes className="h-5 w-5" />
+    <aside className="flex w-full min-w-0 shrink-0 flex-col overflow-hidden border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:w-56 md:border-b-0 md:border-r">
+      <div className="flex items-center gap-2.5 px-4 py-3.5">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-white">
+          <Boxes className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
           {organizations.length > 1 ? (
@@ -78,7 +79,7 @@ export function Sidebar({
           ) : (
             <div className="truncate text-sm font-semibold leading-tight">{companyName}</div>
           )}
-          <a href={portalUrl} className="block truncate whitespace-nowrap text-xs text-muted hover:text-accent">
+          <a href={portalUrl} className="block truncate whitespace-nowrap text-xs text-muted hover:text-text">
             Инвентар · портал
           </a>
         </div>
@@ -86,21 +87,21 @@ export function Sidebar({
           href="/notifications"
           aria-label={alertCount ? `Известия: ${alertCount}` : "Известия"}
           title="Известия"
-          className={cn("relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors", isActive("/notifications") ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-2 hover:text-text")}
+          className={cn("relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors", isActive("/notifications") ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2 hover:text-text")}
         >
           <Bell className="h-4 w-4" />
           {alertCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-medium leading-none text-white tabular-nums">
               {alertCount > 99 ? "99+" : alertCount}
             </span>
           )}
         </Link>
       </div>
 
-      <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:overflow-y-auto md:pb-0">
+      <nav className="flex gap-0.5 overflow-x-auto px-2 pb-3 md:flex-1 md:flex-col md:overflow-y-auto md:pb-0">
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} className={linkClass(href)}>
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4" strokeWidth={1.75} />
             {label}
           </Link>
         ))}
@@ -114,7 +115,7 @@ export function Sidebar({
         </button>
       </nav>
 
-      <div className="hidden border-t border-line p-3 md:block">
+      <div className="hidden border-t border-line p-2 md:block">
         <Link href="/settings" className={linkClass("/settings")}>
           <Settings className="h-4 w-4" />
           Настройки
@@ -123,18 +124,18 @@ export function Sidebar({
           <CircleHelp className="h-4 w-4" />
           Помощ
         </Link>
-        <div className="mt-2 flex items-center gap-2.5 px-3 py-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-muted">
+        <div className="mt-1 flex items-center gap-2.5 px-2.5 py-2">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-xs font-medium text-muted">
             {userName.slice(0, 1).toUpperCase()}
           </div>
-          <Link href="/profile" className="min-w-0 flex-1 rounded-md hover:text-accent" title="Профил">
+          <Link href="/profile" className="min-w-0 flex-1 rounded-md hover:text-text" title="Профил">
             <div className="truncate text-sm font-medium">{userName}</div>
             <div className="flex items-center gap-1 text-xs text-muted">
               <Building2 className="h-3 w-3" />
               {ROLE_LABELS[role]}
             </div>
           </Link>
-          <button type="button" onClick={() => void logout()} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-text" aria-label="Изход" title="Изход">
+          <button type="button" onClick={() => void logout()} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-text" aria-label="Изход" title="Изход">
             <LogOut className="h-4 w-4" />
           </button>
         </div>

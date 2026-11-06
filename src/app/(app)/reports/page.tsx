@@ -43,6 +43,9 @@ export default async function ReportsPage() {
                 За счетоводителя
               </ButtonLink>
             )}
+            <ButtonLink href="/reports/balances" variant="secondary">
+              Салда по партньори
+            </ButtonLink>
             {can(ctx.role, "write") && (
               <ButtonLink href="/reports/cod" variant="secondary">
                 Наложени платежи

@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     <>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Табло</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Табло</h1>
           <p className="mt-1 text-sm text-muted first-letter:uppercase">{format(new Date(), "EEEE, d MMMM yyyy", { locale: LOCALE })}</p>
         </div>
         {writable && (

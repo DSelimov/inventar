@@ -110,7 +110,7 @@ export function OrderForm({
 
   return (
     <Form action={action} className="space-y-6">
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Поръчка</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Тип">
@@ -182,7 +182,7 @@ export function OrderForm({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold">Редове</h2>
           <span className="text-xs text-muted tabular-nums">

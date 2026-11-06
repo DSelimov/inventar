@@ -40,7 +40,7 @@ export function ItemForm({
 
   return (
     <Form action={action} className="space-y-6">
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Основни данни</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Име" className="sm:col-span-2">
@@ -81,7 +81,7 @@ export function ItemForm({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Наличност и цени</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {!item && (
@@ -152,7 +152,7 @@ export function ItemForm({
       </section>
 
       {category && category.fields.length > 0 && (
-        <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-1 text-sm font-semibold">Данни за „{category.name}“</h2>
           <p className="mb-4 text-xs text-muted">Полета, дефинирани за тази категория.</p>
           <div className="grid gap-4 sm:grid-cols-2">

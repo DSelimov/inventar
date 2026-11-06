@@ -102,7 +102,7 @@ export default async function ProfilePage() {
           />
           <CardBody className="space-y-4">
             {recoveryCodes && (
-              <div className="rounded-xl border border-warning/40 bg-warning-soft p-4">
+              <div className="rounded-lg border border-warning/40 bg-warning-soft p-4">
                 <p className="text-sm font-medium text-warning">Кодове за възстановяване — запишете ги сега, няма да се покажат отново.</p>
                 <p className="mt-1 text-xs text-warning">Всеки код влиза веднъж, ако нямате достъп до телефона.</p>
                 <ul className="mt-3 grid grid-cols-2 gap-1 font-mono text-sm" data-recovery-codes>

@@ -668,7 +668,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
 function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "danger" }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <div className="rounded-lg border border-line bg-surface p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
       <div className={`mt-1 text-xl font-semibold tabular-nums ${tone === "danger" ? "text-danger" : ""}`}>{value}</div>
       {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}

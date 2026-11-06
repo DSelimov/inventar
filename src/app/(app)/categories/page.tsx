@@ -30,7 +30,7 @@ export default async function CategoriesPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {categories.map((c) => (
-                <Link key={c.id} href={`/categories/${c.id}`} className="group rounded-2xl border border-line bg-surface p-5 shadow-sm transition-colors hover:border-accent/40">
+                <Link key={c.id} href={`/categories/${c.id}`} className="group rounded-lg border border-line bg-surface p-5 transition-colors hover:border-accent/40">
                   <div className="flex items-center gap-3">
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: c.color }} />
                     <h2 className="font-semibold group-hover:text-accent">{c.name}</h2>

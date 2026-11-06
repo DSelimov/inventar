@@ -293,7 +293,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <div className="rounded-lg border border-line bg-surface p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
       {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}

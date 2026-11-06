@@ -59,7 +59,7 @@ export default async function SettingsPage() {
             )}
           </Form>
           {ctx.org.currency === "BGN" && (
-            <Form action={convertToEuro} className="mt-4 space-y-2 rounded-xl bg-warning-soft p-4 text-sm">
+            <Form action={convertToEuro} className="mt-4 space-y-2 rounded-lg bg-warning-soft p-4 text-sm">
               <p className="font-medium text-warning">От 1 януари 2026 г. България е в еврозоната.</p>
               <p className="text-muted">
                 Превалутирането преизчислява всички цени и поръчки по курс 1 € = 1,95583 лв. Продажните цени се закръглят до стотинка,

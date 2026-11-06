@@ -160,7 +160,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <div className="rounded-lg border border-line bg-surface p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
     </div>

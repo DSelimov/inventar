@@ -19,7 +19,7 @@ export function PageHeader({
   help?: string;
 }) {
   return (
-    <div className="mb-6">
+    <div className="mb-5">
       {back && (
         <Link href={back.href} className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-text">
           <ChevronLeft className="h-3.5 w-3.5" />
@@ -29,11 +29,11 @@ export function PageHeader({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {eyebrow && <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">{eyebrow}</div>}
-          <h1 className="flex items-center gap-2 truncate text-2xl font-semibold tracking-tight">
+          <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-tight">
             {title}
             {help && (
-              <Link href={`/help/${help}`} target="_blank" className="text-muted hover:text-accent" aria-label="Помощ за тази страница" title="Помощ">
-                <CircleHelp className="h-5 w-5" />
+              <Link href={`/help/${help}`} target="_blank" className="text-muted/70 hover:text-text" aria-label="Помощ за тази страница" title="Помощ">
+                <CircleHelp className="h-4 w-4" />
               </Link>
             )}
           </h1>

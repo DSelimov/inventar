@@ -50,7 +50,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       />
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <div className="flex w-fit gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+        <div className="flex w-fit gap-1 rounded-lg border border-line bg-surface p-1">
           {[
             ["all", "Всички"],
             ["purchase", "Доставки"],
@@ -61,7 +61,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             </Link>
           ))}
         </div>
-        <div className="flex w-fit flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+        <div className="flex w-fit flex-wrap gap-1 rounded-lg border border-line bg-surface p-1">
           {(["all", ...ORDER_STATUSES] as const).map((v) => (
             <Link key={v} href={href(type, v)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", status === v ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}>
               {v === "all" ? "Всички статуси" : label(v)}

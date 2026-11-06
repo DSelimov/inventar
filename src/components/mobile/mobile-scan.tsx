@@ -183,7 +183,7 @@ export function MobileScan({ orgName }: { orgName: string }) {
 
       <div className="grid grid-cols-3 gap-2">
         {modes.map((m) => (
-          <button key={m.key} type="button" onClick={() => setMode(m.key)} className={cn("flex flex-col items-center gap-1 rounded-2xl py-4 text-sm font-semibold transition", mode === m.key ? m.tone : "bg-surface text-muted ring-1 ring-line")}>
+          <button key={m.key} type="button" onClick={() => setMode(m.key)} className={cn("flex flex-col items-center gap-1 rounded-lg py-4 text-sm font-semibold transition", mode === m.key ? m.tone : "bg-surface text-muted ring-1 ring-line")}>
             <m.icon className="h-6 w-6" />
             {m.label}
           </button>
@@ -212,7 +212,7 @@ export function MobileScan({ orgName }: { orgName: string }) {
         <Input value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="decimal" aria-label="Количество" className="h-12 text-center text-lg font-semibold" />
       </div>
 
-      <div className="rounded-2xl bg-surface p-3 ring-1 ring-line">
+      <div className="rounded-lg bg-surface p-3 ring-1 ring-line">
         <Scanner continuous hideInput onCode={enqueue} />
         {/* Bluetooth/USB скенерът пише като клавиатура и завършва с Enter */}
         <form
@@ -232,7 +232,7 @@ export function MobileScan({ orgName }: { orgName: string }) {
 
       <ul className="space-y-1.5">
         {log.map((l) => (
-          <li key={l.id} className={cn("rounded-xl px-3 py-2 text-sm", l.ok === false ? "bg-danger-soft text-danger" : l.ok ? "bg-success-soft text-success" : "bg-surface text-muted ring-1 ring-line")}>
+          <li key={l.id} className={cn("rounded-lg px-3 py-2 text-sm", l.ok === false ? "bg-danger-soft text-danger" : l.ok ? "bg-success-soft text-success" : "bg-surface text-muted ring-1 ring-line")}>
             <div className="font-medium">{l.label}</div>
             <div className="text-xs">{l.message}</div>
           </li>

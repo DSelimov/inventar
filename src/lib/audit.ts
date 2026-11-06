@@ -69,4 +69,6 @@ export const ENTITY_LABELS: Record<string, string> = {
   price_group: "Ценова група",
   item_prices: "Цени по групи",
   prices_bulk: "Смяна на цени",
+  cash_account: "Каса / сметка",
+  cash_entry: "Касов запис",
 };

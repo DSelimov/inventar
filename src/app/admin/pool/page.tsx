@@ -27,7 +27,7 @@ export default async function PoolPage() {
         description="Предварително създадени бази за режим manual (споделен хостинг без CREATE DATABASE): всяка нова организация получава първата свободна."
       />
       {mode !== "manual" && (
-        <p className="mb-4 rounded-xl bg-accent-soft px-4 py-2 text-sm text-accent">
+        <p className="mb-4 rounded-lg bg-accent-soft px-4 py-2 text-sm text-accent">
           Текущият режим е <strong>{mode}</strong>: новите организации получават база чрез CREATE DATABASE и пулът не се използва.
         </p>
       )}
