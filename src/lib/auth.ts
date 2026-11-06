@@ -104,7 +104,7 @@ export async function clearTwoFactor() {
 // ------------------------------------------------------------------- session
 export type SessionInfo = {
   user: User;
-  memberships: Array<{ organizationId: number; role: Role; organization: Organization }>;
+  memberships: Array<{ organizationId: number; role: Role; organization: Organization; locationIds: number[] | null; hideCosts: boolean }>;
 };
 
 /** Влезлият потребител и организациите му, независимо от поддомейна. */
@@ -117,7 +117,7 @@ export const getSession = cache(async (): Promise<SessionInfo | null> => {
   const [user] = await controlDb.select().from(users).where(eq(users.id, session.userId)).limit(1);
   if (!user) return null;
   const rows = await controlDb
-    .select({ organizationId: memberships.organizationId, role: memberships.role, organization: organizations })
+    .select({ organizationId: memberships.organizationId, role: memberships.role, organization: organizations, locationIds: memberships.locationIds, hideCosts: memberships.hideCosts })
     .from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
     .where(eq(memberships.userId, user.id));
@@ -125,12 +125,25 @@ export const getSession = cache(async (): Promise<SessionInfo | null> => {
 });
 
 // ------------------------------------------------------------------- context
-export type Context = SessionInfo & {
+export type Context = Omit<SessionInfo, "user"> & {
+  /** Потребителят; locations — ограничението по локации (минава към applyMovement като actor). */
+  user: User & { locations: number[] | null };
   org: Organization;
   role: Role;
   /** Базата на текущата организация. */
   db: TenantDb;
+  /** Локациите, до които има достъп; null = всички. */
+  locations: number[] | null;
+  /** Без доставни цени и стойност на склада. */
+  hideCosts: boolean;
 };
+
+/** Ограниченията важат за мениджър, служител и „само четене“; собственикът и администраторът виждат всичко. */
+function scoped(session: SessionInfo, org: Organization, m: SessionInfo["memberships"][number]): Context {
+  const full = m.role === "owner" || m.role === "admin";
+  const locations = full || !m.locationIds?.length ? null : m.locationIds;
+  return { ...session, user: { ...session.user, locations }, org, role: m.role, db: getTenantDb(org), locations, hideCosts: !full && m.hideCosts };
+}
 
 /**
  * Потребител + организация според поддомейна. null ако няма сесия, няма поддомейн,
@@ -141,7 +154,7 @@ export const getContext = cache(async (): Promise<Context | null> => {
   if (!session || !org) return null;
   const m = session.memberships.find((x) => x.organizationId === org.id);
   if (!m) return null;
-  return { ...session, org, role: m.role, db: getTenantDb(org) };
+  return scoped(session, org, m);
 });
 
 /** Пренасочва към вход/портал при липса на достъп; хвърля при недостатъчна роля. */
@@ -153,7 +166,7 @@ export async function requireContext(level: Level = "read"): Promise<Context> {
   const m = session.memberships.find((x) => x.organizationId === org.id);
   if (!m) redirect(rootUrl("/portal?denied=" + encodeURIComponent(org.subdomain)));
   if (!can(m.role, level)) throw new UserError("Нямате права за това действие.");
-  return { ...session, org, role: m.role, db: getTenantDb(org) };
+  return scoped(session, org, m);
 }
 
 export async function findMembership(userId: number, organizationId: number) {
@@ -177,4 +190,9 @@ export function suggestSubdomain(name: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
+}
+
+/** Страници и файлове с доставни цени, себестойност и марж: потребител със „скрити доставни цени“ се връща в началото. */
+export function requireCostAccess(ctx: Pick<Context, "hideCosts">) {
+  if (ctx.hideCosts) redirect("/");
 }

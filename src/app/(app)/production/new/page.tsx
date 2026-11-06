@@ -14,7 +14,7 @@ import { lineTotal, sumMoney } from "@/lib/money";
 import { param, type SearchParams } from "@/lib/paging";
 import { planProduction } from "@/lib/production";
 import { parseQuantity } from "@/lib/quantity";
-import { listLocations, listRecipes } from "@/lib/queries";
+import { listLocationsFor, listRecipes } from "@/lib/queries";
 import { cn, formatMoney, formatNumber } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Ново производство" };
@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Ново производство" }
 export default async function NewProductionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext("write");
   const sp = await searchParams;
-  const [recipes, locations] = await Promise.all([listRecipes(ctx.db), listLocations(ctx.db)]);
+  const [recipes, locations] = await Promise.all([listRecipes(ctx.db), listLocationsFor(ctx)]);
   const recipeId = Number(param(sp, "recipe")) || recipes[0]?.id;
   const kind = param(sp, "kind") === "disassembly" ? "disassembly" : "assembly";
   const locationId = Number(param(sp, "location")) || locations.find((l) => l.isDefault)?.id || locations[0]?.id;

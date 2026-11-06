@@ -14,7 +14,7 @@ import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
 import { MAX_DECIMALS, addQty, parseQuantity, subQty } from "@/lib/quantity";
-import { assertItemQuantities } from "@/lib/stock";
+import { assertItemQuantities, assertLocationAccess } from "@/lib/stock";
 import { getSettings } from "@/lib/settings";
 import { assignVat } from "@/lib/vat-rates";
 
@@ -57,6 +57,7 @@ export const createOrder = act(async (fd: FormData) => {
   await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
+  assertLocationAccess(ctx.user, locationId);
   const { id, number } = await ctx.db.transaction(async (tx) => {
     // ръчно въведен номер или следващият поред (заема се в транзакцията — без дупки)
     const number = str(fd, "number") || (await nextNumber(tx, type));
@@ -97,7 +98,7 @@ export const updateOrder = act(async (id: number, fd: FormData) => {
       .set({
         number: str(fd, "number") || existing.number,
         partnerId: optionalInt(fd, "partnerId"),
-        locationId: optionalInt(fd, "locationId"),
+        locationId: (assertLocationAccess(ctx.user, optionalInt(fd, "locationId")), optionalInt(fd, "locationId")),
         orderDate: optional(fd, "orderDate"),
         expectedDate: optional(fd, "expectedDate"),
         notes: optional(fd, "notes"),

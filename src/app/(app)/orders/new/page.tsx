@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { createOrder } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
 import { peekNumber } from "@/lib/numbering";
-import { listAllItemUnits, listGroupPrices, listItemOptions, listItemSuppliers, listLocations, listPartners, listPriceGroups, listSupplierPrices, listVatRates } from "@/lib/queries";
+import { listAllItemUnits, listGroupPrices, listItemOptions, listItemSuppliers, listLocationsFor, listPartners, listPriceGroups, listSupplierPrices, listVatRates } from "@/lib/queries";
 import { getSettings } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Нова поръчка" };
@@ -13,7 +13,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   const ctx = await requireContext("write");
   const sp = await searchParams;
   const type = sp.type === "sales" ? "sales" : "purchase";
-  const [items, locations, partnersList, number, vatRates, settings, supplierPrices] = await Promise.all([listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), peekNumber(ctx.db, type), listVatRates(ctx.db), getSettings(ctx.db), listSupplierPrices(ctx.db)]);
+  const [items, locations, partnersList, number, vatRates, settings, supplierPrices] = await Promise.all([listItemOptions(ctx.db), listLocationsFor(ctx), listPartners(ctx.db), peekNumber(ctx.db, type), listVatRates(ctx.db), getSettings(ctx.db), listSupplierPrices(ctx.db)]);
   const [packUnits, groupPrices, priceGroups] = await Promise.all([listAllItemUnits(ctx.db), listGroupPrices(ctx.db), listPriceGroups(ctx.db, true)]);
   const priceGroupNames = Object.fromEntries(priceGroups.map((g) => [g.id, g.name]));
   const itemId = Number(sp.item);

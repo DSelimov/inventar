@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Table, TableWrap } from "@/components/ui/table";
 import { bulkChangePrices } from "@/lib/actions/pricing";
-import { requireContext } from "@/lib/auth";
+import { requireContext, requireCostAccess } from "@/lib/auth";
 import { UserError } from "@/lib/errors";
 import { param, type SearchParams } from "@/lib/paging";
 import { previewBulkPrices, readBulkParams, type BulkPriceParams } from "@/lib/price-groups";
@@ -22,6 +22,7 @@ const PREVIEW_ROWS = 200;
 
 export default async function BulkPricesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext("manage");
+  requireCostAccess(ctx);
   const sp = await searchParams;
   const [groups, categories] = await Promise.all([listPriceGroups(ctx.db), listCategories(ctx.db)]);
   const get = (k: string) => param(sp, k) || undefined;

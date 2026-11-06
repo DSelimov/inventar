@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { assertLocationAccess } from "@/lib/stock";
 import { int, optional, str } from "@/lib/forms";
 import { formatMoney } from "@/lib/utils";
 import { MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
@@ -21,6 +22,7 @@ export const createWriteOffAction = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const locationId = int(fd, "locationId", 0);
   if (!locationId) throw new UserError("Изберете локация.");
+  assertLocationAccess(ctx.user, locationId);
   const ids = fd.getAll("lineItemId").map(String);
   const qtys = fd.getAll("lineQuantity").map(String);
   const lotIds = fd.getAll("lineLotId").map(String);

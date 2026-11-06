@@ -3,13 +3,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { WriteOffForm } from "@/components/write-offs/write-off-form";
 import { createWriteOffAction } from "@/lib/actions/write-offs";
 import { requireContext } from "@/lib/auth";
-import { listAvailableLots, listItemOptions, listLocations } from "@/lib/queries";
+import { listAvailableLots, listItemOptions, listLocationsFor } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Нов протокол за брак" };
 
 export default async function NewWriteOffPage({ searchParams }: { searchParams: Promise<{ item?: string }> }) {
   const ctx = await requireContext("write");
-  const [items, locations, lots] = await Promise.all([listItemOptions(ctx.db), listLocations(ctx.db), listAvailableLots(ctx.db)]);
+  const [items, locations, lots] = await Promise.all([listItemOptions(ctx.db), listLocationsFor(ctx), listAvailableLots(ctx.db)]);
   const itemId = Number((await searchParams).item) || undefined;
   return (
     <div className="mx-auto max-w-3xl">

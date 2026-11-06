@@ -16,5 +16,7 @@ export async function GET() {
     ctx.db.select({ id: locations.id, name: locations.name, isDefault: locations.isDefault }).from(locations).where(eq(locations.active, true)),
     ctx.db.select({ id: stockCounts.id, number: stockCounts.number, locationId: stockCounts.locationId }).from(stockCounts).where(eq(stockCounts.status, "open")),
   ]);
-  return NextResponse.json({ items: catalog, packs, locations: locs, counts, role: ctx.role, at: new Date().toISOString() }, { headers: { "Cache-Control": "private, no-store" } });
+  // ограничен потребител вижда само своите обекти
+  const allowed = ctx.locations ? locs.filter((l) => ctx.locations!.includes(l.id)) : locs;
+  return NextResponse.json({ items: catalog, packs, locations: allowed, counts, role: ctx.role, at: new Date().toISOString() }, { headers: { "Cache-Control": "private, no-store" } });
 }

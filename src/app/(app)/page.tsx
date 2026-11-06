@@ -44,6 +44,9 @@ import { formatMoney, formatNumber, LOCALE, todayIso } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Начало" };
 
+/** Плочки, скрити за потребител без достъп до доставните цени. */
+const COST_PAGES = ["/reports", "/items/prices"];
+
 type TileDef = {
   href: string;
   label: string;
@@ -165,11 +168,11 @@ export default async function HomePage() {
   ];
 
   const visible = groups
-    .map((g) => ({ ...g, tiles: g.tiles.filter((t) => !t.level || can(ctx.role, t.level)) }))
+    .map((g) => ({ ...g, tiles: g.tiles.filter((t) => (!t.level || can(ctx.role, t.level)) && !(ctx.hideCosts && COST_PAGES.some((c) => t.href.startsWith(c)))) }))
     .filter((g) => g.tiles.length > 0);
 
   const kpis = [
-    { label: "Стойност на склада", value: formatMoney(c.stockValue, ctx.org.currency), href: "/reports/valuation" },
+    ...(ctx.hideCosts ? [] : [{ label: "Стойност на склада", value: formatMoney(c.stockValue, ctx.org.currency), href: "/reports/valuation" }]),
     { label: "Отворени поръчки", value: formatNumber(c.openOrders), href: "/orders" },
     { label: "Очаквани пратки", value: formatNumber(openShipments), href: "/shipments" },
     { label: "Известия", value: formatNumber(alerts.total), href: "/notifications" },

@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { Field, Input, Select } from "@/components/ui/fields";
+import { Checkbox, Field, Input, Select } from "@/components/ui/fields";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Table } from "@/components/ui/table";
 import { ROLES } from "@/db/control-schema";
-import { addMember, changeRole, removeMember, resendInvite } from "@/lib/actions/members";
+import { addMember, changeRole, removeMember, resendInvite, setMemberScope } from "@/lib/actions/members";
+import { listLocations } from "@/lib/queries";
 import { requireContext } from "@/lib/auth";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/permissions";
 import { listMembers } from "@/lib/members";
@@ -21,7 +22,8 @@ export const metadata: Metadata = { title: "Потребители" };
 
 export default async function UsersPage() {
   const ctx = await requireContext("manage");
-  const members = await listMembers(ctx.org.id);
+  const [members, locations] = await Promise.all([listMembers(ctx.org.id), listLocations(ctx.db)]);
+  const locationName = (id: number) => locations.find((l) => l.id === id)?.name ?? `#${id}`;
   const assignable = ROLES.filter((r) => r !== "owner" || ctx.role === "owner");
 
   return (
@@ -46,6 +48,26 @@ export default async function UsersPage() {
                     {isPendingInvite(m.user) && <Badge tone="warning">Поканен</Badge>}
                   </div>
                   <div className="text-xs text-muted">{m.user.email}</div>
+                  {m.role !== "owner" && m.role !== "admin" && (
+                    <details className="mt-1.5 text-xs">
+                      <summary className="cursor-pointer text-accent">
+                        {m.locationIds?.length ? `Само: ${m.locationIds.map(locationName).join(", ")}` : "Всички локации"}
+                        {m.hideCosts ? " · без доставни цени" : ""}
+                      </summary>
+                      <Form action={setMemberScope.bind(null, m.id)} className="mt-2 space-y-2 rounded-md border border-line p-3">
+                        <div className="font-medium text-muted">Локации (нищо избрано = всички)</div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {locations.map((l) => (
+                            <Checkbox key={l.id} name="locationIds" value={l.id} defaultChecked={m.locationIds?.includes(l.id) ?? false} label={l.name} />
+                          ))}
+                        </div>
+                        <Checkbox name="hideCosts" value="1" defaultChecked={m.hideCosts} label="Скрий доставните цени, себестойността и стойността на склада" />
+                        <SubmitButton variant="secondary" size="sm">
+                          Запази достъпа
+                        </SubmitButton>
+                      </Form>
+                    </details>
+                  )}
                 </td>
                 <td>
                   {m.userId === ctx.user.id || (m.role === "owner" && ctx.role !== "owner") ? (

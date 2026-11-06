@@ -8,6 +8,12 @@ const countExpr = () => n(sql<number>`count(*)`);
 type Where = ReturnType<typeof and>;
 
 // ------------------------------------------------------------------ locations
+/** Локациите, достъпни за потребителя (ограничение по обект от Настройки › Потребители). */
+export async function listLocationsFor(ctx: { db: Db; locations: number[] | null }, includeInactive = false) {
+  const all = await listLocations(ctx.db, includeInactive);
+  return ctx.locations ? all.filter((l) => ctx.locations!.includes(l.id)) : all;
+}
+
 export async function listLocations(db: Db, includeInactive = false) {
   return db
     .select()

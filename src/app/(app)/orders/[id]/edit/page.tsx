@@ -4,7 +4,7 @@ import { OrderForm } from "@/components/orders/order-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateOrder } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
-import { getOrder, listAllItemUnits, listGroupPrices, listItemOptions, listLocations, listPartners, listPriceGroups, listSupplierPrices, listVatRates } from "@/lib/queries";
+import { getOrder, listAllItemUnits, listGroupPrices, listItemOptions, listLocationsFor, listPartners, listPriceGroups, listSupplierPrices, listVatRates } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Редакция на поръчка" };
 
@@ -12,7 +12,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
   const ctx = await requireContext("write");
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [order, items, locations, partnersList, vatRates, supplierPrices] = await Promise.all([getOrder(ctx.db, id), listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), listVatRates(ctx.db), listSupplierPrices(ctx.db)]);
+  const [order, items, locations, partnersList, vatRates, supplierPrices] = await Promise.all([getOrder(ctx.db, id), listItemOptions(ctx.db), listLocationsFor(ctx), listPartners(ctx.db), listVatRates(ctx.db), listSupplierPrices(ctx.db)]);
   const [packUnits, groupPrices, priceGroups] = await Promise.all([listAllItemUnits(ctx.db), listGroupPrices(ctx.db), listPriceGroups(ctx.db, true)]);
   const priceGroupNames = Object.fromEntries(priceGroups.map((g) => [g.id, g.name]));
   if (!order) notFound();

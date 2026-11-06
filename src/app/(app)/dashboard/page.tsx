@@ -79,7 +79,7 @@ export default async function DashboardPage() {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Активни артикули" value={formatNumber(totals.itemCount)} hint={`${formatNumber(totals.totalUnits)} единици`} icon={Boxes} tone="accent" />
-        <StatCard label="Стойност на склада" value={money(totals.stockValue)} hint={`Продажна ${money(totals.retailValue)}`} icon={Coins} tone="success" />
+        {!ctx.hideCosts && <StatCard label="Стойност на склада" value={money(totals.stockValue)} hint={`Продажна ${money(totals.retailValue)}`} icon={Coins} tone="success" />}
         <StatCard
           label="Ниска наличност"
           value={formatNumber(totals.lowStock)}
@@ -211,7 +211,7 @@ export default async function DashboardPage() {
                     {l.name}
                   </Link>
                   <span className="text-xs text-muted tabular-nums">{formatNumber(l.units)} ед.</span>
-                  <span className="tabular-nums">{money(l.value)}</span>
+                  {!ctx.hideCosts && <span className="tabular-nums">{money(l.value)}</span>}
                 </li>
               ))}
             </ul>
@@ -234,6 +234,7 @@ export default async function DashboardPage() {
             </Card>
           )}
 
+          {!ctx.hideCosts && (
           <Card>
             <CardHeader title="Стойност по категория" description="По доставна цена." />
             {byCategory.length === 0 ? (
@@ -254,6 +255,7 @@ export default async function DashboardPage() {
               </CardBody>
             )}
           </Card>
+          )}
         </div>
       </div>
     </>

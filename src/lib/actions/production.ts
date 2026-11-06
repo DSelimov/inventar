@@ -6,6 +6,7 @@ import { PRODUCTION_KINDS, productions, recipes } from "@/db/tenant-schema";
 import { act, redirectWith } from "@/lib/action";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { assertLocationAccess } from "@/lib/stock";
 import { UserError } from "@/lib/errors";
 import { bool, int, oneOf, optional, required, str } from "@/lib/forms";
 import { runProduction, saveRecipe } from "@/lib/production";
@@ -62,6 +63,7 @@ export const deleteRecipe = act(async (id: number) => {
 export const runProductionAction = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const kind = oneOf(fd, "kind", PRODUCTION_KINDS, "assembly");
+  assertLocationAccess(ctx.user, int(fd, "location"));
   const r = await runProduction(ctx.db, ctx.user, {
     recipeId: int(fd, "recipe"),
     kind,

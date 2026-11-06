@@ -13,7 +13,7 @@ import { emit } from "@/lib/webhooks";
 import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { MAX_DECIMALS, parseQuantity } from "@/lib/quantity";
-import { assertItemQuantities } from "@/lib/stock";
+import { assertItemQuantities, assertLocationAccess } from "@/lib/stock";
 import { parseMoney } from "@/lib/money";
 
 function revalidate(id?: number) {
@@ -73,6 +73,7 @@ async function readShipment(db: Db, fd: FormData) {
 export const createShipment = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const data = await readShipment(ctx.db, fd);
+  assertLocationAccess(ctx.user, data.locationId);
   const lines = readLines(fd);
   await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към пратката.");
@@ -94,6 +95,7 @@ export const updateShipment = act(async (id: number, fd: FormData) => {
   const existing = await ctx.db.query.shipments.findFirst({ where: eq(shipments.id, id) });
   if (!existing) throw new UserError("Пратката не е намерена.");
   const data = await readShipment(ctx.db, fd);
+  assertLocationAccess(ctx.user, data.locationId);
   const lines = readLines(fd);
   await assertItemQuantities(ctx.db, lines);
   const editable = existing.status === "pending" || existing.status === "in_transit";

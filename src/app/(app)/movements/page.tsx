@@ -11,7 +11,7 @@ import { Table, TableWrap } from "@/components/ui/table";
 import { MOVEMENT_TYPES, type MovementType } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { pageParam, param, type SearchParams } from "@/lib/paging";
-import { listLocations, listMovementUsers, pageMovements } from "@/lib/queries";
+import { listLocationsFor, listMovementUsers, pageMovements } from "@/lib/queries";
 import { formatDateTime, formatNumber, label } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Движения" };
@@ -31,7 +31,7 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
     to: isDate(param(sp, "to")),
     userId: positive(param(sp, "user")),
   };
-  const [{ rows, total, page, pageSize }, locations, users] = await Promise.all([pageMovements(ctx.db, filters, pageParam(sp)), listLocations(ctx.db, true), listMovementUsers(ctx.db)]);
+  const [{ rows, total, page, pageSize }, locations, users] = await Promise.all([pageMovements(ctx.db, filters, pageParam(sp)), listLocationsFor(ctx, true), listMovementUsers(ctx.db)]);
   const filtered = Object.values(filters).some((v) => v !== undefined);
   const forItem = filters.itemId ? (rows[0]?.item ?? null) : null;
 

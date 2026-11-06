@@ -4,7 +4,7 @@ import { ShipmentForm } from "@/components/shipments/shipment-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateShipment } from "@/lib/actions/shipments";
 import { requireContext } from "@/lib/auth";
-import { getShipment, listAllItemUnits, listAvailableLots, listItemOptions, listLocations, listPartners } from "@/lib/queries";
+import { getShipment, listAllItemUnits, listAvailableLots, listItemOptions, listLocationsFor, listPartners } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Редакция на пратка" };
 
@@ -15,7 +15,7 @@ export default async function EditShipmentPage({ params }: { params: Promise<{ i
   const [shipment, items, locations, partners, lots] = await Promise.all([
     getShipment(ctx.db, id),
     listItemOptions(ctx.db),
-    listLocations(ctx.db),
+    listLocationsFor(ctx),
     listPartners(ctx.db),
     listAvailableLots(ctx.db),
   ]);

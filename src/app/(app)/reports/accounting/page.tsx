@@ -8,7 +8,7 @@ import { FilterBar } from "@/components/ui/search-form";
 import { Table } from "@/components/ui/table";
 import { purchasesList, RATES, salesJournal } from "@/lib/accounting";
 import { SALES_COLUMNS } from "@/lib/accounting-export";
-import { requireContext } from "@/lib/auth";
+import { requireContext, requireCostAccess } from "@/lib/auth";
 import { localTodayIso } from "@/lib/dates";
 import { param, type SearchParams } from "@/lib/paging";
 import { formatDate, formatMoney } from "@/lib/utils";
@@ -23,6 +23,7 @@ const monthEnd = (iso: string) => {
 
 export default async function AccountingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext("write");
+  requireCostAccess(ctx);
   const sp = await searchParams;
   // по подразбиране — предишният месец (обичайното предаване на документите)
   const today = localTodayIso();

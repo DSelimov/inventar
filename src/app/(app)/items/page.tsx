@@ -13,7 +13,7 @@ import { requireContext } from "@/lib/auth";
 import { imageUrl, primaryImages } from "@/lib/item-images";
 import { can } from "@/lib/permissions";
 import { pageParam } from "@/lib/paging";
-import { listCategories, listLocations, pageItems } from "@/lib/queries";
+import { listCategories, listLocationsFor, pageItems } from "@/lib/queries";
 import { formatDate, formatMoney, formatNumber, isLowStock, plural } from "@/lib/utils";
 import { lineTotal } from "@/lib/money";
 
@@ -35,7 +35,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   const [{ rows, total, page, pageSize }, categories, locations] = await Promise.all([
     pageItems(ctx.db, { q, categoryId, status, low, locationId }, pageParam(sp)),
     listCategories(ctx.db),
-    listLocations(ctx.db),
+    listLocationsFor(ctx),
   ]);
   const photos = await primaryImages(ctx.db, [...new Set(rows.flatMap((r) => (r.parentId ? [r.id, r.parentId] : [r.id])))]);
   const labelQuery = new URLSearchParams(Object.entries({ q, category: categoryId ? String(categoryId) : "", location: locationId ? String(locationId) : "", status, low: low ? "1" : "" }).filter(([, v]) => v)).toString();
@@ -123,8 +123,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                 <th>Категория</th>
                 <th className="text-right">Наличност</th>
                 {multiLocation && <th>По локации</th>}
-                <th className="text-right">Доставна цена</th>
-                <th className="text-right">Стойност</th>
+                {!ctx.hideCosts && <th className="text-right">Доставна цена</th>}
+                {!ctx.hideCosts && <th className="text-right">Стойност</th>}
                 <th>Обновен</th>
               </tr>
             </thead>
@@ -178,8 +178,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                           .join(" · ") || "—"}
                       </td>
                     )}
-                    <td className="text-right tabular-nums text-muted">{formatMoney(item.unitCost, ctx.org.currency)}</td>
-                    <td className="text-right tabular-nums font-medium">{formatMoney(lineTotal(item.quantity, item.unitCost), ctx.org.currency)}</td>
+                    {!ctx.hideCosts && <td className="text-right tabular-nums text-muted">{formatMoney(item.unitCost, ctx.org.currency)}</td>}
+                    {!ctx.hideCosts && <td className="text-right tabular-nums font-medium">{formatMoney(lineTotal(item.quantity, item.unitCost), ctx.org.currency)}</td>}
                     <td className="text-muted">{formatDate(item.updatedAt)}</td>
                   </tr>
                 );

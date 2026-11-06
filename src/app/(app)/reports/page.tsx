@@ -9,7 +9,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { Coins, PackageMinus, RefreshCw, TrendingUp } from "lucide-react";
-import { requireContext } from "@/lib/auth";
+import { requireContext, requireCostAccess } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { buildReports } from "@/lib/reports";
 import { getSettings } from "@/lib/settings";
@@ -20,6 +20,7 @@ export const metadata: Metadata = { title: "Отчети" };
 
 export default async function ReportsPage() {
   const ctx = await requireContext();
+  requireCostAccess(ctx);
   const settings = await getSettings(ctx.db);
   const r = await buildReports(ctx.db, settings);
   const money = (v: number) => formatMoney(v, ctx.org.currency);

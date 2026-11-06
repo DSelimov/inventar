@@ -14,7 +14,7 @@ import { adjustStock, createVariant, deleteItem, transfer } from "@/lib/actions/
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
-import { getItem, getItemGroupPrices, listItemSuppliers, listItemUnits, listLocations, listPartners, listPriceChanges, listPriceGroups } from "@/lib/queries";
+import { getItem, getItemGroupPrices, listItemSuppliers, listItemUnits, listLocationsFor, listPartners, listPriceChanges, listPriceGroups } from "@/lib/queries";
 import { saveItemGroupPrices } from "@/lib/actions/pricing";
 import { addItemUnit, removeItemUnit } from "@/lib/actions/item-units";
 import { removeItemSupplier, saveItemSupplier } from "@/lib/actions/item-suppliers";
@@ -33,13 +33,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [item, locations, ownImages, suppliers, partnerOptions, packUnits] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier"), listItemUnits(ctx.db, id)]);
+  const [item, locations, ownImages, suppliers, partnerOptions, packUnits] = await Promise.all([getItem(ctx.db, id), listLocationsFor(ctx), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier"), listItemUnits(ctx.db, id)]);
   const [priceGroups, groupPrices, priceHistory] = await Promise.all([listPriceGroups(ctx.db), getItemGroupPrices(ctx.db, id), listPriceChanges(ctx.db, id, 10)]);
   if (!item) notFound();
   const images = ownImages.length || !item.parentId ? ownImages : await listItemImages(ctx.db, item.parentId);
 
   const currency = ctx.org.currency;
   const writable = can(ctx.role, "write");
+  const hideCosts = ctx.hideCosts;
   const low = isLowStock(item);
   const values = new Map(item.fieldValues.map((v) => [v.fieldId, v.value]));
   const fields = item.category?.fields ?? [];
@@ -91,7 +92,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Обща наличност" value={`${formatNumber(item.quantity)} ${item.unit}`} tone={low ? "danger" : undefined} />
         <Stat label="Минимум" value={item.minQuantity > 0 ? `${formatNumber(item.minQuantity)} ${item.unit}` : "—"} />
-        <Stat label="Стойност на склад" value={formatMoney(lineTotal(item.quantity, item.unitCost), currency)} hint={`${formatMoney(item.unitCost, currency)} / ${item.unit}`} />
+        {!hideCosts && <Stat label="Стойност на склад" value={formatMoney(lineTotal(item.quantity, item.unitCost), currency)} hint={`${formatMoney(item.unitCost, currency)} / ${item.unit}`} />}
         <Stat label="Продажна стойност" value={formatMoney(lineTotal(item.quantity, item.unitPrice), currency)} hint={`${formatMoney(item.unitPrice, currency)} / ${item.unit}`} />
       </div>
 
@@ -104,7 +105,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 <tr>
                   <th>Локация</th>
                   <th className="text-right">Количество</th>
-                  <th className="text-right">Стойност</th>
+                  {!hideCosts && <th className="text-right">Стойност</th>}
                 </tr>
               </thead>
               <tbody>
@@ -118,7 +119,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                       <td className="text-right tabular-nums">
                         {formatNumber(lvl?.quantity ?? 0)} {item.unit}
                       </td>
-                      <td className="text-right tabular-nums text-muted">{formatMoney(lineTotal(lvl?.quantity ?? 0, item.unitCost), currency)}</td>
+                      {!hideCosts && <td className="text-right tabular-nums text-muted">{formatMoney(lineTotal(lvl?.quantity ?? 0, item.unitCost), currency)}</td>}
                     </tr>
                   );
                 })}
@@ -209,9 +210,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                     <Field label="Код (по избор)">
                       <Input name="sku" className="font-mono" placeholder={`${item.sku}-…`} />
                     </Field>
-                    <Field label="Доставна">
-                      <Input name="unitCost" type="number" step="0.01" min={0} defaultValue={item.unitCost} />
-                    </Field>
+                    {!hideCosts && (
+                      <Field label="Доставна">
+                        <Input name="unitCost" type="number" step="0.01" min={0} defaultValue={item.unitCost} />
+                      </Field>
+                    )}
                     <Field label="Продажна">
                       <Input name="unitPrice" type="number" step="0.01" min={0} defaultValue={item.unitPrice} />
                     </Field>
@@ -344,9 +347,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   <Field label="Количество">
                     <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} required placeholder="0" />
                   </Field>
-                  <Field label="Доставна цена (при приход)" hint={`Празно = текущата средна (${formatMoney(item.unitCost, currency)}).`}>
-                    <Input name="unitCost" type="number" min={0} step="0.0001" placeholder={String(item.unitCost)} />
-                  </Field>
+                  {!hideCosts && (
+                    <Field label="Доставна цена (при приход)" hint={`Празно = текущата средна (${formatMoney(item.unitCost, currency)}).`}>
+                      <Input name="unitCost" type="number" min={0} step="0.0001" placeholder={String(item.unitCost)} />
+                    </Field>
+                  )}
                   {tracked && (
                     <>
                       <Field label={item.tracking === "serial" ? "Серийни номера (при приход)" : "Партида № (при приход)"} hint={item.tracking === "serial" ? "Разделени със запетая." : undefined}>
@@ -485,10 +490,12 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   <dt className="text-xs text-muted">На дребно</dt>
                   <dd className="font-semibold tabular-nums">{formatMoney(item.unitPrice, ctx.org.currency)}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs text-muted">Доставна</dt>
-                  <dd className="font-semibold tabular-nums">{formatMoney(item.unitCost, ctx.org.currency)}</dd>
-                </div>
+                {!hideCosts && (
+                  <div>
+                    <dt className="text-xs text-muted">Доставна</dt>
+                    <dd className="font-semibold tabular-nums">{formatMoney(item.unitCost, ctx.org.currency)}</dd>
+                  </div>
+                )}
               </dl>
               {priceGroups.length > 0 ? (
                 <Form action={saveItemGroupPrices.bind(null, id)} className="space-y-2">
@@ -531,7 +538,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 <div>
                   <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">История на цените</div>
                   <ul className="space-y-1.5">
-                    {priceHistory.map((h) => (
+                    {priceHistory.filter((h) => !hideCosts || h.target !== "cost").map((h) => (
                       <li key={h.id} className="flex items-baseline justify-between gap-2 text-xs">
                         <span className="min-w-0 truncate">
                           <span className="font-medium">{h.target === "retail" ? "Дребно" : h.target === "cost" ? "Доставна" : (h.priceGroup?.name ?? "Група")}</span>
@@ -564,7 +571,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                       </Badge>
                     )}
                     <div className="text-xs text-muted">
-                      {[s.supplierSku && `код ${s.supplierSku}`, s.purchasePrice !== null && formatMoney(s.purchasePrice, currency), s.minOrderQuantity && `мин. ${formatNumber(s.minOrderQuantity)} ${item.unit}`, s.leadTimeDays !== null && `${s.leadTimeDays} дни`].filter(Boolean).join(" · ") || "—"}
+                      {[s.supplierSku && `код ${s.supplierSku}`, !hideCosts && s.purchasePrice !== null && formatMoney(s.purchasePrice, currency), s.minOrderQuantity && `мин. ${formatNumber(s.minOrderQuantity)} ${item.unit}`, s.leadTimeDays !== null && `${s.leadTimeDays} дни`].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </div>
                   {writable && (

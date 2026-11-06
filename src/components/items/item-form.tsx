@@ -20,8 +20,11 @@ export function ItemForm({
   cancelHref,
   defaultBarcode,
   vatRates,
+  hideCosts = false,
 }: {
   vatRates: Array<{ id: number; name: string }>;
+  /** Потребителят не вижда доставните цени — полето не се показва (сървърът пази текущата). */
+  hideCosts?: boolean;
   categories: CategoryWithFields[];
   locations: Location[];
   item?: Item;
@@ -134,9 +137,11 @@ export function ItemForm({
               ))}
             </Select>
           </Field>
-          <Field label="Доставна цена" hint={item && item.quantity > 0 ? "Средна от доставките — изчислява се автоматично при всеки приход." : "Колко плащате за единица."}>
-            <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} readOnly={Boolean(item && item.quantity > 0)} />
-          </Field>
+          {!hideCosts && (
+            <Field label="Доставна цена" hint={item && item.quantity > 0 ? "Средна от доставките — изчислява се автоматично при всеки приход." : "Колко плащате за единица."}>
+              <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} readOnly={Boolean(item && item.quantity > 0)} />
+            </Field>
+          )}
           <Field label="Продажна цена" hint="На каква цена продавате (по избор).">
             <Input name="unitPrice" type="number" min={0} step="0.01" defaultValue={item?.unitPrice ?? 0} />
           </Field>

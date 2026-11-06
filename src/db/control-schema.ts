@@ -95,6 +95,10 @@ export const memberships = mysqlTable(
     emailDigest: boolean("email_digest").notNull().default(true),
     /** Последна дата на изпратен дневен имейл — не се изпраща два пъти в един ден. */
     digestSentOn: date("digest_sent_on", { mode: "string" }),
+    /** Локации, до които има достъп (id-та в клиентската база); null = всички. Не важи за собственик и администратор. */
+    locationIds: json("location_ids").$type<number[] | null>(),
+    /** Скрива доставните цени и стойността на склада (служител на щанд). Не важи за собственик и администратор. */
+    hideCosts: boolean("hide_costs").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("memberships_user_org").on(t.userId, t.organizationId)],

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { controlDb } from "@/db/control";
 import { memberships, ROLES, users, type Role, type User } from "@/db/control-schema";
+import { locations } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { destroyAllSessions, destroyOtherSessions, hashPassword, requireContext, verifyPassword, type Context } from "@/lib/auth";
 import { oneOf, required, str } from "@/lib/forms";
@@ -137,3 +138,23 @@ export const setEmailDigest = act(async (fd: FormData) => {
   revalidatePath("/profile");
   return on ? "Ще получавате дневен имейл с известия." : "Дневният имейл е изключен.";
 }, { allowReadOnly: true });
+
+/**
+ * Достъп на член: до кои локации (празно = всички) и дали вижда доставните цени.
+ * Важи за мениджър, служител и „само четене“ — собственикът и администраторът виждат всичко.
+ */
+export const setMemberScope = act(async (membershipId: number, fd: FormData) => {
+  const ctx = await requireContext("manage");
+  const [m] = await controlDb.select().from(memberships).where(and(eq(memberships.id, membershipId), eq(memberships.organizationId, ctx.org.id))).limit(1);
+  if (!m) throw new UserError("Членството не е намерено.");
+  if (m.role === "owner" || m.role === "admin") throw new UserError("Собственикът и администраторът имат достъп до всичко.");
+  const wanted = fd.getAll("locationIds").map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const existing = new Set((await ctx.db.select({ id: locations.id }).from(locations)).map((l) => l.id));
+  if (wanted.some((id) => !existing.has(id))) throw new UserError("Непозната локация.");
+  const locationIds = wanted.length ? [...new Set(wanted)].sort((a, b) => a - b) : null;
+  const hideCosts = fd.get("hideCosts") === "1" || fd.get("hideCosts") === "on";
+  await controlDb.update(memberships).set({ locationIds, hideCosts }).where(eq(memberships.id, membershipId));
+  await audit(ctx, "update", "user", m.userId, { locationIds, hideCosts });
+  revalidatePath("/settings/users");
+  return "Достъпът е запазен.";
+});

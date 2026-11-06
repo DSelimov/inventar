@@ -11,7 +11,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { adjustStock } from "@/lib/actions/items";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { findItemByCode, listLocations } from "@/lib/queries";
+import { findItemByCode, listLocationsFor } from "@/lib/queries";
 import { formatMoney, formatNumber, isLowStock } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { itemDecimals, quantityStep } from "@/lib/quantity";
@@ -21,7 +21,7 @@ export const metadata: Metadata = { title: "Сканиране" };
 export default async function ScanPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
   const ctx = await requireContext();
   const { code } = await searchParams;
-  const [item, locations] = await Promise.all([code ? findItemByCode(ctx.db, code) : null, listLocations(ctx.db)]);
+  const [item, locations] = await Promise.all([code ? findItemByCode(ctx.db, code) : null, listLocationsFor(ctx)]);
   const writable = can(ctx.role, "write");
 
   return (

@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, ne } from "drizzle-orm";
 import { categories, items, locations, stockLevels } from "@/db/tenant-schema";
-import { requireContext } from "@/lib/auth";
+import { requireContext, requireCostAccess } from "@/lib/auth";
 import { createDoc, documentHeader, pageNumbers, pdfResponse, table } from "@/lib/pdf";
 import { getCompanyDetails } from "@/lib/settings";
 import { formatDate, formatMoney, formatNumber } from "@/lib/utils";
@@ -16,6 +16,7 @@ import { stockValueAt } from "@/lib/valuation-reports";
  */
 export async function GET(req: Request) {
   const ctx = await requireContext("read");
+  requireCostAccess(ctx);
   const sp = new URL(req.url).searchParams;
   const locationId = Number(sp.get("location")) || null;
   const categoryId = Number(sp.get("category")) || null;

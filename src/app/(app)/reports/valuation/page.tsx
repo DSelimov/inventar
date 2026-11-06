@@ -7,10 +7,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/search-form";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table } from "@/components/ui/table";
-import { requireContext } from "@/lib/auth";
+import { requireContext, requireCostAccess } from "@/lib/auth";
 import { localTodayIso } from "@/lib/dates";
 import { param, type SearchParams } from "@/lib/paging";
-import { listLocations } from "@/lib/queries";
+import { listLocationsFor } from "@/lib/queries";
 import { getValuationMethod } from "@/lib/valuation";
 import { salesMargin, stockValueAt } from "@/lib/valuation-reports";
 import { formatDate, formatMoney, formatNumber } from "@/lib/utils";
@@ -22,13 +22,14 @@ const LIMIT = 200;
 
 export default async function ValuationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext();
+  requireCostAccess(ctx);
   const sp = await searchParams;
   const today = localTodayIso();
   const at = isDate(param(sp, "at")) ?? today;
   const from = isDate(param(sp, "from")) ?? `${today.slice(0, 8)}01`;
   const to = isDate(param(sp, "to")) ?? today;
   const locationId = Number(param(sp, "location")) || null;
-  const [stock, sales, locations, method] = await Promise.all([stockValueAt(ctx.db, at, { locationId }), salesMargin(ctx.db, from, to), listLocations(ctx.db, true), getValuationMethod(ctx.db)]);
+  const [stock, sales, locations, method] = await Promise.all([stockValueAt(ctx.db, at, { locationId }), salesMargin(ctx.db, from, to), listLocationsFor(ctx, true), getValuationMethod(ctx.db)]);
   const money = (v: number) => formatMoney(v, ctx.org.currency);
   const pct = (v: number) => `${v.toFixed(1)} %`;
   const pdf = `/print/stock?date=${at}${locationId ? `&location=${locationId}` : ""}`;

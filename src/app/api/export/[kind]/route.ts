@@ -19,6 +19,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   if (!ctx) return new Response("Unauthorized", { status: 401 });
   const { kind } = await params;
   const db = ctx.db;
+  // доставни цени и стойности: не за потребители със скрити доставни цени
+  if (ctx.hideCosts && kind !== "template") return new Response("Forbidden", { status: 403 });
 
   if (kind === "template") {
     return csvResponse("shablon-artikuli", [

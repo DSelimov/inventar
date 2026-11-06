@@ -6,6 +6,7 @@ import { locations } from "@/db/tenant-schema";
 import { act, redirectWith } from "@/lib/action";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { assertLocationAccess } from "@/lib/stock";
 import { UserError } from "@/lib/errors";
 import { bool, int, oneOf, optional, optionalInt, str } from "@/lib/forms";
 import { addLotLine, applyStockCount, cancelStockCount, createStockCount, recordCount, saveCountedValues } from "@/lib/stock-count";
@@ -20,6 +21,7 @@ const revalidate = (id?: number) => {
 export const startStockCount = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const locationId = int(fd, "locationId", 0);
+  assertLocationAccess(ctx.user, locationId);
   const location = await ctx.db.query.locations.findFirst({ where: eq(locations.id, locationId) });
   if (!location) throw new UserError("Изберете локация.");
   const r = await createStockCount(ctx.db, { locationId, categoryId: optionalInt(fd, "categoryId"), includeZero: bool(fd, "includeZero"), notes: optional(fd, "notes"), createdBy: ctx.user.name });
