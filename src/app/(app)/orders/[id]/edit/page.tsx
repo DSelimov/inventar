@@ -17,7 +17,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
   const [packUnits, groupPrices, priceGroups, currencies] = await Promise.all([listAllItemUnits(ctx.db), listGroupPrices(ctx.db), listPriceGroups(ctx.db, true), listCurrencies(ctx.db)]);
   const priceGroupNames = Object.fromEntries(priceGroups.map((g) => [g.id, g.name]));
   if (!order) notFound();
-  if (order.status !== "draft") redirect(`/orders/${id}`);
+  if (order.status !== "draft" && order.status !== "quote") redirect(`/orders/${id}`);
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title={`Редакция: ${order.number}`} back={{ href: `/orders/${id}`, label: order.number }} />

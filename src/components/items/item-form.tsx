@@ -148,6 +148,9 @@ export function ItemForm({
           <Field label="Продажна цена" hint="На каква цена продавате (по избор).">
             <Input name="unitPrice" type="number" min={0} step="0.0001" defaultValue={item?.unitPrice ?? 0} />
           </Field>
+          <Field label="Минимална продажна цена" hint="По избор. Под нея продава само администратор/собственик.">
+            <Input name="minPrice" type="number" min={0} step="0.0001" defaultValue={item?.minPrice ?? ""} />
+          </Field>
           {item && (
             <Field label="Статус">
               <Select name="status" defaultValue={item.status}>

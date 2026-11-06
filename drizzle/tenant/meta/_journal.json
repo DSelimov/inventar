@@ -169,6 +169,13 @@
       "when": 1793963466541,
       "tag": "0023_scale_plu",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1793968261621,
+      "tag": "0024_quotes_min_price",
+      "breakpoints": true
     }
   ]
 }

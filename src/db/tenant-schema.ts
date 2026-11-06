@@ -22,7 +22,8 @@ export const PARTNER_TYPES = ["supplier", "customer", "both"] as const;
 export type PartnerType = (typeof PARTNER_TYPES)[number];
 export const ORDER_TYPES = ["purchase", "sales"] as const;
 export type OrderType = (typeof ORDER_TYPES)[number];
-export const ORDER_STATUSES = ["draft", "confirmed", "partial", "completed", "cancelled"] as const;
+/** quote = оферта (клиентска, още не е поръчка); превръща се в поръчка с един бутон. */
+export const ORDER_STATUSES = ["quote", "draft", "confirmed", "partial", "completed", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export const EVENT_TYPES = ["event", "reminder", "deadline"] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -154,6 +155,8 @@ export const items = mysqlTable(
     quantityDecimals: tinyint("quantity_decimals").notNull().default(0),
     unitCost: money("unit_cost").notNull().default(0),
     unitPrice: money("unit_price").notNull().default(0),
+    /** Минимална продажна цена (същата основа като unitPrice); под нея продава само администратор. */
+    minPrice: money("min_price"),
     status: mysqlEnum("status", ITEM_STATUSES).notNull().default("active"),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().default(sql`CURRENT_TIMESTAMP(3)`),

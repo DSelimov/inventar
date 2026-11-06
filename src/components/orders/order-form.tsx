@@ -13,8 +13,9 @@ import { itemDecimals, mulQty, quantityStep } from "@/lib/quantity";
 import { orderVat } from "@/lib/vat";
 import { effectivePriceGroup, salesPrice } from "@/lib/pricing";
 import { roundMoney } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
-export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; quantityDecimals: number; tracking: string; vatRateId: number | null };
+export type OrderItemOption = { id: number; name: string; sku: string; unit: string; quantity: number; variantLabel: string | null; unitCost: number; unitPrice: number; minPrice?: number | null; quantityDecimals: number; tracking: string; vatRateId: number | null };
 export type VatRateOption = { id: number; name: string; rate: number; isDefault: boolean };
 export type OrderPartnerOption = { id: number; name: string; type: string; leadTimeDays: number | null; priceGroupId?: number | null; discountPercent?: number };
 export type GroupPriceOption = { itemId: number; priceGroupId: number; price: number };
@@ -114,6 +115,13 @@ export function OrderForm({
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   const purchase = type === "purchase";
+  // минимална продажна цена (в основната валута): предупреждение; сървърът спира под нея всички без администратор
+  const belowMin = (it: OrderItemOption | undefined, price: string) => {
+    if (purchase || it?.minPrice == null) return false;
+    const p = Number(price.replace(",", ".")) || 0;
+    const x = Number(rate.replace(",", "."));
+    return (currency && x > 0 ? p * x : p) < it.minPrice;
+  };
   const partnerList = partners.filter((p) => p.type === "both" || p.type === (purchase ? "supplier" : "customer"));
   const baseQuantity = (l: Line) => {
     const q = Number(l.quantity.replace(",", ".")) || 0;
@@ -263,7 +271,19 @@ export function OrderForm({
                   step={stepFor(line.itemId)}
                   onChange={(patch) => update(line.key, patch)}
                 />
-                <Input name="linePrice" type="number" min={0} step="0.0001" value={line.price} onChange={(e) => update(line.key, { price: e.target.value })} aria-label={`Цена за ${chosen?.unit ?? "единица"}`} />
+                <div>
+                  <Input
+                    name="linePrice"
+                    type="number"
+                    min={0}
+                    step="0.0001"
+                    value={line.price}
+                    onChange={(e) => update(line.key, { price: e.target.value })}
+                    aria-label={`Цена за ${chosen?.unit ?? "единица"}`}
+                    className={cn(belowMin(chosen, line.price) && "border-danger text-danger")}
+                  />
+                  {belowMin(chosen, line.price) && <p className="mt-0.5 text-[11px] text-danger">под мин. {chosen?.minPrice}</p>}
+                </div>
                 <Select name="lineVatRateId" value={line.vat} onChange={(e) => update(line.key, { vat: e.target.value })} aria-label="ДДС">
                   {vatRates.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -299,6 +319,11 @@ export function OrderForm({
           <SubmitButton>Запази промените</SubmitButton>
         ) : (
           <>
+            {type === "sales" && (
+              <SubmitButton variant="secondary" name="confirm" value="quote">
+                Запази като оферта
+              </SubmitButton>
+            )}
             <SubmitButton variant="secondary" name="confirm" value="0">
               Запази като чернова
             </SubmitButton>

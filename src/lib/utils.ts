@@ -87,6 +87,7 @@ export const STATUS_LABELS: Record<string, string> = {
   produce_out: "Влагане в производство",
   assembly: "Производство",
   disassembly: "Разглобяване",
+  quote: "Оферта",
   give: "Даване",
   report: "Отчет за продадено",
   return: "Връщане",

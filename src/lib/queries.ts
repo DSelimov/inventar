@@ -108,6 +108,7 @@ export async function listItemOptions(db: Db) {
       variantLabel: items.variantLabel,
       unitCost: items.unitCost,
       unitPrice: items.unitPrice,
+      minPrice: items.minPrice,
       /** ДДС на артикула или на категорията му; null = ставката по подразбиране. */
       vatRateId: sql<number | null>`coalesce(${items.vatRateId}, ${categories.vatRateId})`,
     })

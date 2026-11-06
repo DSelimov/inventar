@@ -61,6 +61,7 @@ function readItem(fd: FormData) {
     unit: str(fd, "unit", "бр.") || "бр.",
     unitCost: parseMoney(str(fd, "unitCost"), "Доставна цена"),
     unitPrice: parseMoney(str(fd, "unitPrice"), "Продажна цена"),
+    minPrice: parseMoney(str(fd, "minPrice"), "Минимална продажна цена", null),
     status: oneOf(fd, "status", ITEM_STATUSES, "active"),
     variantLabel: optional(fd, "variantLabel"),
   };
