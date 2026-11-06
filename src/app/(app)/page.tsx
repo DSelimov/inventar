@@ -15,6 +15,7 @@ import {
   FileText,
   Factory,
   FileUp,
+  Handshake,
   History,
   Layers,
   LayoutDashboard,
@@ -123,7 +124,7 @@ export default async function HomePage() {
         { href: "/reports/balances", label: "Салда", hint: "Кой колко дължи", icon: Scale, tone: "danger" },
         { href: "/movements", label: "Движения", hint: "История на наличностите", icon: History, tone: "neutral" },
         { href: "/orders/suggestions", label: "Предложения", hint: "Какво да се поръча", icon: Lightbulb, tone: "warning" },
-        { href: "/write-offs", label: "Протоколи за брак", hint: "Чернови и приложени", icon: Trash, tone: "danger" },
+        { href: "/consignments", label: "Консигнация", hint: "Стока при клиенти", icon: Handshake, tone: "info" },
       ],
     },
     {

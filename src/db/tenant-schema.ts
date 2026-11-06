@@ -78,6 +78,8 @@ export const locations = mysqlTable("locations", {
   active: boolean("active").notNull().default(true),
   /** Ценова група за продажби от този обект (магазин на едро); партньорът с група има предимство. */
   priceGroupId: int("price_group_id").references(() => priceGroups.id, { onDelete: "set null" }),
+  /** Консигнационна локация: стоката е при този партньор, но е наша (вж. consignments). */
+  partnerId: int("partner_id"),
   createdAt: createdAt(),
 });
 
@@ -692,6 +694,45 @@ export const productionLines = mysqlTable("production_lines", {
   value: amount("value").notNull().default(0),
 });
 
+// ---------------------------------------------------------------- consignment
+export const CONSIGNMENT_KINDS = ["give", "report", "return"] as const;
+export type ConsignmentKind = (typeof CONSIGNMENT_KINDS)[number];
+
+/**
+ * Консигнация: give — стоката отива в консигнационната локация на партньора (трансфер, остава наша);
+ * report — отчет за продаденото (продажба от тази локация, вземане към партньора); return — обратно в склада.
+ * Номер КСГ-ГГГГ-NNN.
+ */
+export const consignments = mysqlTable(
+  "consignments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }).notNull(),
+    kind: mysqlEnum("kind", CONSIGNMENT_KINDS).notNull(),
+    partnerId: int("partner_id").notNull().references(() => partners.id, { onDelete: "restrict" }),
+    /** Консигнационната локация на партньора. */
+    locationId: int("location_id").notNull().references(() => locations.id),
+    /** Складът, от който се дава / в който се връща. */
+    warehouseId: int("warehouse_id").references(() => locations.id),
+    /** При отчет: създадената продажба. */
+    orderId: int("order_id").references(() => orders.id, { onDelete: "set null" }),
+    notes: text("notes"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("consignments_number").on(t.number), index("consignments_partner").on(t.partnerId)],
+);
+
+export const consignmentLines = mysqlTable("consignment_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  consignmentId: int("consignment_id").notNull().references(() => consignments.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  quantity: qty("quantity").notNull(),
+  /** Продажна цена при отчет (без/с ДДС според поръчката). */
+  unitPrice: money("unit_price"),
+});
+
 // ---------------------------------------------------------------- cash book
 export const CASH_ACCOUNT_KINDS = ["cash", "bank"] as const;
 export type CashAccountKind = (typeof CASH_ACCOUNT_KINDS)[number];
@@ -939,6 +980,17 @@ export const productionLinesRelations = relations(productionLines, ({ one }) => 
   production: one(productions, { fields: [productionLines.productionId], references: [productions.id] }),
   item: one(items, { fields: [productionLines.itemId], references: [items.id] }),
 }));
+export const consignmentsRelations = relations(consignments, ({ one, many }) => ({
+  partner: one(partners, { fields: [consignments.partnerId], references: [partners.id] }),
+  location: one(locations, { fields: [consignments.locationId], references: [locations.id] }),
+  warehouse: one(locations, { fields: [consignments.warehouseId], references: [locations.id], relationName: "consignmentWarehouse" }),
+  order: one(orders, { fields: [consignments.orderId], references: [orders.id] }),
+  lines: many(consignmentLines),
+}));
+export const consignmentLinesRelations = relations(consignmentLines, ({ one }) => ({
+  consignment: one(consignments, { fields: [consignmentLines.consignmentId], references: [consignments.id] }),
+  item: one(items, { fields: [consignmentLines.itemId], references: [items.id] }),
+}));
 export const cashAccountsRelations = relations(cashAccounts, ({ many }) => ({ entries: many(cashEntries) }));
 export const cashEntriesRelations = relations(cashEntries, ({ one }) => ({
   account: one(cashAccounts, { fields: [cashEntries.accountId], references: [cashAccounts.id] }),
@@ -1024,6 +1076,7 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
 export type PriceGroup = typeof priceGroups.$inferSelect;
 export type CashAccount = typeof cashAccounts.$inferSelect;
 export type Recipe = typeof recipes.$inferSelect;
+export type Consignment = typeof consignments.$inferSelect;
 export type Production = typeof productions.$inferSelect;
 export type CashEntry = typeof cashEntries.$inferSelect;
 export type PriceChange = typeof priceChanges.$inferSelect;

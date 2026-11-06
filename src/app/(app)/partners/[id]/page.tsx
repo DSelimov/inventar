@@ -13,6 +13,7 @@ import { can } from "@/lib/permissions";
 import { getPartner, listPriceGroups } from "@/lib/queries";
 import { payPartnerAction } from "@/lib/actions/cash";
 import { accountBalances, openDocuments, partnerBalance } from "@/lib/cash";
+import { consignmentStock } from "@/lib/consignment";
 import { localTodayIso } from "@/lib/dates";
 import { Field, Input, Select } from "@/components/ui/fields";
 import { formatDate, formatMoney, label } from "@/lib/utils";
@@ -39,6 +40,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
     openDocuments(ctx.db, id, "out"),
     accountBalances(ctx.db),
   ]);
+  const consigned = await consignmentStock(ctx.db, id);
   const money = (v: number) => formatMoney(v, ctx.org.currency);
   const isCustomer = partner.type !== "supplier";
   const isSupplier = partner.type !== "customer";
@@ -160,6 +162,52 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
               )}
             </CardBody>
           </Card>
+
+          {(consigned.length > 0 || (writable && isCustomer)) && (
+            <Card>
+              <CardHeader
+                title="Консигнация"
+                description={consigned.length ? "Стока при партньора — ваша, докато не отчете продаденото." : "Няма стока на консигнация."}
+                actions={
+                  writable && (
+                    <span className="flex gap-3 text-xs font-medium">
+                      <Link href={`/consignments/new?partner=${id}&kind=give`} className="text-accent hover:underline">
+                        Дай
+                      </Link>
+                      {consigned.length > 0 && (
+                        <>
+                          <Link href={`/consignments/new?partner=${id}&kind=report`} className="text-accent hover:underline">
+                            Отчет за продадено
+                          </Link>
+                          <Link href={`/consignments/new?partner=${id}&kind=return`} className="text-accent hover:underline">
+                            Връщане
+                          </Link>
+                        </>
+                      )}
+                    </span>
+                  )
+                }
+              />
+              {consigned.length > 0 && (
+                <Table>
+                  <tbody>
+                    {consigned.map((c) => (
+                      <tr key={c.itemId}>
+                        <td>
+                          <Link href={`/items/${c.itemId}`} className="hover:text-accent">
+                            {c.name}
+                          </Link>
+                        </td>
+                        <td className="text-right tabular-nums">
+                          {c.quantity} {c.unit}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card>
+          )}
 
           <Card>
             <CardHeader title="Поръчки" />

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNull } from "drizzle-orm";
 import { controlDb } from "@/db/control";
 import { memberships, plans, type Organization, type Plan } from "@/db/control-schema";
 import type { Db } from "@/db/tenant";
@@ -61,7 +61,7 @@ export async function usage(org: Pick<Organization, "id">, db: Db) {
   const [[users], [itemCount], [locationCount], [invoiceCount]] = await Promise.all([
     controlDb.select({ n: count() }).from(memberships).where(eq(memberships.organizationId, org.id)),
     db.select({ n: count() }).from(items),
-    db.select({ n: count() }).from(locations).where(eq(locations.active, true)),
+    db.select({ n: count() }).from(locations).where(and(eq(locations.active, true), isNull(locations.partnerId))), // консигнационните не се броят
     db.select({ n: count() }).from(invoices).where(and(inArray(invoices.status, ["issued", "cancelled"]), inArray(invoices.kind, ["invoice", "credit_note", "debit_note"]), gte(invoices.issuedAt, monthStart))),
   ]);
   return { users: users.n, items: itemCount.n, locations: locationCount.n, invoices: invoiceCount.n } satisfies Record<LimitKey, number>;
