@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const alerts = await alertCounts(ctx.db, todayIso());
   const sub = subscriptionState(ctx.org);
   return (
-    <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-hidden md:flex-row">
+    <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-clip md:flex-row">
       <Sidebar
         companyName={ctx.org.name}
         userName={ctx.user.name}
