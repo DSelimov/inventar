@@ -55,6 +55,10 @@ export const statusTone: Record<string, Tone> = {
   transfer_in: "info",
   transfer_out: "info",
   write_off: "danger",
+  produce_in: "success",
+  produce_out: "warning",
+  assembly: "success",
+  disassembly: "warning",
   purchase: "info",
   sales: "accent",
 };

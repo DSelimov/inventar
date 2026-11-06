@@ -12,7 +12,7 @@ import { localTodayIso } from "./dates";
  *  - фактури и известия: общ десетразряден ред само с арабски цифри (чл. 114, ал. 1, т. 2 ЗДДС), без
  *    нулиране по години; проформите не са данъчни документи — свой ред ПФ-ГГГГ-NNN.
  */
-export const DOC_PREFIXES = { purchase: "ПЗ", sales: "ПР", count: "ИНВ", writeOff: "БР", proforma: "ПФ", cashIn: "ПКО", cashOut: "РКО" } as const;
+export const DOC_PREFIXES = { purchase: "ПЗ", sales: "ПР", count: "ИНВ", writeOff: "БР", proforma: "ПФ", cashIn: "ПКО", cashOut: "РКО", production: "ПРД" } as const;
 export type DocType = keyof typeof DOC_PREFIXES;
 
 const INVOICE_SERIES = "invoice";

@@ -35,8 +35,8 @@ export async function buildReports(db: Db, s: AppSettings) {
   const lastMoves = await db
     .select({
       itemId: stockMovements.itemId,
-      lastOut: sql<Date | null>`max(case when ${stockMovements.type} = 'out' then ${stockMovements.createdAt} end)`,
-      lastIn: sql<Date | null>`max(case when ${stockMovements.type} in ('in','transfer_in') or (${stockMovements.type} = 'adjust' and ${stockMovements.delta} > 0) then ${stockMovements.createdAt} end)`,
+      lastOut: sql<Date | null>`max(case when ${stockMovements.type} in ('out','produce_out') then ${stockMovements.createdAt} end)`,
+      lastIn: sql<Date | null>`max(case when ${stockMovements.type} in ('in','transfer_in','produce_in') or (${stockMovements.type} = 'adjust' and ${stockMovements.delta} > 0) then ${stockMovements.createdAt} end)`,
     })
     .from(stockMovements)
     .groupBy(stockMovements.itemId);

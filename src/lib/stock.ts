@@ -41,9 +41,9 @@ export async function applyMovement(tx: Db, input: MovementInput) {
   const before = level?.quantity ?? 0;
 
   let delta: number;
-  if (input.type === "in" || input.type === "transfer_in") delta = input.quantity;
-  else if (input.type === "out" || input.type === "transfer_out" || input.type === "write_off") delta = -input.quantity;
-  else delta = subQty(input.quantity, before);
+  if (input.type === "in" || input.type === "transfer_in" || input.type === "produce_in") delta = input.quantity;
+  else if (input.type === "out" || input.type === "transfer_out" || input.type === "write_off" || input.type === "produce_out") delta = -input.quantity;
+  else delta = subQty(input.quantity, before); // adjust: новото абсолютно количество
 
   if (delta === 0) return { delta: 0, after: item.quantity, unitCost: item.unitCost, value: 0 };
   const after = addQty(before, delta);

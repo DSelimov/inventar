@@ -37,6 +37,18 @@ export function mulQty(a: number, b: number) {
   return Number(negative ? -r : r) / SCALE;
 }
 
+/**
+ * a × b / c (количество по рецепта: съставка × произвеждано / добив на рецептата), закръглено
+ * до decimals знака, половинката нагоре. c > 0.
+ */
+export function scaleQty(a: number, b: number, c: number, decimals = MAX_DECIMALS) {
+  const num = BigInt(units(a)) * BigInt(units(b)); // милионни
+  const den = BigInt(units(c)) * BigInt(10 ** (MAX_DECIMALS - decimals)); // → резултат в 10^-decimals
+  if (den <= BigInt(0)) throw new UserError("Добивът на рецептата трябва да е положителен.");
+  const r = (num * BigInt(2) + den) / (den * BigInt(2));
+  return Number(r) / 10 ** decimals;
+}
+
 /** Точна сума по редове. */
 export function sumQty<T>(rows: Iterable<T>, quantity: (row: T) => number) {
   let total = 0;

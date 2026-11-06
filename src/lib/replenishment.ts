@@ -69,7 +69,7 @@ export async function replenishmentSuggestions(db: Db) {
     db
       .select({ itemId: stockMovements.itemId, out: sql<number>`coalesce(sum(-${stockMovements.delta}), 0)`.mapWith(Number) })
       .from(stockMovements)
-      .where(and(eq(stockMovements.type, "out"), gte(stockMovements.createdAt, since)))
+      .where(and(inArray(stockMovements.type, ["out", "produce_out"]), gte(stockMovements.createdAt, since))) // продажби и влагане в производство
       .groupBy(stockMovements.itemId),
     db.select().from(itemSuppliers),
     db.select({ id: partners.id, name: partners.name, leadTimeDays: partners.leadTimeDays }).from(partners),

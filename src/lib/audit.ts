@@ -71,4 +71,6 @@ export const ENTITY_LABELS: Record<string, string> = {
   prices_bulk: "Смяна на цени",
   cash_account: "Каса / сметка",
   cash_entry: "Касов запис",
+  recipe: "Рецепта",
+  production: "Производство",
 };

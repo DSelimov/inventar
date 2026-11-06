@@ -12,7 +12,7 @@ export const ITEM_STATUSES = ["active", "archived"] as const;
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
 export const TRACKING_MODES = ["none", "lot", "serial"] as const;
 export type TrackingMode = (typeof TRACKING_MODES)[number];
-export const MOVEMENT_TYPES = ["in", "out", "adjust", "transfer_in", "transfer_out", "write_off"] as const;
+export const MOVEMENT_TYPES = ["in", "out", "adjust", "transfer_in", "transfer_out", "write_off", "produce_in", "produce_out"] as const;
 export type MovementType = (typeof MOVEMENT_TYPES)[number];
 export const SHIPMENT_DIRECTIONS = ["inbound", "outbound"] as const;
 export type ShipmentDirection = (typeof SHIPMENT_DIRECTIONS)[number];
@@ -631,6 +631,67 @@ export const invoicePayments = mysqlTable("invoice_payments", {
   createdAt: createdAt(),
 });
 
+// ---------------------------------------------------------------- production
+/**
+ * Рецепта (стокова разписка за производство): от кои артикули и колко се прави outputQuantity от
+ * itemId. Същата рецепта служи и за разглобяване (обратно: артикулът → съставките).
+ */
+export const recipes = mysqlTable(
+  "recipes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    outputQuantity: qty("output_quantity").notNull().default(1),
+    notes: text("notes"),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index("recipes_item").on(t.itemId)],
+);
+
+export const recipeLines = mysqlTable("recipe_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  recipeId: int("recipe_id").notNull().references(() => recipes.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  quantity: qty("quantity").notNull(),
+});
+
+export const PRODUCTION_KINDS = ["assembly", "disassembly"] as const;
+export type ProductionKind = (typeof PRODUCTION_KINDS)[number];
+
+/** Протокол за производство (сглобяване) или разглобяване; прилага се веднага, номерът е ПРД-ГГГГ-NNN. */
+export const productions = mysqlTable(
+  "productions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }).notNull(),
+    kind: mysqlEnum("kind", PRODUCTION_KINDS).notNull().default("assembly"),
+    recipeId: int("recipe_id").references(() => recipes.id, { onDelete: "set null" }),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+    quantity: qty("quantity").notNull(),
+    locationId: int("location_id").notNull().references(() => locations.id),
+    /** Себестойност на произведеното (сума на вложеното) или на разглобеното. */
+    totalCost: amount("total_cost").notNull().default(0),
+    notes: text("notes"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("productions_number").on(t.number)],
+);
+
+export const productionLines = mysqlTable("production_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  productionId: int("production_id").notNull().references(() => productions.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  /** in = произведено/получено, out = вложено/разглобено. */
+  direction: mysqlEnum("direction", ["in", "out"]).notNull(),
+  quantity: qty("quantity").notNull(),
+  unitCost: money("unit_cost").notNull().default(0),
+  value: amount("value").notNull().default(0),
+});
+
 // ---------------------------------------------------------------- cash book
 export const CASH_ACCOUNT_KINDS = ["cash", "bank"] as const;
 export type CashAccountKind = (typeof CASH_ACCOUNT_KINDS)[number];
@@ -833,6 +894,7 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   orderLines: many(orderLines),
   suppliers: many(itemSuppliers),
   packUnits: many(itemUnits),
+  recipes: many(recipes),
   groupPrices: many(itemPrices),
 }));
 export const itemImagesRelations = relations(itemImages, ({ one }) => ({
@@ -858,6 +920,24 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   partner: one(partners, { fields: [invoices.partnerId], references: [partners.id] }),
   related: one(invoices, { fields: [invoices.relatedInvoiceId], references: [invoices.id], relationName: "notes" }),
   notesFor: many(invoices, { relationName: "notes" }),
+}));
+export const recipesRelations = relations(recipes, ({ one, many }) => ({
+  item: one(items, { fields: [recipes.itemId], references: [items.id] }),
+  lines: many(recipeLines),
+}));
+export const recipeLinesRelations = relations(recipeLines, ({ one }) => ({
+  recipe: one(recipes, { fields: [recipeLines.recipeId], references: [recipes.id] }),
+  item: one(items, { fields: [recipeLines.itemId], references: [items.id] }),
+}));
+export const productionsRelations = relations(productions, ({ one, many }) => ({
+  item: one(items, { fields: [productions.itemId], references: [items.id] }),
+  recipe: one(recipes, { fields: [productions.recipeId], references: [recipes.id] }),
+  location: one(locations, { fields: [productions.locationId], references: [locations.id] }),
+  lines: many(productionLines),
+}));
+export const productionLinesRelations = relations(productionLines, ({ one }) => ({
+  production: one(productions, { fields: [productionLines.productionId], references: [productions.id] }),
+  item: one(items, { fields: [productionLines.itemId], references: [items.id] }),
 }));
 export const cashAccountsRelations = relations(cashAccounts, ({ many }) => ({ entries: many(cashEntries) }));
 export const cashEntriesRelations = relations(cashEntries, ({ one }) => ({
@@ -943,6 +1023,8 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
 // Row types
 export type PriceGroup = typeof priceGroups.$inferSelect;
 export type CashAccount = typeof cashAccounts.$inferSelect;
+export type Recipe = typeof recipes.$inferSelect;
+export type Production = typeof productions.$inferSelect;
 export type CashEntry = typeof cashEntries.$inferSelect;
 export type PriceChange = typeof priceChanges.$inferSelect;
 export type Location = typeof locations.$inferSelect;

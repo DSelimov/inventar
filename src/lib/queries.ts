@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
-import { apiKeys, calendarEvents, itemPrices, priceChanges, priceGroups, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, itemUnits, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
+import { apiKeys, calendarEvents, itemPrices, priceChanges, priceGroups, productions, recipes, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, itemUnits, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 const countExpr = () => n(sql<number>`count(*)`);
@@ -604,4 +604,26 @@ export async function listPriceChanges(db: Db, itemId: number, limit = 20) {
     orderBy: [desc(priceChanges.createdAt), desc(priceChanges.id)],
     limit,
   });
+}
+
+// ------------------------------------------------------------------- производство
+
+export async function listRecipes(db: Db, includeInactive = false) {
+  return db.query.recipes.findMany({
+    where: includeInactive ? undefined : eq(recipes.active, true),
+    with: { item: true, lines: { with: { item: true } } },
+    orderBy: [asc(recipes.name)],
+  });
+}
+
+export async function getRecipe(db: Db, id: number) {
+  return db.query.recipes.findFirst({ where: eq(recipes.id, id), with: { item: true, lines: { with: { item: true } } } });
+}
+
+export async function listProductions(db: Db, limit = 100) {
+  return db.query.productions.findMany({ with: { item: true, location: true }, orderBy: [desc(productions.createdAt), desc(productions.id)], limit });
+}
+
+export async function getProduction(db: Db, id: number) {
+  return db.query.productions.findFirst({ where: eq(productions.id, id), with: { item: true, location: true, recipe: true, lines: { with: { item: true } } } });
 }
