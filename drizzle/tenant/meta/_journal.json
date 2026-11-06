@@ -162,6 +162,13 @@
       "when": 1793962441524,
       "tag": "0022_currencies",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1793963466541,
+      "tag": "0023_scale_plu",
+      "breakpoints": true
     }
   ]
 }

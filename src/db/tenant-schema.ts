@@ -136,6 +136,8 @@ export const items = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     sku: varchar("sku", { length: 64 }).notNull(),
     barcode: varchar("barcode", { length: 64 }),
+    /** PLU код за везна (етикет 2x PPPPP VVVVV C): по него се разпознава теглото/цената от баркода. */
+    plu: varchar("plu", { length: 8 }),
     name: varchar("name", { length: 300 }).notNull(),
     description: text("description"),
     categoryId: int("category_id").references(() => categories.id, { onDelete: "set null" }),
@@ -156,7 +158,7 @@ export const items = mysqlTable(
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
-  (t) => [uniqueIndex("items_sku").on(t.sku), index("items_barcode").on(t.barcode), index("items_parent").on(t.parentId)],
+  (t) => [uniqueIndex("items_sku").on(t.sku), index("items_barcode").on(t.barcode), index("items_parent").on(t.parentId), uniqueIndex("items_plu").on(t.plu)],
 );
 
 /** Снимки на артикул. Файловете са в хранилището (src/lib/storage.ts) под storageKey + "-full.webp" / "-thumb.webp". */

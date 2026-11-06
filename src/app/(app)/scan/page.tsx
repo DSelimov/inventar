@@ -26,7 +26,8 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader help="mobile"
+      <PageHeader
+        help="scan"
         title="Сканиране"
         description="Намерете артикул по баркод или код и направете бърз приход или разход."
         actions={
@@ -79,6 +80,12 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                     {item.category && <ColorBadge color={item.category.color}>{item.category.name}</ColorBadge>}
                     {isLowStock(item) && <Badge tone="danger">Ниска наличност</Badge>}
                     {item.pack && <Badge tone="accent">сканирана опаковка: {item.pack.name} = {formatNumber(item.pack.factor)} {item.unit}</Badge>}
+                    {item.scale && (
+                      <Badge tone="accent">
+                        етикет от везна: {item.scale.kind === "price" ? `${formatNumber(item.scale.value)} ${ctx.org.currency}` : `${formatNumber(item.scale.value)} ${item.scale.kind === "weight" ? "кг" : item.unit}`}
+                        {item.scale.quantity !== null ? ` → ${formatNumber(item.scale.quantity)} ${item.unit}` : " (артикулът няма продажна цена)"}
+                      </Badge>
+                    )}
                   </span>
                 }
                 actions={<ButtonLink href={`/items/${item.id}`} variant="secondary" size="sm">Отвори</ButtonLink>}
@@ -123,7 +130,7 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                         </Select>
                       </Field>
                       <Field label="Количество">
-                        <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} defaultValue={item.pack ? item.pack.factor : 1} required />
+                        <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} defaultValue={item.scale?.quantity ?? (item.pack ? item.pack.factor : 1)} required />
                       </Field>
                     </div>
                     <Field label="Причина">

@@ -60,6 +60,9 @@ export function ItemForm({
           <Field label="Баркод" hint="EAN / QR; използва се при сканиране.">
             <Input name="barcode" defaultValue={item?.barcode ?? defaultBarcode ?? ""} className="font-mono" inputMode="numeric" />
           </Field>
+          <Field label="PLU (везна)" hint="Код на артикула във везната; етикетът с тегло/цена се разпознава при сканиране.">
+            <Input name="plu" defaultValue={item?.plu ?? ""} className="font-mono" inputMode="numeric" maxLength={7} />
+          </Field>
           <Field label="Категория">
             <Select name="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">— Без категория —</option>

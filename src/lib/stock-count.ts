@@ -3,6 +3,7 @@ import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import type { Db, TenantDb } from "@/db/tenant";
 import { itemUnits, items, lots, stockCountLines, stockCounts, stockLevels, type StockCountLine } from "@/db/tenant-schema";
 import { UserError } from "./errors";
+import { scaleLookup } from "./scale";
 import { nextNumber } from "./numbering";
 import { applyMovement, type Actor } from "./stock";
 import { lineTotal, sumMoney } from "@/lib/money";
@@ -72,6 +73,13 @@ export async function recordCount(db: Db, countId: number, code: string, quantit
     if (forItem.length > 1) throw new UserError(`„${forItem[0].item.name}“ е с партиди/серийни номера — сканирайте номера на партидата.`);
     match = forItem[0];
   }
+  // етикет от везна (PLU + тегло/цена): количеството идва от етикета
+  const scaled = !match && !pack ? await scaleLookup(db, code) : null;
+  if (scaled) {
+    if (!scaled.quantity) throw new UserError(`„${scaled.item.name}“ няма продажна цена — етикетът с цена не може да се преобразува в количество.`);
+    quantity = scaled.quantity;
+    match = lines.find((l) => l.item.id === scaled.item.id && l.line.lotId === null) ?? match;
+  }
   let line: StockCountLine;
   let item;
   if (match) {
@@ -79,6 +87,7 @@ export async function recordCount(db: Db, countId: number, code: string, quantit
   } else {
     // артикул, който не е в списъка (напр. намерен на място без наличност в системата)
     item = await db.query.items.findFirst({ where: pack ? eq(items.id, pack.itemId) : or(eq(items.barcode, code), eq(items.sku, code)) });
+    item ??= scaled?.item;
     if (!item) throw new UserError(`Няма артикул с код „${code}“.`);
     if (item.tracking !== "none") throw new UserError(`„${item.name}“ е с партиди/серийни номера — добавете партидата от формата „Нова партида“.`);
     assertQuantity(quantity, itemDecimals(item), `„${item.name}“`); // преди да добавим ред

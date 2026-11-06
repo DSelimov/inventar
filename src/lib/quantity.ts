@@ -103,3 +103,11 @@ export function parseQuantity(raw: unknown, decimals = 0, label = "Количе�
 export function assertQuantity(value: number, decimals: number, label = "Количество") {
   return parseQuantity(value, decimals, label);
 }
+
+/** a ÷ b като количество с decimals знака (цена от етикет ÷ цена за кг), половинката нагоре; b > 0. */
+export function divideToQuantity(a: number, b: number, decimals = MAX_DECIMALS) {
+  const num = BigInt(Math.round(a * 10_000)) * BigInt(10 ** decimals); // десетохилядни × 10^decimals
+  const den = BigInt(Math.round(b * 10_000));
+  if (den <= BigInt(0)) throw new UserError("Делителят трябва да е положителен.");
+  return Number((num * BigInt(2) + den) / (den * BigInt(2))) / 10 ** decimals;
+}

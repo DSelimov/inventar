@@ -17,11 +17,15 @@ import { getValuationMethod } from "@/lib/valuation";
 import { Download, Trash2 } from "lucide-react";
 import { DELETION_GRACE_DAYS } from "@/lib/legal";
 import { formatDate } from "@/lib/utils";
+import { saveScaleFormats } from "@/lib/actions/scale";
+import { getScaleFormats } from "@/lib/scale";
+import { SCALE_KIND_LABELS, SCALE_KINDS } from "@/lib/scale-barcode";
 
 export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
+  const scaleFormats = await getScaleFormats(ctx.db);
   const [s, company, method, [moved]] = await Promise.all([getSettings(ctx.db), getCompanyDetails(ctx.db), getValuationMethod(ctx.db), ctx.db.select({ n: count() }).from(stockMovements)]);
   const methodLocked = moved.n > 0;
   const manage = can(ctx.role, "manage");
@@ -108,6 +112,53 @@ export default async function SettingsPage() {
             {manage && (
               <div className="flex justify-end sm:col-span-2">
                 <SubmitButton variant="secondary">Запази</SubmitButton>
+              </div>
+            )}
+          </Form>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Везни (етикети с тегло или цена)"
+          description="Баркод 2x PPPPP VVVVV C от везната: по PLU на артикула се намира артикулът, а количеството е теглото (или цената ÷ продажната цена). Работи при сканиране, инвентаризация и в мобилния режим."
+          actions={
+            <ButtonLink href="/api/export/scale-plu" variant="secondary" size="sm">
+              <Download className="h-3.5 w-3.5" /> PLU за везната (CSV)
+            </ButtonLink>
+          }
+        />
+        <CardBody>
+          <Form action={saveScaleFormats} className="space-y-3">
+            <div className="grid grid-cols-[6rem_7rem_1fr] gap-2 text-xs font-medium text-muted">
+              <span>Префикс</span>
+              <span>Цифри PLU</span>
+              <span>Стойност</span>
+            </div>
+            {[0, 1, 2, 3].map((i) => {
+              const f = scaleFormats[i];
+              return (
+                <div key={i} className="grid grid-cols-[6rem_7rem_1fr] gap-2">
+                  <Input name={`prefix_${i}`} defaultValue={f?.prefix ?? ""} placeholder={i === 0 ? "28" : ""} inputMode="numeric" maxLength={3} className="font-mono" disabled={!manage} aria-label={`Префикс ${i + 1}`} />
+                  <Input name={`pluLength_${i}`} type="number" min={3} max={7} defaultValue={f?.pluLength ?? 5} disabled={!manage} aria-label={`Цифри PLU ${i + 1}`} />
+                  <Select name={`kind_${i}`} defaultValue={f?.kind ?? "weight"} disabled={!manage} aria-label={`Вид ${i + 1}`}>
+                    {SCALE_KINDS.map((k) => (
+                      <option key={k} value={k}>
+                        {SCALE_KIND_LABELS[k]}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              );
+            })}
+            {manage && (
+              <div className="flex flex-wrap justify-end gap-2">
+                {scaleFormats.length === 0 && (
+                  <SubmitButton variant="ghost" name="preset" value="1">
+                    Стандартни (28 — тегло, 29 — цена)
+                  </SubmitButton>
+                )}
+                <SubmitButton variant="secondary">Запази форматите</SubmitButton>
               </div>
             )}
           </Form>

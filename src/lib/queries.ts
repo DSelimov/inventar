@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
+import { scaleLookup } from "./scale";
 import { apiKeys, calendarEvents, itemPrices, priceChanges, priceGroups, productions, recipes, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, itemUnits, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
@@ -142,11 +143,17 @@ export async function findItemByCode(db: Db, code: string) {
     where: or(eq(items.barcode, code), eq(items.sku, code)),
     with: { category: true, stockLevels: { with: { location: true } }, packUnits: true },
   });
-  if (item) return { ...item, pack: null };
+  if (item) return { ...item, pack: null, scale: null };
   const unit = await db.query.itemUnits.findFirst({ where: eq(itemUnits.barcode, code) });
-  if (!unit) return undefined;
-  const byPack = await db.query.items.findFirst({ where: eq(items.id, unit.itemId), with: { category: true, stockLevels: { with: { location: true } }, packUnits: true } });
-  return byPack ? { ...byPack, pack: unit } : undefined;
+  if (unit) {
+    const byPack = await db.query.items.findFirst({ where: eq(items.id, unit.itemId), with: { category: true, stockLevels: { with: { location: true } }, packUnits: true } });
+    return byPack ? { ...byPack, pack: unit as typeof unit | null, scale: null } : undefined;
+  }
+  // етикет от везна: PLU + тегло/цена
+  const scale = await scaleLookup(db, code);
+  if (!scale) return undefined;
+  const byPlu = await db.query.items.findFirst({ where: eq(items.id, scale.item.id), with: { category: true, stockLevels: { with: { location: true } }, packUnits: true } });
+  return byPlu ? { ...byPlu, pack: null, scale: { quantity: scale.quantity, kind: scale.reading.kind, value: scale.reading.value } } : undefined;
 }
 
 export async function listItemUnits(db: Db, itemId: number) {

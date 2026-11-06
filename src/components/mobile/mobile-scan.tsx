@@ -6,11 +6,12 @@ import { ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, RefreshCw, Wifi, Wifi
 import { Scanner } from "@/components/scan/scanner";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/fields";
-import { mulQty } from "@/lib/quantity";
+import { divideToQuantity, itemDecimals, mulQty } from "@/lib/quantity";
+import { parseScaleBarcode, pluCandidates, type ScaleFormat } from "@/lib/scale-barcode";
 import { cn, formatNumber } from "@/lib/utils";
 
-type CatalogItem = { id: number; sku: string; barcode: string | null; name: string; variantLabel: string | null; unit: string; quantityDecimals: number; tracking: string; quantity: number };
-type Catalog = { items: CatalogItem[]; packs: Array<{ itemId: number; name: string; factor: number; barcode: string | null }>; locations: Array<{ id: number; name: string; isDefault: boolean }>; counts: Array<{ id: number; number: string; locationId: number }>; at: string };
+type CatalogItem = { id: number; sku: string; barcode: string | null; plu?: string | null; unitPrice?: number; name: string; variantLabel: string | null; unit: string; quantityDecimals: number; tracking: string; quantity: number };
+type Catalog = { items: CatalogItem[]; packs: Array<{ itemId: number; name: string; factor: number; barcode: string | null }>; locations: Array<{ id: number; name: string; isDefault: boolean }>; counts: Array<{ id: number; number: string; locationId: number }>; scaleFormats?: ScaleFormat[]; at: string };
 type Mode = "in" | "out" | "count";
 type QueuedAction = { id: string; kind: "movement" | "count"; recordedAt: string; payload: Record<string, unknown>; label: string };
 type LogLine = { id: string; label: string; ok: boolean | null; message: string };
@@ -131,8 +132,21 @@ export function MobileScan({ orgName }: { orgName: string }) {
     const key = code.trim().toLowerCase();
     if (!c || !key) return;
     const pack = c.packs.find((p) => p.barcode?.toLowerCase() === key);
-    const item = c.items.find((i) => (pack ? i.id === pack.itemId : i.barcode?.toLowerCase() === key || i.sku.toLowerCase() === key));
-    const qty = Number(quantity.replace(",", ".")) || 1;
+    let item = c.items.find((i) => (pack ? i.id === pack.itemId : i.barcode?.toLowerCase() === key || i.sku.toLowerCase() === key));
+    let qty = Number(quantity.replace(",", ".")) || 1;
+    // етикет от везна: PLU + тегло/цена → артикулът и количеството от етикета
+    if (!item && !pack && c.scaleFormats?.length) {
+      const reading = parseScaleBarcode(code, c.scaleFormats);
+      const byPlu = reading ? c.items.find((i) => i.plu && pluCandidates(reading.plu).includes(i.plu)) : undefined;
+      if (reading && byPlu) {
+        const decimals = itemDecimals(byPlu);
+        const fromLabel = reading.kind === "price" ? (byPlu.unitPrice ? divideToQuantity(reading.value, byPlu.unitPrice, decimals) : null) : divideToQuantity(reading.value, 1, decimals);
+        if (fromLabel) {
+          item = byPlu;
+          qty = fromLabel;
+        }
+      }
+    }
     const fail = (message: string) => {
       feedback(false);
       setLog((l) => [{ id: crypto.randomUUID(), label: code, ok: false, message }, ...l].slice(0, 50));

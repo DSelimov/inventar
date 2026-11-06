@@ -51,6 +51,7 @@ function readItem(fd: FormData) {
     name,
     sku: str(fd, "sku") || slugSku(name),
     barcode: optional(fd, "barcode"),
+    plu: readPlu(fd),
     description: optional(fd, "description"),
     categoryId: optionalInt(fd, "categoryId"),
     tracking,
@@ -65,16 +66,28 @@ function readItem(fd: FormData) {
   };
 }
 
-async function assertUniqueSku(db: Db, sku: string, exceptId?: number) {
+async function assertUniqueSku(db: Db, sku: string, exceptId?: number, plu?: string | null) {
   const dup = await db.query.items.findFirst({ where: eq(items.sku, sku) });
   if (dup && dup.id !== exceptId) throw new UserError(`Вече има артикул с код „${sku}“.`);
+  if (plu) {
+    const byPlu = await db.query.items.findFirst({ where: eq(items.plu, plu) });
+    if (byPlu && byPlu.id !== exceptId) throw new UserError(`PLU ${plu} вече е на „${byPlu.name}“.`);
+  }
+}
+
+/** PLU за везна: само цифри, до 7 (без водещите нули — етикетът 00123 намира 123). */
+function readPlu(fd: FormData) {
+  const raw = (optional(fd, "plu") ?? "").replace(/\s/g, "");
+  if (!raw) return null;
+  if (!/^\d{1,7}$/.test(raw)) throw new UserError("PLU е до 7 цифри.");
+  return raw.replace(/^0+(?=\d)/, "");
 }
 
 export const createItem = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
   await assertWithinLimit(ctx, "items");
-  await assertUniqueSku(ctx.db, data.sku);
+  await assertUniqueSku(ctx.db, data.sku, undefined, data.plu);
   const parentId = optionalInt(fd, "parentId");
   const quantity = parseQuantity(str(fd, "quantity"), data.quantityDecimals, "Начална наличност");
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
@@ -107,7 +120,7 @@ export const createItem = act(async (fd: FormData) => {
 export const updateItem = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
-  await assertUniqueSku(ctx.db, data.sku, id);
+  await assertUniqueSku(ctx.db, data.sku, id, data.plu);
   const existing = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
   if (!existing) throw new UserError("Артикулът не е намерен.");
   if (existing.tracking !== data.tracking && existing.quantity > 0) throw new UserError("Режимът на проследяване може да се смени само при нулева наличност.");
