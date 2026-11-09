@@ -8,6 +8,8 @@ const TABS = [
   { href: "/settings", label: "Организация" },
   { href: "/settings/users", label: "Потребители" },
   { href: "/settings/locations", label: "Локации" },
+  { href: "/settings/prices", label: "Ценови групи" },
+  { href: "/settings/currencies", label: "Валути" },
   { href: "/settings/vat", label: "ДДС" },
   { href: "/settings/integrations", label: "Интеграции" },
   { href: "/settings/import", label: "Импорт / Експорт" },
@@ -20,14 +22,14 @@ const TABS = [
 export function SettingsTabs({ manage }: { manage: boolean }) {
   const pathname = usePathname();
   return (
-    <div className="mb-6 flex w-fit max-w-full flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+    <div className="mb-6 flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-line bg-surface p-1">
       {TABS.filter((t) => manage || t.href === "/settings" || t.href === "/settings/plan").map((t) => (
         <Link
           key={t.href}
           href={t.href}
           className={cn(
             "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-            (t.href === "/settings" ? pathname === "/settings" : pathname.startsWith(t.href)) ? "bg-accent-soft text-accent" : "text-muted hover:text-text",
+            (t.href === "/settings" ? pathname === "/settings" : pathname.startsWith(t.href)) ? "bg-accent text-white" : "text-accent hover:bg-surface-2",
           )}
         >
           {t.label}

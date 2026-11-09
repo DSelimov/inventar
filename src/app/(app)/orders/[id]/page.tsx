@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, FileText, Pencil, Trash2, Truck, Undo2, X } from "lucide-react";
+import { Check, Copy, FileText, Pencil, Printer, Trash2, Truck, Undo2, X, Zap } from "lucide-react";
 import { Badge, statusTone } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PROVIDERS, type ProviderId } from "@/lib/integrations/core";
 import { Table } from "@/components/ui/table";
-import { createReturnForOrder, createShipmentForRemaining, deleteOrder, setOrderStatus } from "@/lib/actions/orders";
+import { createReturnForOrder, createShipmentForRemaining, deleteOrder, setOrderStatus, duplicateOrder, fulfilNow } from "@/lib/actions/orders";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getOrder, listOrderInvoices } from "@/lib/queries";
@@ -33,7 +33,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const [order, orderInvoices] = await Promise.all([getOrder(ctx.db, id), listOrderInvoices(ctx.db, id)]);
   if (!order) notFound();
 
-  const currency = ctx.org.currency;
+  // поръчка в чужда валута: сумите са във валутата ѝ (курсът е в описанието)
+  const currency = order.currency ?? ctx.org.currency;
   const writable = can(ctx.role, "write");
   const purchase = order.type === "purchase";
   const vat = orderVat(order, order.lines.map((l) => ({ ...l, legalBasis: l.vatRateRecord?.legalBasis ?? null })));
@@ -63,13 +64,18 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </Link>
             )}
             {order.location && <span className="text-muted">· {order.location.name}</span>}
+            {order.currency && order.exchangeRate && (
+              <Badge tone="info">
+                {order.currency} · 1 {order.currency} = {order.exchangeRate} {ctx.org.currency}
+              </Badge>
+            )}
             {order.externalSource && <Badge tone="info">от {PROVIDERS[order.externalSource as ProviderId]?.name ?? order.externalSource}</Badge>}
           </span>
         }
         actions={
           writable && (
             <>
-              {order.status === "draft" && (
+              {(order.status === "draft" || order.status === "quote") && (
                 <ButtonLink href={`/orders/${id}/edit`} variant="secondary">
                   <Pencil className="h-4 w-4" />
                   Редакция
@@ -220,11 +226,18 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 </CardBody>
               )}
               <CardBody className="space-y-2">
-                {order.status === "draft" && (
+                {(order.status === "draft" || order.status === "quote") && (
                   <Form action={setOrderStatus.bind(null, id, "confirmed")}>
                     <Button type="submit" className="w-full">
-                      <Check className="h-4 w-4" /> Потвърди поръчката
+                      <Check className="h-4 w-4" /> {order.status === "quote" ? "Превърни в поръчка" : "Потвърди поръчката"}
                     </Button>
+                  </Form>
+                )}
+                {active && remainingToShip > 0 && (
+                  <Form action={fulfilNow.bind(null, id)}>
+                    <ConfirmButton className="w-full" message={purchase ? "Да заприходя ли цялото оставащо количество сега?" : "Да изпиша ли цялото оставащо количество от склада сега?"}>
+                      <Zap className="h-4 w-4" /> {purchase ? "Приеми всичко сега" : "Изпълни сега"}
+                    </ConfirmButton>
                   </Form>
                 )}
                 {active && (
@@ -234,7 +247,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     </Button>
                   </Form>
                 )}
-                {!purchase && order.status !== "draft" && order.status !== "cancelled" && (
+                {!purchase && order.status !== "draft" && order.status !== "quote" && order.status !== "cancelled" && (
                   <div className="grid grid-cols-2 gap-2">
                     <Form action={invoiceFromOrder.bind(null, id, "invoice")}>
                       <Button type="submit" variant="secondary" className="w-full">
@@ -262,7 +275,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     </ConfirmButton>
                   </Form>
                 )}
-                {(order.status === "draft" || active) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {!purchase && (
+                    <a href={`/print/orders/${id}`} target="_blank" rel="noreferrer" className={buttonClasses("secondary", "md", "w-full")}>
+                      <Printer className="h-4 w-4" /> {order.status === "quote" ? "Оферта (PDF)" : "Поръчка (PDF)"}
+                    </a>
+                  )}
+                  <Form action={duplicateOrder.bind(null, id)} className={purchase ? "col-span-2" : undefined}>
+                    <Button type="submit" variant="secondary" className="w-full">
+                      <Copy className="h-4 w-4" /> Копирай
+                    </Button>
+                  </Form>
+                </div>
+                {(order.status === "draft" || order.status === "quote" || active) && (
                   <Form action={setOrderStatus.bind(null, id, "cancelled")}>
                     <ConfirmButton variant="ghost" className="w-full" message="Да откажа ли поръчката?">
                       <X className="h-4 w-4" /> Откажи
@@ -293,7 +318,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <div className="rounded-lg border border-line bg-surface p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
       {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}

@@ -14,7 +14,9 @@ import { adjustStock, createVariant, deleteItem, transfer } from "@/lib/actions/
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { imageUrl, listItemImages, MAX_IMAGES_PER_ITEM } from "@/lib/item-images";
-import { getItem, listItemSuppliers, listItemUnits, listLocations, listPartners } from "@/lib/queries";
+import { getItem, getItemGroupPrices, listItemSuppliers, listItemUnits, listLocationsFor, listPartners, listPriceChanges, listPriceGroups } from "@/lib/queries";
+import { saveItemGroupPrices } from "@/lib/actions/pricing";
+import { BARCODE_TYPE_LABELS, barcodeTypeOf } from "@/lib/scale-barcode";
 import { addItemUnit, removeItemUnit } from "@/lib/actions/item-units";
 import { removeItemSupplier, saveItemSupplier } from "@/lib/actions/item-suppliers";
 import { daysBetween, formatDate, formatDateTime, formatMoney, formatNumber, isLowStock, label, todayIso } from "@/lib/utils";
@@ -32,12 +34,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const ctx = await requireContext();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [item, locations, ownImages, suppliers, partnerOptions, packUnits] = await Promise.all([getItem(ctx.db, id), listLocations(ctx.db), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier"), listItemUnits(ctx.db, id)]);
+  const [item, locations, ownImages, suppliers, partnerOptions, packUnits] = await Promise.all([getItem(ctx.db, id), listLocationsFor(ctx), listItemImages(ctx.db, id), listItemSuppliers(ctx.db, id), listPartners(ctx.db, "supplier"), listItemUnits(ctx.db, id)]);
+  const [priceGroups, groupPrices, priceHistory] = await Promise.all([listPriceGroups(ctx.db), getItemGroupPrices(ctx.db, id), listPriceChanges(ctx.db, id, 10)]);
   if (!item) notFound();
   const images = ownImages.length || !item.parentId ? ownImages : await listItemImages(ctx.db, item.parentId);
 
   const currency = ctx.org.currency;
   const writable = can(ctx.role, "write");
+  const hideCosts = ctx.hideCosts;
   const low = isLowStock(item);
   const values = new Map(item.fieldValues.map((v) => [v.fieldId, v.value]));
   const fields = item.category?.fields ?? [];
@@ -89,7 +93,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Обща наличност" value={`${formatNumber(item.quantity)} ${item.unit}`} tone={low ? "danger" : undefined} />
         <Stat label="Минимум" value={item.minQuantity > 0 ? `${formatNumber(item.minQuantity)} ${item.unit}` : "—"} />
-        <Stat label="Стойност на склад" value={formatMoney(lineTotal(item.quantity, item.unitCost), currency)} hint={`${formatMoney(item.unitCost, currency)} / ${item.unit}`} />
+        {!hideCosts && <Stat label="Стойност на склад" value={formatMoney(lineTotal(item.quantity, item.unitCost), currency)} hint={`${formatMoney(item.unitCost, currency)} / ${item.unit}`} />}
         <Stat label="Продажна стойност" value={formatMoney(lineTotal(item.quantity, item.unitPrice), currency)} hint={`${formatMoney(item.unitPrice, currency)} / ${item.unit}`} />
       </div>
 
@@ -102,7 +106,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 <tr>
                   <th>Локация</th>
                   <th className="text-right">Количество</th>
-                  <th className="text-right">Стойност</th>
+                  {!hideCosts && <th className="text-right">Стойност</th>}
                 </tr>
               </thead>
               <tbody>
@@ -116,7 +120,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                       <td className="text-right tabular-nums">
                         {formatNumber(lvl?.quantity ?? 0)} {item.unit}
                       </td>
-                      <td className="text-right tabular-nums text-muted">{formatMoney(lineTotal(lvl?.quantity ?? 0, item.unitCost), currency)}</td>
+                      {!hideCosts && <td className="text-right tabular-nums text-muted">{formatMoney(lineTotal(lvl?.quantity ?? 0, item.unitCost), currency)}</td>}
                     </tr>
                   );
                 })}
@@ -207,9 +211,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                     <Field label="Код (по избор)">
                       <Input name="sku" className="font-mono" placeholder={`${item.sku}-…`} />
                     </Field>
-                    <Field label="Доставна">
-                      <Input name="unitCost" type="number" step="0.01" min={0} defaultValue={item.unitCost} />
-                    </Field>
+                    {!hideCosts && (
+                      <Field label="Доставна">
+                        <Input name="unitCost" type="number" step="0.01" min={0} defaultValue={item.unitCost} />
+                      </Field>
+                    )}
                     <Field label="Продажна">
                       <Input name="unitPrice" type="number" step="0.01" min={0} defaultValue={item.unitPrice} />
                     </Field>
@@ -342,9 +348,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   <Field label="Количество">
                     <Input name="quantity" type="number" min={0} step={quantityStep(itemDecimals(item))} required placeholder="0" />
                   </Field>
-                  <Field label="Доставна цена (при приход)" hint={`Празно = текущата средна (${formatMoney(item.unitCost, currency)}).`}>
-                    <Input name="unitCost" type="number" min={0} step="0.0001" placeholder={String(item.unitCost)} />
-                  </Field>
+                  {!hideCosts && (
+                    <Field label="Доставна цена (при приход)" hint={`Празно = текущата средна (${formatMoney(item.unitCost, currency)}).`}>
+                      <Input name="unitCost" type="number" min={0} step="0.0001" placeholder={String(item.unitCost)} />
+                    </Field>
+                  )}
                   {tracked && (
                     <>
                       <Field label={item.tracking === "serial" ? "Серийни номера (при приход)" : "Партида № (при приход)"} hint={item.tracking === "serial" ? "Разделени със запетая." : undefined}>
@@ -476,6 +484,80 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           )}
 
           <Card>
+            <CardHeader title="Цени" description={priceGroups.length ? "Празна цена в група = цената на дребно." : undefined} />
+            <CardBody className="space-y-4 text-sm">
+              <dl className="grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-xs text-muted">На дребно</dt>
+                  <dd className="font-semibold tabular-nums">{formatMoney(item.unitPrice, ctx.org.currency)}</dd>
+                </div>
+                {!hideCosts && (
+                  <div>
+                    <dt className="text-xs text-muted">Доставна</dt>
+                    <dd className="font-semibold tabular-nums">{formatMoney(item.unitCost, ctx.org.currency)}</dd>
+                  </div>
+                )}
+              </dl>
+              {priceGroups.length > 0 ? (
+                <Form action={saveItemGroupPrices.bind(null, id)} className="space-y-2">
+                  {priceGroups.map((g) => (
+                    <label key={g.id} className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 truncate">{g.name}</span>
+                      <Input
+                        name={`price_${g.id}`}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="w-32 text-right tabular-nums"
+                        defaultValue={groupPrices.find((p) => p.priceGroupId === g.id)?.price ?? ""}
+                        placeholder={String(item.unitPrice)}
+                        disabled={!writable}
+                        aria-label={`Цена ${g.name}`}
+                      />
+                    </label>
+                  ))}
+                  {writable && (
+                    <div className="flex justify-end pt-1">
+                      <SubmitButton variant="secondary" size="sm">
+                        Запази цените
+                      </SubmitButton>
+                    </div>
+                  )}
+                </Form>
+              ) : (
+                can(ctx.role, "manage") && (
+                  <p className="text-xs text-muted">
+                    Различни цени за едро, дилъри или ключови клиенти —{" "}
+                    <Link href="/settings/prices" className="font-medium text-accent hover:underline">
+                      добавете ценови групи
+                    </Link>
+                    .
+                  </p>
+                )
+              )}
+              {priceHistory.length > 0 && (
+                <div>
+                  <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">История на цените</div>
+                  <ul className="space-y-1.5">
+                    {priceHistory.filter((h) => !hideCosts || h.target !== "cost").map((h) => (
+                      <li key={h.id} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="min-w-0 truncate">
+                          <span className="font-medium">{h.target === "retail" ? "Дребно" : h.target === "cost" ? "Доставна" : (h.priceGroup?.name ?? "Група")}</span>
+                          <span className="text-muted"> · {formatDate(h.createdAt)}{h.userName ? ` · ${h.userName}` : ""}</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          <span className="text-muted line-through">{h.oldPrice === null ? "—" : formatMoney(h.oldPrice, ctx.org.currency)}</span>{" "}
+                          {h.newPrice === null ? "—" : formatMoney(h.newPrice, ctx.org.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
             <CardHeader title="Доставчици" description={suppliers.length ? "Цена и код при всеки доставчик; предпочитаният се ползва за предложенията за поръчка." : "Добавете от кого купувате артикула."} />
             <CardBody className="space-y-3 text-sm">
               {suppliers.map((s) => (
@@ -490,7 +572,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                       </Badge>
                     )}
                     <div className="text-xs text-muted">
-                      {[s.supplierSku && `код ${s.supplierSku}`, s.purchasePrice !== null && formatMoney(s.purchasePrice, currency), s.minOrderQuantity && `мин. ${formatNumber(s.minOrderQuantity)} ${item.unit}`, s.leadTimeDays !== null && `${s.leadTimeDays} дни`].filter(Boolean).join(" · ") || "—"}
+                      {[s.supplierSku && `код ${s.supplierSku}`, !hideCosts && s.purchasePrice !== null && formatMoney(s.purchasePrice, currency), s.minOrderQuantity && `мин. ${formatNumber(s.minOrderQuantity)} ${item.unit}`, s.leadTimeDays !== null && `${s.leadTimeDays} дни`].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </div>
                   {writable && (
@@ -561,7 +643,10 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           </Card>
 
           <Card>
-            <CardHeader title="Етикети с баркод" description={item.barcode ? `Баркод ${item.barcode}` : `Без баркод — ще се използва кодът ${item.sku}.`} />
+            <CardHeader
+              title="Етикети с баркод"
+              description={`${BARCODE_TYPE_LABELS[barcodeTypeOf(item)]}${item.plu ? ` · PLU ${item.plu}` : ""} · ${item.barcode ? `баркод ${item.barcode}` : `без баркод — кодът ${item.sku}`}`}
+            />
             <CardBody>
               <form action="/print/labels" method="get" target="_blank" className="grid grid-cols-2 gap-3">
                 <input type="hidden" name="item" value={id} />
@@ -571,6 +656,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 <Field label="Пропусни" hint="Вече използвани места на листа.">
                   <Input name="skip" type="number" min={0} max={23} defaultValue={0} />
                 </Field>
+                {barcodeTypeOf(item) !== "standard" && (
+                  <Field label={barcodeTypeOf(item) === "weight" ? `Тегло в пакета (${item.unit})` : `Брой в пакета (${item.unit})`} hint="По избор: етикет с количеството в баркода (пакетиране без везна)." className="col-span-2">
+                    <Input name="qty" type="number" min={0} step={quantityStep(itemDecimals(item))} placeholder={barcodeTypeOf(item) === "weight" ? "0,500" : "5"} />
+                  </Field>
+                )}
                 <label className="col-span-2 flex items-center gap-2 text-sm">
                   <input type="checkbox" name="price" value="0" className="h-4 w-4 rounded border-line" />
                   Без цена
@@ -594,7 +684,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
 function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "danger" }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <div className="rounded-lg border border-line bg-surface p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
       <div className={`mt-1 text-xl font-semibold tabular-nums ${tone === "danger" ? "text-danger" : ""}`}>{value}</div>
       {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}

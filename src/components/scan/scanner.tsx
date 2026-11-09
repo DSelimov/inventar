@@ -71,6 +71,8 @@ export function Scanner({ initialCode, onCode, continuous = false, hideInput = f
         onSubmit={(e) => {
           e.preventDefault();
           go(code);
+          // с onCode страницата остава — полето се чисти за следващия код от скенера
+          if (onCode) setCode("");
         }}
         className="flex gap-2"
       >
@@ -79,7 +81,7 @@ export function Scanner({ initialCode, onCode, continuous = false, hideInput = f
       </form>
       )}
       {!hideInput && <p className="text-xs text-muted">USB/Bluetooth скенерите пишат в полето като клавиатура и натискат Enter. За камера на телефон използвайте бутона.</p>}
-      <div id="scanner-view" className={active ? "overflow-hidden rounded-2xl border border-line" : "hidden"} />
+      <div id="scanner-view" className={active ? "overflow-hidden rounded-lg border border-line" : "hidden"} />
       {error && <p className="rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning">{error}</p>}
       {active ? (
         <Button variant="secondary" onClick={() => void stop()}>

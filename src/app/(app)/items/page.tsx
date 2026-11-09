@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, ImageOff, Package, Plus, Printer } from "lucide-react";
+import { Download, ImageOff, Package, Plus, Printer, Tags } from "lucide-react";
 import type { Metadata } from "next";
 import { Badge, ColorBadge } from "@/components/ui/badge";
 import { buttonClasses, ButtonLink } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { requireContext } from "@/lib/auth";
 import { imageUrl, primaryImages } from "@/lib/item-images";
 import { can } from "@/lib/permissions";
 import { pageParam } from "@/lib/paging";
-import { listCategories, listLocations, pageItems } from "@/lib/queries";
+import { listCategories, listLocationsFor, pageItems } from "@/lib/queries";
 import { formatDate, formatMoney, formatNumber, isLowStock, plural } from "@/lib/utils";
 import { lineTotal } from "@/lib/money";
 
@@ -35,7 +35,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   const [{ rows, total, page, pageSize }, categories, locations] = await Promise.all([
     pageItems(ctx.db, { q, categoryId, status, low, locationId }, pageParam(sp)),
     listCategories(ctx.db),
-    listLocations(ctx.db),
+    listLocationsFor(ctx),
   ]);
   const photos = await primaryImages(ctx.db, [...new Set(rows.flatMap((r) => (r.parentId ? [r.id, r.parentId] : [r.id])))]);
   const labelQuery = new URLSearchParams(Object.entries({ q, category: categoryId ? String(categoryId) : "", location: locationId ? String(locationId) : "", status, low: low ? "1" : "" }).filter(([, v]) => v)).toString();
@@ -57,6 +57,12 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
               <Download className="h-4 w-4" />
               CSV
             </ButtonLink>
+            {can(ctx.role, "manage") && (
+              <ButtonLink href="/items/prices" variant="secondary">
+                <Tags className="h-4 w-4" />
+                Смяна на цени
+              </ButtonLink>
+            )}
             {can(ctx.role, "write") && (
               <ButtonLink href="/items/new">
                 <Plus className="h-4 w-4" />
@@ -67,10 +73,10 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
         }
       />
 
-      {imported > 0 && <p className="mb-4 rounded-xl bg-success-soft px-4 py-2 text-sm text-success">Импортирани са {imported} артикула.</p>}
+      {imported > 0 && <p className="mb-4 rounded-lg bg-success-soft px-4 py-2 text-sm text-success">Импортирани са {imported} артикула.</p>}
 
       <FilterBar action="/items" resetHref={hasFilters ? "/items" : undefined}>
-        <div className="min-w-56 flex-1">
+        <div className="min-w-40 flex-1">
           <Input name="q" placeholder="Търсене по име, код, баркод…" defaultValue={q} />
         </div>
         <Select name="category" defaultValue={categoryId ?? ""} className="w-auto">
@@ -117,8 +123,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                 <th>Категория</th>
                 <th className="text-right">Наличност</th>
                 {multiLocation && <th>По локации</th>}
-                <th className="text-right">Доставна цена</th>
-                <th className="text-right">Стойност</th>
+                {!ctx.hideCosts && <th className="text-right">Доставна цена</th>}
+                {!ctx.hideCosts && <th className="text-right">Стойност</th>}
                 <th>Обновен</th>
               </tr>
             </thead>
@@ -172,8 +178,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
                           .join(" · ") || "—"}
                       </td>
                     )}
-                    <td className="text-right tabular-nums text-muted">{formatMoney(item.unitCost, ctx.org.currency)}</td>
-                    <td className="text-right tabular-nums font-medium">{formatMoney(lineTotal(item.quantity, item.unitCost), ctx.org.currency)}</td>
+                    {!ctx.hideCosts && <td className="text-right tabular-nums text-muted">{formatMoney(item.unitCost, ctx.org.currency)}</td>}
+                    {!ctx.hideCosts && <td className="text-right tabular-nums font-medium">{formatMoney(lineTotal(item.quantity, item.unitCost), ctx.org.currency)}</td>}
                     <td className="text-muted">{formatDate(item.updatedAt)}</td>
                   </tr>
                 );

@@ -35,7 +35,7 @@ export default async function PlanPage() {
                 const max = limits(plan)[k];
                 const pct = max ? Math.min(100, Math.round((used[k] / max) * 100)) : 0;
                 return (
-                  <div key={k} className="rounded-xl border border-line p-3">
+                  <div key={k} className="rounded-lg border border-line p-3">
                     <div className="text-xs uppercase tracking-wide text-muted">{LIMIT_LABELS[k]}</div>
                     <div className="mt-1 text-lg font-semibold tabular-nums">
                       {formatNumber(used[k])}

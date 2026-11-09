@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, Pencil, Printer, Trash2, Truck, X } from "lucide-react";
+import { Check, Pencil, Printer, ScanLine, Trash2, Truck, X } from "lucide-react";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button, buttonClasses, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -181,6 +181,12 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
                     Отбележи „в движение“
                   </Button>
                 </Form>
+              )}
+              {writable && open && inbound && (
+                <ButtonLink href={`/shipments/${id}/receive`} className="w-full">
+                  <ScanLine className="h-4 w-4" />
+                  Приеми със скенер
+                </ButtonLink>
               )}
               {writable && open && (
                 <Form action={setShipmentStatus.bind(null, id, "delivered")}>

@@ -57,7 +57,7 @@ export function Toaster() {
           role={t.tone === "error" ? "alert" : "status"}
           data-toast={t.tone}
           className={cn(
-            "pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border bg-surface px-4 py-3 text-sm shadow-lg",
+            "pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border bg-surface px-4 py-3 text-sm shadow-lg",
             t.tone === "error" ? "border-danger/30" : "border-line",
           )}
         >

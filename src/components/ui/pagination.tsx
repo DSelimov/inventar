@@ -54,7 +54,7 @@ export function Pagination({ basePath, searchParams, page, pageSize, total, noun
                 …
               </span>
             ) : (
-              <Link key={p} href={href(p)} aria-current={p === page ? "page" : undefined} className={cn(link, p === page ? "bg-accent-soft font-semibold text-accent" : "text-muted hover:bg-surface-2 hover:text-text")}>
+              <Link key={p} href={href(p)} aria-current={p === page ? "page" : undefined} className={cn(link, p === page ? "bg-accent font-semibold text-white" : "text-accent hover:bg-surface-2")}>
                 {p}
               </Link>
             ),

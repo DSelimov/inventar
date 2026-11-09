@@ -43,7 +43,7 @@ export function PartnerImportForm({ action }: { action: (fd: FormData) => Promis
 
   return (
     <Form action={action} className="space-y-4">
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface-2/50 p-6 text-center text-sm hover:border-accent/50">
+      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line bg-surface-2/50 p-6 text-center text-sm hover:border-accent/50">
         <Upload className="h-6 w-6 text-muted" />
         <span className="font-medium">{fileName || "Изберете CSV файл с партньори"}</span>
         <span className="text-xs text-muted">Колони: име/фирма, ЕИК/булстат, ДДС №, МОЛ, град, адрес, телефон, имейл, тип (клиент/доставчик).</span>
@@ -52,7 +52,7 @@ export function PartnerImportForm({ action }: { action: (fd: FormData) => Promis
       {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
       {rows.length > 0 && (
         <>
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="overflow-x-auto rounded-lg border border-line">
             <table className="table">
               <thead>
                 <tr>

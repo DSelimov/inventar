@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { Field, Input } from "@/components/ui/fields";
+import { Field, Input, Select } from "@/components/ui/fields";
+import { accountBalances } from "@/lib/cash";
 import { Form } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -37,6 +38,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const payable = inv.status === "issued" && (inv.kind === "invoice" || inv.kind === "debit_note");
   const title = `${KIND_TITLES[inv.kind]} ${inv.number ? `№ ${inv.number}` : "(чернова)"}`;
 
+  const accounts = inv.status === "issued" && inv.paymentStatus !== "paid" ? (await accountBalances(ctx.db)).filter((a) => a.active) : [];
   const [partners, items, vatRates, company, due] = await Promise.all([
     draft ? listPartners(ctx.db) : Promise.resolve([]),
     draft ? listItemOptions(ctx.db) : Promise.resolve([]),
@@ -199,7 +201,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     <Form action={addInvoicePayment.bind(null, inv.id)} className="grid grid-cols-2 gap-2 border-t border-line pt-3">
                       <Input name="amount" type="number" min="0.01" step="0.01" defaultValue={Math.max(0, sumMoney([due, -inv.paidAmount]))} required aria-label="Сума" />
                       <Input name="paidOn" type="date" defaultValue={localTodayIso()} aria-label="Дата" />
-                      <Input name="method" placeholder="Банков превод" className="col-span-2" aria-label="Начин" />
+                      <Select name="accountId" defaultValue={accounts.find((a) => a.kind === "bank")?.id ?? accounts[0]?.id} aria-label="Каса / сметка">
+                        {accounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </Select>
+                      <Input name="method" placeholder="Банков превод" aria-label="Начин" />
                       <SubmitButton variant="secondary" size="sm" className="col-span-2">
                         Отбележи плащане
                       </SubmitButton>

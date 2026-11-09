@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { desc, isNotNull } from "drizzle-orm";
 import { items, stockMovements } from "@/db/tenant-schema";
 import { getContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -19,12 +19,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   if (!ctx) return new Response("Unauthorized", { status: 401 });
   const { kind } = await params;
   const db = ctx.db;
+  // доставни цени и стойности: не за потребители със скрити доставни цени
+  if (ctx.hideCosts && kind !== "template" && kind !== "scale-plu") return new Response("Forbidden", { status: 403 });
 
   if (kind === "template") {
     return csvResponse("shablon-artikuli", [
       ["sku", "name", "barcode", "category", "quantity", "min", "unit", "cost", "price", "location", "description"],
       ["ART-001", "Примерен артикул", "3800000000001", "Категория", 10, 2, "бр.", "4.50", "9.90", "Основен склад", "Описание"],
     ]);
+  }
+  if (kind === "scale-plu") {
+    // списък за зареждане във везната: PLU, име (до 40 знака), цена за мерната единица
+    const rows = await db.query.items.findMany({ where: isNotNull(items.plu), orderBy: [items.plu] });
+    return csvResponse("plu-vezna", [["plu", "name", "price", "unit", "barcode"], ...rows.map((r) => [r.plu, r.name.slice(0, 40), r.unitPrice.toFixed(2), r.unit, r.barcode])]);
   }
   if (kind === "items") {
     const rows = await db.query.items.findMany({ with: { category: true }, orderBy: [items.name] });

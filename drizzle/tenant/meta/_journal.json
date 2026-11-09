@@ -120,6 +120,69 @@
       "when": 1792654649862,
       "tag": "0016_shops",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1793957904544,
+      "tag": "0017_price_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1793958734636,
+      "tag": "0018_cash_book",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1793958902952,
+      "tag": "0019_cash_reversal",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1793959653787,
+      "tag": "0020_production",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1793961847286,
+      "tag": "0021_consignment",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1793962441524,
+      "tag": "0022_currencies",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1793963466541,
+      "tag": "0023_scale_plu",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1793968261621,
+      "tag": "0024_quotes_min_price",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1793969881224,
+      "tag": "0025_transfers",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function Label({ className, ...props }: ComponentProps<"label">) {
-  return <label className={cn("mb-1.5 block text-sm font-medium text-text", className)} {...props} />;
+  return <label className={cn("mb-1.5 block text-sm font-bold text-text", className)} {...props} />;
 }
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
@@ -20,7 +20,7 @@ export function Select({ className, ...props }: ComponentProps<"select">) {
 export function Checkbox({ className, label, ...props }: ComponentProps<"input"> & { label: ReactNode }) {
   return (
     <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-      <input type="checkbox" className={cn("h-4 w-4 rounded border-line text-accent accent-accent", className)} {...props} />
+      <input type="checkbox" className={cn("h-4 w-4 rounded border-line accent-accent", className)} {...props} />
       {label}
     </label>
   );
@@ -43,7 +43,7 @@ export function Field({
     <div className={className}>
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs leading-snug text-muted">{hint}</p>}
     </div>
   );
 }

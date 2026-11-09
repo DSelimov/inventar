@@ -80,7 +80,7 @@ export function ShipmentForm({
   return (
     <Form action={action} className="space-y-6">
       {orderId && <input type="hidden" name="orderId" value={orderId} />}
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Пратка</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Посока">
@@ -131,7 +131,7 @@ export function ShipmentForm({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold">Редове</h2>
@@ -147,7 +147,7 @@ export function ShipmentForm({
             const insufficient = !inbound && chosen && Number(line.quantity) > chosen.quantity;
             const lineLots = chosen ? lots.filter((l) => l.itemId === chosen.id && String(l.locationId) === locationId) : [];
             return (
-              <div key={line.key} className="rounded-xl border border-line p-3">
+              <div key={line.key} className="rounded-lg border border-line p-3">
                 <div className={withCost ? "grid grid-cols-[1fr_6rem_7rem_2.5rem] items-start gap-2" : "grid grid-cols-[1fr_7rem_2.5rem] items-start gap-2"}>
                   <div>
                     <Select name="lineItemId" required value={line.itemId} disabled={!linesEditable} onChange={(e) => update(line.key, { itemId: e.target.value, lotId: "", packId: "" })}>

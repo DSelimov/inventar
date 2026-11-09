@@ -118,7 +118,7 @@ export const deleteInvoiceDraft = act(async (id: number) => {
 
 export const addInvoicePayment = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
-  const r = await addPayment(ctx.db, id, { paidOn: isoDate(fd, "paidOn") ?? localTodayIso(), amount: parseMoney(str(fd, "amount"), "Сума"), method: optional(fd, "method"), note: optional(fd, "note") }, ctx.user.name);
+  const r = await addPayment(ctx.db, id, { paidOn: isoDate(fd, "paidOn") ?? localTodayIso(), amount: parseMoney(str(fd, "amount"), "Сума"), method: optional(fd, "method"), note: optional(fd, "note"), accountId: optionalInt(fd, "accountId") }, ctx.user.name, ctx.user);
   await audit(ctx, "update", "invoice", id, { payment: str(fd, "amount"), paymentStatus: r.status });
   if (r.becamePaid) emit(ctx.db, "invoice.paid", { id, number: r.number, paidAmount: r.paid, paymentStatus: r.status });
   revalidate(id);

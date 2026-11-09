@@ -37,6 +37,18 @@ export function mulQty(a: number, b: number) {
   return Number(negative ? -r : r) / SCALE;
 }
 
+/**
+ * a × b / c (количество по рецепта: съставка × произвеждано / добив на рецептата), закръглено
+ * до decimals знака, половинката нагоре. c > 0.
+ */
+export function scaleQty(a: number, b: number, c: number, decimals = MAX_DECIMALS) {
+  const num = BigInt(units(a)) * BigInt(units(b)); // милионни
+  const den = BigInt(units(c)) * BigInt(10 ** (MAX_DECIMALS - decimals)); // → резултат в 10^-decimals
+  if (den <= BigInt(0)) throw new UserError("Добивът на рецептата трябва да е положителен.");
+  const r = (num * BigInt(2) + den) / (den * BigInt(2));
+  return Number(r) / 10 ** decimals;
+}
+
 /** Точна сума по редове. */
 export function sumQty<T>(rows: Iterable<T>, quantity: (row: T) => number) {
   let total = 0;
@@ -90,4 +102,12 @@ export function parseQuantity(raw: unknown, decimals = 0, label = "Количе�
 /** Проверява вече разчетено количество спрямо артикула (за stock engine и API). */
 export function assertQuantity(value: number, decimals: number, label = "Количество") {
   return parseQuantity(value, decimals, label);
+}
+
+/** a ÷ b като количество с decimals знака (цена от етикет ÷ цена за кг), половинката нагоре; b > 0. */
+export function divideToQuantity(a: number, b: number, decimals = MAX_DECIMALS) {
+  const num = BigInt(Math.round(a * 10_000)) * BigInt(10 ** decimals); // десетохилядни × 10^decimals
+  const den = BigInt(Math.round(b * 10_000));
+  if (den <= BigInt(0)) throw new UserError("Делителят трябва да е положителен.");
+  return Number((num * BigInt(2) + den) / (den * BigInt(2))) / 10 ** decimals;
 }

@@ -33,6 +33,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader
+        help="categories"
         back={{ href: "/categories", label: "Категории" }}
         title={
           <span className="flex items-center gap-3">
@@ -96,35 +97,37 @@ export default async function CategoryPage({ params }: { params: Promise<{ id: s
             )}
           </Card>
 
-          <Card>
-            <CardHeader title="Настройки на категорията" />
-            <CardBody>
-              <Form action={updateCategory.bind(null, id)} className="grid gap-4 sm:grid-cols-[1fr_auto]">
-                <Field label="Име">
-                  <Input name="name" required defaultValue={category.name} />
-                </Field>
-                <Field label="Цвят">
-                  <Input name="color" type="color" defaultValue={category.color} className="h-10 w-20 p-1" />
-                </Field>
-                <Field label="ДДС за артикулите" className="sm:col-span-2" hint="Артикул без собствена ставка взема тази.">
-                  <Select name="vatRateId" defaultValue={category.vatRateId ?? ""}>
-                    <option value="">Ставката по подразбиране</option>
-                    {vatRates.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Описание" className="sm:col-span-2">
-                  <Textarea name="description" defaultValue={category.description ?? ""} className="min-h-16" />
-                </Field>
-                <div className="sm:col-span-2 flex justify-end">
-                  <SubmitButton variant="secondary">Запази</SubmitButton>
-                </div>
-              </Form>
-            </CardBody>
-          </Card>
+          {can(ctx.role, "write") && (
+            <Card>
+              <CardHeader title="Настройки на категорията" />
+              <CardBody>
+                <Form action={updateCategory.bind(null, id)} className="grid gap-4 sm:grid-cols-[1fr_auto]">
+                  <Field label="Име">
+                    <Input name="name" required defaultValue={category.name} />
+                  </Field>
+                  <Field label="Цвят">
+                    <Input name="color" type="color" defaultValue={category.color} className="h-10 w-20 p-1" />
+                  </Field>
+                  <Field label="ДДС за артикулите" className="sm:col-span-2" hint="Артикул без собствена ставка взема тази.">
+                    <Select name="vatRateId" defaultValue={category.vatRateId ?? ""}>
+                      <option value="">Ставката по подразбиране</option>
+                      {vatRates.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Описание" className="sm:col-span-2">
+                    <Textarea name="description" defaultValue={category.description ?? ""} className="min-h-16" />
+                  </Field>
+                  <div className="sm:col-span-2 flex justify-end">
+                    <SubmitButton variant="secondary">Запази</SubmitButton>
+                  </div>
+                </Form>
+              </CardBody>
+            </Card>
+          )}
         </div>
 
         {manage && <Card className="h-fit">

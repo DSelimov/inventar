@@ -50,20 +50,20 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       />
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <div className="flex w-fit gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+        <div className="flex w-fit gap-1 rounded-lg border border-line bg-surface p-1">
           {[
             ["all", "Всички"],
             ["purchase", "Доставки"],
             ["sales", "Клиентски"],
           ].map(([v, l]) => (
-            <Link key={v} href={href(v, status)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", type === v ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}>
+            <Link key={v} href={href(v, status)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", type === v ? "bg-accent text-white" : "text-accent hover:bg-surface-2")}>
               {l}
             </Link>
           ))}
         </div>
-        <div className="flex w-fit flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+        <div className="flex w-fit flex-wrap gap-1 rounded-lg border border-line bg-surface p-1">
           {(["all", ...ORDER_STATUSES] as const).map((v) => (
-            <Link key={v} href={href(type, v)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", status === v ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}>
+            <Link key={v} href={href(type, v)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", status === v ? "bg-accent text-white" : "text-accent hover:bg-surface-2")}>
               {v === "all" ? "Всички статуси" : label(v)}
             </Link>
           ))}
@@ -118,7 +118,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <td className="text-right tabular-nums">
                       {done} / {ordered}
                     </td>
-                    <td className="text-right tabular-nums">{formatMoney(value, ctx.org.currency)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(value, o.currency ?? ctx.org.currency)}</td>
                   </tr>
                 );
               })}

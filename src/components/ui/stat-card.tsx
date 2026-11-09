@@ -15,25 +15,21 @@ export function StatCard({
   icon: LucideIcon;
   tone?: "neutral" | "accent" | "warning" | "danger" | "success";
 }) {
-  const toneClass = {
-    neutral: "bg-surface-2 text-muted",
-    accent: "bg-accent-soft text-accent",
-    warning: "bg-warning-soft text-warning",
-    danger: "bg-danger-soft text-danger",
-    success: "bg-success-soft text-success",
+  const valueClass = {
+    neutral: "",
+    accent: "",
+    success: "",
+    warning: "text-warning",
+    danger: "text-danger",
   }[tone];
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
-          <div className="mt-2 break-words text-xl font-semibold tabular-nums tracking-tight xl:text-[1.35rem]">{value}</div>
-          {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
-        </div>
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", toneClass)}>
-          <Icon className="h-5 w-5" />
-        </div>
+    <div className="rounded-lg border border-line bg-surface px-4 py-3.5">
+      <div className="flex items-center gap-1.5 text-xs text-muted">
+        <Icon className="h-3.5 w-3.5" />
+        <span className="truncate">{label}</span>
       </div>
+      <div className={cn("mt-1.5 break-words text-xl font-semibold tabular-nums tracking-tight", valueClass)}>{value}</div>
+      {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}
     </div>
   );
 }

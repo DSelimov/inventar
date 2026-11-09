@@ -8,6 +8,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action";
 import { quantityStep } from "@/lib/quantity";
+import { BARCODE_TYPE_LABELS, BARCODE_TYPES, barcodeTypeOf, type BarcodeType } from "@/lib/scale-barcode";
 
 type CategoryWithFields = Category & { fields: FieldDefinition[] };
 
@@ -20,8 +21,11 @@ export function ItemForm({
   cancelHref,
   defaultBarcode,
   vatRates,
+  hideCosts = false,
 }: {
   vatRates: Array<{ id: number; name: string }>;
+  /** Потребителят не вижда доставните цени — полето не се показва (сървърът пази текущата). */
+  hideCosts?: boolean;
   categories: CategoryWithFields[];
   locations: Location[];
   item?: Item;
@@ -34,13 +38,24 @@ export function ItemForm({
   const [tracking, setTracking] = useState<string>(item?.tracking ?? "none");
   const [quantity, setQuantity] = useState<string>("0");
   const [decimals, setDecimals] = useState<number>(item?.quantityDecimals ?? 0);
+  const [unit, setUnit] = useState<string>(item?.unit ?? "бр.");
+  const [barcodeType, setBarcodeType] = useState<BarcodeType>(item ? barcodeTypeOf(item) : "standard");
+  // теглови → кг с 3 знака; количествен → цели бройки
+  const changeBarcodeType = (t: BarcodeType) => {
+    setBarcodeType(t);
+    if (t === "weight") {
+      if (decimals === 0) setDecimals(3);
+      if (unit === "бр.") setUnit("кг");
+    }
+    if (t === "count") setDecimals(0);
+  };
   const step = quantityStep(tracking === "serial" ? 0 : decimals);
   const category = categories.find((c) => String(c.id) === categoryId);
   const trackingLocked = Boolean(item && item.quantity > 0);
 
   return (
     <Form action={action} className="space-y-6">
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Основни данни</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Име" className="sm:col-span-2">
@@ -54,9 +69,30 @@ export function ItemForm({
           <Field label="Код (SKU)" hint="Оставете празно за автоматично генериране.">
             <Input name="sku" defaultValue={item?.sku} placeholder="MISHKA-001" className="font-mono" />
           </Field>
-          <Field label="Баркод" hint="EAN / QR; използва се при сканиране.">
-            <Input name="barcode" defaultValue={item?.barcode ?? defaultBarcode ?? ""} className="font-mono" inputMode="numeric" />
+          <Field label="Тип баркод" hint={barcodeType === "standard" ? "Всяко сканиране е 1 бр. (или опаковка)." : barcodeType === "weight" ? "Етикет от везна с тегло (28…) или цена (29…)." : "Етикет с брой в баркода (27…), напр. торбичка 5 бр."}>
+            <Select name="barcodeType" value={barcodeType} onChange={(e) => changeBarcodeType(e.target.value as BarcodeType)} disabled={tracking === "serial"}>
+              {BARCODE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {BARCODE_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </Select>
           </Field>
+          {barcodeType === "standard" ? (
+            <Field label="Баркод" hint="EAN / QR; празно + отметка = вътрешен баркод.">
+              <Input name="barcode" defaultValue={item?.barcode ?? defaultBarcode ?? ""} className="font-mono" inputMode="numeric" />
+              {!item?.barcode && (
+                <div className="mt-1.5">
+                  <Checkbox name="generateBarcode" value="1" label="Генерирай вътрешен баркод (EAN-13)" />
+                </div>
+              )}
+            </Field>
+          ) : (
+            <Field label="PLU (код във везната)" hint="Празно = следващият свободен номер.">
+              <Input name="plu" defaultValue={item?.plu ?? ""} className="font-mono" inputMode="numeric" maxLength={7} placeholder="автоматично" />
+              <input type="hidden" name="barcode" value={item?.barcode ?? ""} />
+            </Field>
+          )}
           <Field label="Категория">
             <Select name="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">— Без категория —</option>
@@ -81,7 +117,7 @@ export function ItemForm({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Наличност и цени</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {!item && (
@@ -114,7 +150,7 @@ export function ItemForm({
             <Input name="minQuantity" type="number" min={0} step={step} defaultValue={item?.minQuantity ?? 0} />
           </Field>
           <Field label="Мерна единица">
-            <Input name="unit" defaultValue={item?.unit ?? "бр."} placeholder="бр., кг, кашон…" />
+            <Input name="unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="бр., кг, кашон…" />
           </Field>
           <Field label="Количества" hint={tracking === "serial" ? "Серийните номера са винаги цели бройки." : "Цели бройки или дробни за кг, л, м."}>
             <Select name="quantityDecimals" value={tracking === "serial" ? 0 : decimals} onChange={(e) => setDecimals(Number(e.target.value))} disabled={tracking === "serial"}>
@@ -134,11 +170,16 @@ export function ItemForm({
               ))}
             </Select>
           </Field>
-          <Field label="Доставна цена" hint={item && item.quantity > 0 ? "Средна от доставките — изчислява се автоматично при всеки приход." : "Колко плащате за единица."}>
-            <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} readOnly={Boolean(item && item.quantity > 0)} />
-          </Field>
+          {!hideCosts && (
+            <Field label="Доставна цена" hint={item && item.quantity > 0 ? "Средна от доставките — изчислява се автоматично при всеки приход." : "Колко плащате за единица."}>
+              <Input name="unitCost" type="number" min={0} step="0.0001" defaultValue={item?.unitCost ?? 0} readOnly={Boolean(item && item.quantity > 0)} />
+            </Field>
+          )}
           <Field label="Продажна цена" hint="На каква цена продавате (по избор).">
-            <Input name="unitPrice" type="number" min={0} step="0.01" defaultValue={item?.unitPrice ?? 0} />
+            <Input name="unitPrice" type="number" min={0} step="0.0001" defaultValue={item?.unitPrice ?? 0} />
+          </Field>
+          <Field label="Минимална продажна цена" hint="По избор. Под нея продава само администратор/собственик.">
+            <Input name="minPrice" type="number" min={0} step="0.0001" defaultValue={item?.minPrice ?? ""} />
           </Field>
           {item && (
             <Field label="Статус">
@@ -152,7 +193,7 @@ export function ItemForm({
       </section>
 
       {category && category.fields.length > 0 && (
-        <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-1 text-sm font-semibold">Данни за „{category.name}“</h2>
           <p className="mb-4 text-xs text-muted">Полета, дефинирани за тази категория.</p>
           <div className="grid gap-4 sm:grid-cols-2">

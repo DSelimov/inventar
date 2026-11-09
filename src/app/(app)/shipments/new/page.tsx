@@ -3,14 +3,14 @@ import { ShipmentForm } from "@/components/shipments/shipment-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { createShipment } from "@/lib/actions/shipments";
 import { requireContext } from "@/lib/auth";
-import { listAllItemUnits, listAvailableLots, listItemOptions, listLocations, listPartners } from "@/lib/queries";
+import { listAllItemUnits, listAvailableLots, listItemOptions, listLocationsFor, listPartners } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Нова пратка" };
 
 export default async function NewShipmentPage({ searchParams }: { searchParams: Promise<{ direction?: string; item?: string }> }) {
   const ctx = await requireContext("write");
   const sp = await searchParams;
-  const [items, locations, partners, lots] = await Promise.all([listItemOptions(ctx.db), listLocations(ctx.db), listPartners(ctx.db), listAvailableLots(ctx.db)]);
+  const [items, locations, partners, lots] = await Promise.all([listItemOptions(ctx.db), listLocationsFor(ctx), listPartners(ctx.db), listAvailableLots(ctx.db)]);
   const packUnits = await listAllItemUnits(ctx.db);
   const direction = sp.direction === "outbound" ? "outbound" : "inbound";
   const itemId = Number(sp.item);

@@ -6,6 +6,7 @@ import { emit } from "@/lib/webhooks";
 import { parseMoney } from "@/lib/money";
 import { itemDecimals, parseQuantity, readDecimals } from "@/lib/quantity";
 import { assertFitsDecimals } from "@/lib/stock";
+import { recordPriceChanges } from "@/lib/price-groups";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,7 +14,7 @@ export const GET = handler("read", async (_req, ctx, { params }: Params) => {
   const id = await paramId(params);
   const row = await ctx.db.query.items.findFirst({
     where: eq(items.id, id),
-    with: { category: true, stockLevels: { with: { location: true } }, lots: { where: gt(lots.quantity, 0), with: { location: true } }, fieldValues: { with: { field: true } }, variants: true },
+    with: { category: true, stockLevels: { with: { location: true } }, lots: { where: gt(lots.quantity, 0), with: { location: true } }, fieldValues: { with: { field: true } }, variants: true, groupPrices: true },
   });
   if (!row) throw new ApiError(404, "Артикулът не е намерен.");
   const images = (await listItemImages(ctx.db, id)).map(apiImage);
@@ -39,6 +40,10 @@ export const PATCH = handler("write", async (req, ctx, { params }: Params) => {
   if ("minQuantity" in patch) patch.minQuantity = parseQuantity(patch.minQuantity, decimals, "minQuantity");
   if (!Object.keys(patch).length) throw new ApiError(422, "Няма полета за промяна.");
   await ctx.db.update(items).set({ ...patch, updatedAt: new Date() }).where(eq(items.id, id));
+  await recordPriceChanges(ctx.db, null, "API", [
+    ...("unitPrice" in patch ? [{ itemId: id, target: "retail" as const, oldPrice: existing.unitPrice, newPrice: patch.unitPrice as number }] : []),
+    ...("unitCost" in patch ? [{ itemId: id, target: "cost" as const, oldPrice: existing.unitCost, newPrice: patch.unitCost as number }] : []),
+  ]);
   const row = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
   emit(ctx.db, "item.updated", { id, ...patch, source: "api" });
   return json({ data: row });

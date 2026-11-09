@@ -21,7 +21,7 @@ export function WriteOffForm({ items, locations, lots, initialItemId, action }: 
 
   return (
     <Form action={action} className="space-y-6">
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Локация">
             <Select name="locationId" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
@@ -44,7 +44,7 @@ export function WriteOffForm({ items, locations, lots, initialItemId, action }: 
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="mb-3 text-sm font-semibold">Стока за брак</h2>
         <div className="space-y-2">
           {lines.map((line) => {

@@ -6,11 +6,12 @@ import { ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, RefreshCw, Wifi, Wifi
 import { Scanner } from "@/components/scan/scanner";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/fields";
-import { mulQty } from "@/lib/quantity";
+import { divideToQuantity, itemDecimals, mulQty } from "@/lib/quantity";
+import { BARCODE_TYPE_LABELS, barcodeTypeOf, labelFits, parseScaleBarcode, pluCandidates, type ScaleFormat } from "@/lib/scale-barcode";
 import { cn, formatNumber } from "@/lib/utils";
 
-type CatalogItem = { id: number; sku: string; barcode: string | null; name: string; variantLabel: string | null; unit: string; quantityDecimals: number; tracking: string; quantity: number };
-type Catalog = { items: CatalogItem[]; packs: Array<{ itemId: number; name: string; factor: number; barcode: string | null }>; locations: Array<{ id: number; name: string; isDefault: boolean }>; counts: Array<{ id: number; number: string; locationId: number }>; at: string };
+type CatalogItem = { id: number; sku: string; barcode: string | null; plu?: string | null; unitPrice?: number; name: string; variantLabel: string | null; unit: string; quantityDecimals: number; tracking: string; quantity: number };
+type Catalog = { items: CatalogItem[]; packs: Array<{ itemId: number; name: string; factor: number; barcode: string | null }>; locations: Array<{ id: number; name: string; isDefault: boolean }>; counts: Array<{ id: number; number: string; locationId: number }>; scaleFormats?: ScaleFormat[]; at: string };
 type Mode = "in" | "out" | "count";
 type QueuedAction = { id: string; kind: "movement" | "count"; recordedAt: string; payload: Record<string, unknown>; label: string };
 type LogLine = { id: string; label: string; ok: boolean | null; message: string };
@@ -131,12 +132,26 @@ export function MobileScan({ orgName }: { orgName: string }) {
     const key = code.trim().toLowerCase();
     if (!c || !key) return;
     const pack = c.packs.find((p) => p.barcode?.toLowerCase() === key);
-    const item = c.items.find((i) => (pack ? i.id === pack.itemId : i.barcode?.toLowerCase() === key || i.sku.toLowerCase() === key));
-    const qty = Number(quantity.replace(",", ".")) || 1;
+    let item = c.items.find((i) => (pack ? i.id === pack.itemId : i.barcode?.toLowerCase() === key || i.sku.toLowerCase() === key));
+    let qty = Number(quantity.replace(",", ".")) || 1;
     const fail = (message: string) => {
       feedback(false);
       setLog((l) => [{ id: crypto.randomUUID(), label: code, ok: false, message }, ...l].slice(0, 50));
     };
+    // етикет от везна: PLU + тегло/цена → артикулът и количеството от етикета
+    if (!item && !pack && c.scaleFormats?.length) {
+      const reading = parseScaleBarcode(code, c.scaleFormats);
+      const byPlu = reading ? c.items.find((i) => i.plu && pluCandidates(reading.plu).includes(i.plu)) : undefined;
+      if (reading && byPlu && !labelFits(barcodeTypeOf(byPlu), reading.kind)) return fail(`Етикетът не подхожда на „${byPlu.name}“ (${BARCODE_TYPE_LABELS[barcodeTypeOf(byPlu)].toLowerCase()}).`);
+      if (reading && byPlu) {
+        const decimals = itemDecimals(byPlu);
+        const fromLabel = reading.kind === "price" ? (byPlu.unitPrice ? divideToQuantity(reading.value, byPlu.unitPrice, decimals) : null) : divideToQuantity(reading.value, 1, decimals);
+        if (fromLabel) {
+          item = byPlu;
+          qty = fromLabel;
+        }
+      }
+    }
     if (!item && mode !== "count") return fail("Няма такъв артикул в каталога.");
     if (item && item.tracking !== "none" && mode !== "count") return fail(`„${item.name}“ е с партиди — направете движението от пълния режим.`);
     if (mode === "count" && !countId) return fail("Няма отворена инвентаризация.");
@@ -183,7 +198,7 @@ export function MobileScan({ orgName }: { orgName: string }) {
 
       <div className="grid grid-cols-3 gap-2">
         {modes.map((m) => (
-          <button key={m.key} type="button" onClick={() => setMode(m.key)} className={cn("flex flex-col items-center gap-1 rounded-2xl py-4 text-sm font-semibold transition", mode === m.key ? m.tone : "bg-surface text-muted ring-1 ring-line")}>
+          <button key={m.key} type="button" onClick={() => setMode(m.key)} className={cn("flex flex-col items-center gap-1 rounded-lg py-4 text-sm font-semibold transition", mode === m.key ? m.tone : "bg-surface text-muted ring-1 ring-line")}>
             <m.icon className="h-6 w-6" />
             {m.label}
           </button>
@@ -212,7 +227,7 @@ export function MobileScan({ orgName }: { orgName: string }) {
         <Input value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="decimal" aria-label="Количество" className="h-12 text-center text-lg font-semibold" />
       </div>
 
-      <div className="rounded-2xl bg-surface p-3 ring-1 ring-line">
+      <div className="rounded-lg bg-surface p-3 ring-1 ring-line">
         <Scanner continuous hideInput onCode={enqueue} />
         {/* Bluetooth/USB скенерът пише като клавиатура и завършва с Enter */}
         <form
@@ -232,7 +247,7 @@ export function MobileScan({ orgName }: { orgName: string }) {
 
       <ul className="space-y-1.5">
         {log.map((l) => (
-          <li key={l.id} className={cn("rounded-xl px-3 py-2 text-sm", l.ok === false ? "bg-danger-soft text-danger" : l.ok ? "bg-success-soft text-success" : "bg-surface text-muted ring-1 ring-line")}>
+          <li key={l.id} className={cn("rounded-lg px-3 py-2 text-sm", l.ok === false ? "bg-danger-soft text-danger" : l.ok ? "bg-success-soft text-success" : "bg-surface text-muted ring-1 ring-line")}>
             <div className="font-medium">{l.label}</div>
             <div className="text-xs">{l.message}</div>
           </li>

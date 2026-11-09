@@ -51,12 +51,12 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <div className="mb-4 flex w-fit max-w-full flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+      <div className="mb-4 flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-line bg-surface p-1">
         {TABS.map((t) => (
           <Link
             key={t.value}
             href={tabHref(t.value)}
-            className={cn("rounded-lg px-3 py-1.5 text-sm font-medium transition-colors", status === t.value ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}
+            className={cn("rounded-lg px-3 py-1.5 text-sm font-medium transition-colors", status === t.value ? "bg-accent text-white" : "text-accent hover:bg-surface-2")}
           >
             {t.label}
           </Link>

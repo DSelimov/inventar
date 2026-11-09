@@ -1,13 +1,20 @@
 import { and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
 import { offsetOf, PAGE_SIZE, type Page } from "./paging";
-import { apiKeys, calendarEvents, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, itemUnits, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
+import { scaleLookup } from "./scale";
+import { apiKeys, calendarEvents, itemPrices, priceChanges, priceGroups, productions, recipes, categories, collectionItems, collections, fieldDefinitions, type InvoiceKind, invoiceLines, invoicePayments, invoices, type InvoiceStatus, items, type ItemStatus, itemSuppliers, itemUnits, locations, lots, type MovementType, orders, type OrderStatus, type OrderType, partners, type PartnerType, type PaymentStatus, type ShipmentDirection, shipmentLines, shipments, type ShipmentStatus, stockCountLines, stockCounts, stockLevels, stockMovements, vatRates, webhooks, writeOffs } from "@/db/tenant-schema";
 
 const n = (expr: ReturnType<typeof sql<number>>) => expr.mapWith(Number);
 const countExpr = () => n(sql<number>`count(*)`);
 type Where = ReturnType<typeof and>;
 
 // ------------------------------------------------------------------ locations
+/** Локациите, достъпни за потребителя (ограничение по обект от Настройки › Потребители). */
+export async function listLocationsFor(ctx: { db: Db; locations: number[] | null }, includeInactive = false) {
+  const all = await listLocations(ctx.db, includeInactive);
+  return ctx.locations ? all.filter((l) => ctx.locations!.includes(l.id)) : all;
+}
+
 export async function listLocations(db: Db, includeInactive = false) {
   return db
     .select()
@@ -101,6 +108,7 @@ export async function listItemOptions(db: Db) {
       variantLabel: items.variantLabel,
       unitCost: items.unitCost,
       unitPrice: items.unitPrice,
+      minPrice: items.minPrice,
       /** ДДС на артикула или на категорията му; null = ставката по подразбиране. */
       vatRateId: sql<number | null>`coalesce(${items.vatRateId}, ${categories.vatRateId})`,
     })
@@ -136,11 +144,17 @@ export async function findItemByCode(db: Db, code: string) {
     where: or(eq(items.barcode, code), eq(items.sku, code)),
     with: { category: true, stockLevels: { with: { location: true } }, packUnits: true },
   });
-  if (item) return { ...item, pack: null };
+  if (item) return { ...item, pack: null, scale: null };
   const unit = await db.query.itemUnits.findFirst({ where: eq(itemUnits.barcode, code) });
-  if (!unit) return undefined;
-  const byPack = await db.query.items.findFirst({ where: eq(items.id, unit.itemId), with: { category: true, stockLevels: { with: { location: true } }, packUnits: true } });
-  return byPack ? { ...byPack, pack: unit } : undefined;
+  if (unit) {
+    const byPack = await db.query.items.findFirst({ where: eq(items.id, unit.itemId), with: { category: true, stockLevels: { with: { location: true } }, packUnits: true } });
+    return byPack ? { ...byPack, pack: unit as typeof unit | null, scale: null } : undefined;
+  }
+  // етикет от везна: PLU + тегло/цена
+  const scale = await scaleLookup(db, code);
+  if (!scale) return undefined;
+  const byPlu = await db.query.items.findFirst({ where: eq(items.id, scale.item.id), with: { category: true, stockLevels: { with: { location: true } }, packUnits: true } });
+  return byPlu ? { ...byPlu, pack: null, scale: { quantity: scale.quantity, kind: scale.reading.kind, value: scale.reading.value, error: scale.error } } : undefined;
 }
 
 export async function listItemUnits(db: Db, itemId: number) {
@@ -168,6 +182,8 @@ const partnerColumns = {
   vatRegistered: partners.vatRegistered,
   country: partners.country,
   leadTimeDays: partners.leadTimeDays,
+  priceGroupId: partners.priceGroupId,
+  discountPercent: partners.discountPercent,
   orderCount: n(sql<number>`(select count(*) from ${orders} where ${orders.partnerId} = ${partners.id})`),
 };
 const partnerTypeWhere = (type?: PartnerType | "all") => (type && type !== "all" ? or(eq(partners.type, type), eq(partners.type, "both")) : undefined);
@@ -528,4 +544,100 @@ export async function listItemSuppliers(db: Db, itemId: number) {
 /** Цени и кодове при доставчиците — за поръчката за доставка (попълване на цената по доставчик). */
 export async function listSupplierPrices(db: Db) {
   return db.select({ itemId: itemSuppliers.itemId, partnerId: itemSuppliers.partnerId, price: itemSuppliers.purchasePrice, sku: itemSuppliers.supplierSku }).from(itemSuppliers);
+}
+
+/** Броячи за плочките на началния екран — по една заявка на таблица. */
+export async function getHomeCounts(db: Db) {
+  const n = (v: unknown) => Number(v ?? 0);
+  const [[o], [s], [i], [c], [w], [v]] = await Promise.all([
+    db
+      .select({
+        draft: sql<number>`coalesce(sum(case when ${orders.status} = 'draft' then 1 else 0 end), 0)`,
+        open: sql<number>`coalesce(sum(case when ${orders.status} in ('confirmed','partial') then 1 else 0 end), 0)`,
+      })
+      .from(orders),
+    db
+      .select({
+        inbound: sql<number>`coalesce(sum(case when ${shipments.status} in ('pending','in_transit') and ${shipments.direction} = 'inbound' then 1 else 0 end), 0)`,
+        outbound: sql<number>`coalesce(sum(case when ${shipments.status} in ('pending','in_transit') and ${shipments.direction} = 'outbound' then 1 else 0 end), 0)`,
+      })
+      .from(shipments),
+    db
+      .select({ unpaid: sql<number>`coalesce(sum(case when ${invoices.status} = 'issued' and ${invoices.paymentStatus} <> 'paid' then 1 else 0 end), 0)` })
+      .from(invoices),
+    db.select({ open: sql<number>`coalesce(sum(case when ${stockCounts.status} = 'open' then 1 else 0 end), 0)` }).from(stockCounts),
+    db.select({ draft: sql<number>`coalesce(sum(case when ${writeOffs.status} = 'draft' then 1 else 0 end), 0)` }).from(writeOffs),
+    // Същата оценка като таблото: наличност × доставна цена, сумирани в MySQL (decimal, без JS аритметика).
+    db.select({ stockValue: sql<string>`coalesce(sum(${items.quantity} * ${items.unitCost}), 0)` }).from(items).where(eq(items.status, "active")),
+  ]);
+  return {
+    draftOrders: n(o.draft),
+    openOrders: n(o.open),
+    inboundShipments: n(s.inbound),
+    outboundShipments: n(s.outbound),
+    unpaidInvoices: n(i.unpaid),
+    openCounts: n(c.open),
+    draftWriteOffs: n(w.draft),
+    stockValue: n(v.stockValue),
+  };
+}
+
+// ------------------------------------------------------------------ ценови групи
+
+export async function listPriceGroups(db: Db, includeInactive = false) {
+  return db.query.priceGroups.findMany({
+    where: includeInactive ? undefined : eq(priceGroups.active, true),
+    orderBy: [asc(priceGroups.sortOrder), asc(priceGroups.name)],
+  });
+}
+
+/** Брой артикули с цена и партньори/локации по група — за страницата с групите. */
+export async function priceGroupUsage(db: Db) {
+  const [prices, partnerRows, locationRows] = await Promise.all([
+    db.select({ id: itemPrices.priceGroupId, n: sql<number>`count(*)` }).from(itemPrices).groupBy(itemPrices.priceGroupId),
+    db.select({ id: partners.priceGroupId, n: sql<number>`count(*)` }).from(partners).groupBy(partners.priceGroupId),
+    db.select({ id: locations.priceGroupId, n: sql<number>`count(*)` }).from(locations).groupBy(locations.priceGroupId),
+  ]);
+  const map = (rows: Array<{ id: number | null; n: unknown }>) => new Map(rows.filter((r) => r.id).map((r) => [r.id as number, Number(r.n)]));
+  return { items: map(prices), partners: map(partnerRows), locations: map(locationRows) };
+}
+
+/** Всички цени по групи (формата за поръчка избира според клиента). */
+export async function listGroupPrices(db: Db) {
+  return db.select({ itemId: itemPrices.itemId, priceGroupId: itemPrices.priceGroupId, price: itemPrices.price }).from(itemPrices);
+}
+
+export async function getItemGroupPrices(db: Db, itemId: number) {
+  return db.select().from(itemPrices).where(eq(itemPrices.itemId, itemId));
+}
+
+export async function listPriceChanges(db: Db, itemId: number, limit = 20) {
+  return db.query.priceChanges.findMany({
+    where: eq(priceChanges.itemId, itemId),
+    with: { priceGroup: true },
+    orderBy: [desc(priceChanges.createdAt), desc(priceChanges.id)],
+    limit,
+  });
+}
+
+// ------------------------------------------------------------------- производство
+
+export async function listRecipes(db: Db, includeInactive = false) {
+  return db.query.recipes.findMany({
+    where: includeInactive ? undefined : eq(recipes.active, true),
+    with: { item: true, lines: { with: { item: true } } },
+    orderBy: [asc(recipes.name)],
+  });
+}
+
+export async function getRecipe(db: Db, id: number) {
+  return db.query.recipes.findFirst({ where: eq(recipes.id, id), with: { item: true, lines: { with: { item: true } } } });
+}
+
+export async function listProductions(db: Db, limit = 100) {
+  return db.query.productions.findMany({ with: { item: true, location: true }, orderBy: [desc(productions.createdAt), desc(productions.id)], limit });
+}
+
+export async function getProduction(db: Db, id: number) {
+  return db.query.productions.findFirst({ where: eq(productions.id, id), with: { item: true, location: true, recipe: true, lines: { with: { item: true } } } });
 }

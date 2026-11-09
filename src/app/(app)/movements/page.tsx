@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { History } from "lucide-react";
+import { ArrowLeftRight, History } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Select } from "@/components/ui/fields";
@@ -11,7 +12,7 @@ import { Table, TableWrap } from "@/components/ui/table";
 import { MOVEMENT_TYPES, type MovementType } from "@/db/tenant-schema";
 import { requireContext } from "@/lib/auth";
 import { pageParam, param, type SearchParams } from "@/lib/paging";
-import { listLocations, listMovementUsers, pageMovements } from "@/lib/queries";
+import { listLocationsFor, listMovementUsers, pageMovements } from "@/lib/queries";
 import { formatDateTime, formatNumber, label } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Движения" };
@@ -31,13 +32,22 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
     to: isDate(param(sp, "to")),
     userId: positive(param(sp, "user")),
   };
-  const [{ rows, total, page, pageSize }, locations, users] = await Promise.all([pageMovements(ctx.db, filters, pageParam(sp)), listLocations(ctx.db, true), listMovementUsers(ctx.db)]);
+  const [{ rows, total, page, pageSize }, locations, users] = await Promise.all([pageMovements(ctx.db, filters, pageParam(sp)), listLocationsFor(ctx, true), listMovementUsers(ctx.db)]);
   const filtered = Object.values(filters).some((v) => v !== undefined);
   const forItem = filters.itemId ? (rows[0]?.item ?? null) : null;
 
   return (
     <>
-      <PageHeader title="Движения" description="Цялата складова история: приходи, разходи, корекции и трансфери, от всички артикули и локации." />
+      <PageHeader
+        help="movements"
+        title="Движения"
+        description="Цялата складова история: приходи, разходи, корекции и трансфери, от всички артикули и локации."
+        actions={
+          <ButtonLink href="/reports/movements" variant="secondary">
+            <ArrowLeftRight className="h-4 w-4" /> Справка приход / разход
+          </ButtonLink>
+        }
+      />
 
       <FilterBar action="/movements" resetHref={filtered ? "/movements" : undefined}>
         {filters.itemId && <input type="hidden" name="item" value={filters.itemId} />}

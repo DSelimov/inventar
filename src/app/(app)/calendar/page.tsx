@@ -46,10 +46,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader
+        help="calendar"
         title="Календар"
         description="Очаквани пратки, напомняния и крайни срокове на едно място."
         actions={
-          <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
             <ButtonLink href={`/calendar?m=${format(subMonths(month, 1), "yyyy-MM")}`} variant="ghost" size="sm" aria-label="Предишен месец">
               <ChevronLeft className="h-4 w-4" />
             </ButtonLink>

@@ -7,7 +7,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <Link href="/" className="mb-6 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-white">
           <Boxes className="h-5 w-5" />
         </span>
         <span className="text-lg font-semibold">Инвентар</span>
@@ -17,7 +17,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           Чернова: данните на оператора още не са попълнени (полетата в квадратни скоби), а текстът трябва да бъде прегледан от юрист преди пускане.
         </p>
       )}
-      <article className="legal space-y-4 rounded-2xl border border-line bg-surface p-6 text-sm leading-relaxed shadow-sm md:p-8">{children}</article>
+      <article className="legal space-y-4 rounded-lg border border-line bg-surface p-6 text-sm leading-relaxed md:p-8">{children}</article>
       <nav className="mt-6 flex flex-wrap gap-4 text-sm text-muted">
         <Link href="/terms" className="hover:text-accent">
           Общи условия

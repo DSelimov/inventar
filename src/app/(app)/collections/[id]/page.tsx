@@ -29,6 +29,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
   if (!Number.isInteger(id)) notFound();
   const ctx = await requireContext();
   const writable = can(ctx.role, "write");
+  const showCost = !ctx.hideCosts;
   const settings = { currency: ctx.org.currency };
   const [collection, options] = await Promise.all([getCollection(ctx.db, id), listItemOptions(ctx.db)]);
   if (!collection) notFound();
@@ -42,6 +43,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
   return (
     <>
       <PageHeader
+        help="collections"
         back={{ href: "/collections", label: "Колекции" }}
         title={
           <span className="flex items-center gap-3">
@@ -60,10 +62,10 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className={`mb-6 grid gap-4 ${showCost ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <Stat label="Артикули" value={String(members.length)} />
         <Stat label="Единици" value={formatNumber(totalUnits)} />
-        <Stat label="Стойност на склад" value={formatMoney(totalValue, settings.currency)} />
+        {showCost && <Stat label="Стойност на склад" value={formatMoney(totalValue, settings.currency)} />}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -78,7 +80,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
                   <th>Артикул</th>
                   <th>Категория</th>
                   <th className="text-right">Наличност</th>
-                  <th className="text-right">Стойност</th>
+                  {showCost && <th className="text-right">Стойност</th>}
                   <th></th>
                 </tr>
               </thead>
@@ -95,7 +97,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
                     <td className="text-right tabular-nums">
                       {formatNumber(m.quantity)} {m.unit}
                     </td>
-                    <td className="text-right tabular-nums">{formatMoney(lineTotal(m.quantity, m.unitCost), settings.currency)}</td>
+                    {showCost && <td className="text-right tabular-nums">{formatMoney(lineTotal(m.quantity, m.unitCost), settings.currency)}</td>}
                     <td className="text-right">
                       {writable && <Form action={removeItemFromCollection.bind(null, id, m.id)}>
                         <Button type="submit" variant="ghost" size="sm" aria-label="Премахни от колекцията">
@@ -160,7 +162,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <div className="rounded-lg border border-line bg-surface p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
     </div>

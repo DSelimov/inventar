@@ -6,9 +6,11 @@ import type { Db } from "@/db/tenant";
 import { fieldDefinitions, itemFieldValues, items, ITEM_STATUSES, TRACKING_MODES, type MovementType } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { applyBarcodeType } from "@/lib/barcodes";
 import { deleteItemFiles } from "@/lib/item-images";
 import { int, oneOf, optional, optionalInt, required, str } from "@/lib/forms";
 import { getDefaultLocation } from "@/lib/queries";
+import { recordPriceChanges } from "@/lib/price-groups";
 import { applyMovement, assertFitsDecimals, transferStock } from "@/lib/stock";
 import { slugSku } from "@/lib/utils";
 import { emit } from "@/lib/webhooks";
@@ -20,6 +22,7 @@ import { assertWithinLimit } from "@/lib/plans";
 
 function revalidateItems(id?: number) {
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/items");
   revalidatePath("/reports");
   if (id) revalidatePath(`/items/${id}`);
@@ -49,6 +52,7 @@ function readItem(fd: FormData) {
     name,
     sku: str(fd, "sku") || slugSku(name),
     barcode: optional(fd, "barcode"),
+    plu: readPlu(fd),
     description: optional(fd, "description"),
     categoryId: optionalInt(fd, "categoryId"),
     tracking,
@@ -58,21 +62,35 @@ function readItem(fd: FormData) {
     unit: str(fd, "unit", "бр.") || "бр.",
     unitCost: parseMoney(str(fd, "unitCost"), "Доставна цена"),
     unitPrice: parseMoney(str(fd, "unitPrice"), "Продажна цена"),
+    minPrice: parseMoney(str(fd, "minPrice"), "Минимална продажна цена", null),
     status: oneOf(fd, "status", ITEM_STATUSES, "active"),
     variantLabel: optional(fd, "variantLabel"),
   };
 }
 
-async function assertUniqueSku(db: Db, sku: string, exceptId?: number) {
+async function assertUniqueSku(db: Db, sku: string, exceptId?: number, plu?: string | null) {
   const dup = await db.query.items.findFirst({ where: eq(items.sku, sku) });
   if (dup && dup.id !== exceptId) throw new UserError(`Вече има артикул с код „${sku}“.`);
+  if (plu) {
+    const byPlu = await db.query.items.findFirst({ where: eq(items.plu, plu) });
+    if (byPlu && byPlu.id !== exceptId) throw new UserError(`PLU ${plu} вече е на „${byPlu.name}“.`);
+  }
+}
+
+/** PLU за везна: само цифри, до 7 (без водещите нули — етикетът 00123 намира 123). */
+function readPlu(fd: FormData) {
+  const raw = (optional(fd, "plu") ?? "").replace(/\s/g, "");
+  if (!raw) return null;
+  if (!/^\d{1,7}$/.test(raw)) throw new UserError("PLU е до 7 цифри.");
+  return raw.replace(/^0+(?=\d)/, "");
 }
 
 export const createItem = act(async (fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
   await assertWithinLimit(ctx, "items");
-  await assertUniqueSku(ctx.db, data.sku);
+  await applyBarcodeType(ctx.db, fd, data);
+  await assertUniqueSku(ctx.db, data.sku, undefined, data.plu);
   const parentId = optionalInt(fd, "parentId");
   const quantity = parseQuantity(str(fd, "quantity"), data.quantityDecimals, "Начална наличност");
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
@@ -105,14 +123,20 @@ export const createItem = act(async (fd: FormData) => {
 export const updateItem = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const data = readItem(fd);
-  await assertUniqueSku(ctx.db, data.sku, id);
+  await applyBarcodeType(ctx.db, fd, data, id);
+  await assertUniqueSku(ctx.db, data.sku, id, data.plu);
   const existing = await ctx.db.query.items.findFirst({ where: eq(items.id, id) });
   if (!existing) throw new UserError("Артикулът не е намерен.");
   if (existing.tracking !== data.tracking && existing.quantity > 0) throw new UserError("Режимът на проследяване може да се смени само при нулева наличност.");
   if (data.quantityDecimals < existing.quantityDecimals) await assertFitsDecimals(ctx.db, id, data.quantityDecimals);
-  // при наличност доставната цена е средната от движенията — ръчната промяна би разминала оценката
-  if (existing.quantity > 0) data.unitCost = existing.unitCost;
+  // при наличност доставната цена е средната от движенията — ръчната промяна би разминала оценката;
+  // потребител без достъп до доставните цени не ги вижда и не ги променя
+  if (existing.quantity > 0 || ctx.hideCosts) data.unitCost = existing.unitCost;
   await ctx.db.update(items).set({ ...data, updatedAt: new Date() }).where(eq(items.id, id));
+  await recordPriceChanges(ctx.db, ctx.user, "Редакция на артикул", [
+    { itemId: id, target: "retail", oldPrice: existing.unitPrice, newPrice: data.unitPrice },
+    { itemId: id, target: "cost", oldPrice: existing.unitCost, newPrice: data.unitCost },
+  ]);
   await saveFieldValues(ctx.db, id, data.categoryId, fd);
   await audit(ctx, "update", "item", id, { name: data.name });
   emit(ctx.db, "item.updated", { id, ...data });
@@ -174,7 +198,7 @@ export const adjustStock = act(async (itemId: number, fd: FormData) => {
   const lotId = optionalInt(fd, "lotId");
   const lotNumber = optional(fd, "lotNumber");
   const lot = type === "out" ? (lotId ? { lotId } : null) : lotNumber ? { lotNumber, expiryDate: optional(fd, "expiryDate") } : null;
-  const unitCost = type === "in" ? parseMoney(str(fd, "unitCost"), "Доставна цена", null) : null;
+  const unitCost = type === "in" && !ctx.hideCosts ? parseMoney(str(fd, "unitCost"), "Доставна цена", null) : null;
   await ctx.db.transaction((tx) => applyMovement(tx, { actor: ctx.user, itemId, locationId, type, quantity, reason: optional(fd, "reason"), lot, unitCost }));
   await audit(ctx, "movement", "item", itemId, { type, quantity, locationId });
   revalidateItems(itemId);

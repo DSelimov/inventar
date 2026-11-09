@@ -1,7 +1,8 @@
 import "server-only";
-import { and, asc, eq, gte, lt, or, sql } from "drizzle-orm";
+import { toBase } from "./fx";
+import { and, asc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/tenant";
-import { categories, items, orderLines, partners, shipments, stockMovements } from "@/db/tenant-schema";
+import { categories, items, orderLines, partners, shipments, stockMovements, orders } from "@/db/tenant-schema";
 import { endOfLocalDay, startOfLocalDay } from "./dates";
 import { lineTotal, sumMoney } from "./money";
 import { addQty } from "./quantity";
@@ -71,9 +72,11 @@ export async function salesMargin(db: Db, from: string, to: string) {
   const orderIds = [...new Set(moves.map((m) => m.orderId).filter((id): id is number => id !== null))];
   const prices = new Map<string, number>();
   if (orderIds.length) {
+    const rates = new Map((await db.select({ id: orders.id, currency: orders.currency, exchangeRate: orders.exchangeRate }).from(orders).where(inArray(orders.id, orderIds))).map((o) => [o.id, o]));
     for (const l of await db.select().from(orderLines).where(sql`${orderLines.orderId} in (${sql.join(orderIds.map((id) => sql`${id}`), sql`, `)})`)) {
       const key = `${l.orderId}:${l.itemId}`;
-      if (!prices.has(key)) prices.set(key, l.unitPrice);
+      // приходът се сравнява със себестойността в основната валута
+      if (!prices.has(key)) prices.set(key, toBase(l.unitPrice, rates.get(l.orderId) ?? {}));
     }
   }
 

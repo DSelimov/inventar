@@ -68,7 +68,7 @@ export function SchemaTable({ schema, schemas, compact = false }: { schema: Sche
   const rows = Object.entries(properties);
   if (!rows.length) return <p className="text-sm text-muted">{String(schema.description ?? "Обект без фиксирани полета.")}</p>;
   return (
-    <div className="overflow-x-auto rounded-xl border border-line">
+    <div className="overflow-x-auto rounded-lg border border-line">
       <table className="table">
         <thead>
           <tr>
@@ -105,7 +105,7 @@ export function SchemaTable({ schema, schemas, compact = false }: { schema: Sche
 
 export function Code({ children, lang }: { children: string; lang?: string }) {
   return (
-    <pre className="overflow-x-auto rounded-xl border border-line bg-[#0f172a] p-4 text-xs leading-relaxed text-slate-100" data-lang={lang}>
+    <pre className="overflow-x-auto rounded-lg border border-line bg-[#0f172a] p-4 text-xs leading-relaxed text-slate-100" data-lang={lang}>
       <code>{children}</code>
     </pre>
   );

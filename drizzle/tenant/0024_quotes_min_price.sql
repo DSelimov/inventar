@@ -1,0 +1,2 @@
+ALTER TABLE `orders` MODIFY COLUMN `status` enum('quote','draft','confirmed','partial','completed','cancelled') NOT NULL DEFAULT 'draft';--> statement-breakpoint
+ALTER TABLE `items` ADD `min_price` decimal(14,4);

@@ -6,6 +6,9 @@ import type { Db } from "@/db/tenant";
 import { lots, ORDER_TYPES, orderLines, orders, shipmentLines, shipments, type OrderStatus } from "@/db/tenant-schema";
 import { audit } from "@/lib/audit";
 import { requireContext } from "@/lib/auth";
+import { assertMinPrices } from "@/lib/order-rules";
+import { changeShipmentStatus } from "@/lib/shipment-service";
+import { readDocumentCurrency } from "@/lib/fx";
 import { oneOf, optional, optionalInt, str } from "@/lib/forms";
 import { nextNumber } from "@/lib/numbering";
 import { getDefaultLocation } from "@/lib/queries";
@@ -14,12 +17,13 @@ import { act, redirectWith } from "@/lib/action";
 import { UserError } from "@/lib/errors";
 import { parseMoney } from "@/lib/money";
 import { MAX_DECIMALS, addQty, parseQuantity, subQty } from "@/lib/quantity";
-import { assertItemQuantities } from "@/lib/stock";
+import { assertItemQuantities, assertLocationAccess } from "@/lib/stock";
 import { getSettings } from "@/lib/settings";
 import { assignVat } from "@/lib/vat-rates";
 
 function revalidate(id?: number) {
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/orders");
   revalidatePath("/reports");
   if (id) revalidatePath(`/orders/${id}`);
@@ -56,6 +60,8 @@ export const createOrder = act(async (fd: FormData) => {
   await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   const locationId = optionalInt(fd, "locationId") ?? (await getDefaultLocation(ctx.db))?.id ?? null;
+  assertLocationAccess(ctx.user, locationId);
+  await assertMinPrices(ctx, type, lines, await readDocumentCurrency(ctx.db, ctx.org.currency, optional(fd, "currency"), optional(fd, "exchangeRate")));
   const { id, number } = await ctx.db.transaction(async (tx) => {
     // ръчно въведен номер или следващият поред (заема се в транзакцията — без дупки)
     const number = str(fd, "number") || (await nextNumber(tx, type));
@@ -66,11 +72,12 @@ export const createOrder = act(async (fd: FormData) => {
         number,
         partnerId: optionalInt(fd, "partnerId"),
         locationId,
-        status: str(fd, "confirm") === "1" ? "confirmed" : "draft",
+        status: str(fd, "confirm") === "1" ? "confirmed" : str(fd, "confirm") === "quote" && type === "sales" ? "quote" : "draft",
         orderDate: optional(fd, "orderDate") ?? new Date().toISOString().slice(0, 10),
         expectedDate: optional(fd, "expectedDate"),
         notes: optional(fd, "notes"),
         pricesIncludeVat: (await getSettings(ctx.db)).pricesIncludeVat,
+        ...(await readDocumentCurrency(ctx.db, ctx.org.currency, optional(fd, "currency"), optional(fd, "exchangeRate"))),
         createdBy: ctx.user.id,
       })
       .$returningId();
@@ -86,8 +93,9 @@ export const createOrder = act(async (fd: FormData) => {
 export const updateOrder = act(async (id: number, fd: FormData) => {
   const ctx = await requireContext("write");
   const existing = await own(ctx.db, id);
-  if (existing.status !== "draft") throw new UserError("Само чернови могат да се редактират. Създайте пратка за промени в изпълнението.");
+  if (existing.status !== "draft" && existing.status !== "quote") throw new UserError("Само чернови и оферти могат да се редактират. Създайте пратка за промени в изпълнението.");
   const lines = await assignVat(ctx.db, readLines(fd));
+  await assertMinPrices(ctx, existing.type, lines, await readDocumentCurrency(ctx.db, ctx.org.currency, optional(fd, "currency"), optional(fd, "exchangeRate")));
   await assertItemQuantities(ctx.db, lines);
   if (!lines.length) throw new UserError("Добавете поне един ред към поръчката.");
   await ctx.db.transaction(async (tx) => {
@@ -96,9 +104,10 @@ export const updateOrder = act(async (id: number, fd: FormData) => {
       .set({
         number: str(fd, "number") || existing.number,
         partnerId: optionalInt(fd, "partnerId"),
-        locationId: optionalInt(fd, "locationId"),
+        locationId: (assertLocationAccess(ctx.user, optionalInt(fd, "locationId")), optionalInt(fd, "locationId")),
         orderDate: optional(fd, "orderDate"),
         expectedDate: optional(fd, "expectedDate"),
+        ...(await readDocumentCurrency(ctx.db, ctx.org.currency, optional(fd, "currency"), optional(fd, "exchangeRate"))),
         notes: optional(fd, "notes"),
       })
       .where(eq(orders.id, id));
@@ -113,7 +122,7 @@ export const updateOrder = act(async (id: number, fd: FormData) => {
 export const setOrderStatus = act(async (id: number, status: OrderStatus) => {
   const ctx = await requireContext("write");
   const o = await own(ctx.db, id);
-  const allowed: Record<OrderStatus, OrderStatus[]> = { draft: ["confirmed", "cancelled"], confirmed: ["cancelled"], partial: ["cancelled", "completed"], completed: [], cancelled: [] };
+  const allowed: Record<OrderStatus, OrderStatus[]> = { quote: ["confirmed", "cancelled"], draft: ["confirmed", "cancelled"], confirmed: ["cancelled"], partial: ["cancelled", "completed"], completed: [], cancelled: [] };
   if (!allowed[o.status].includes(status)) throw new UserError(`Преход от „${o.status}“ към „${status}“ не е позволен.`);
   await ctx.db.update(orders).set({ status }).where(eq(orders.id, id));
   await audit(ctx, "status", "order", id, { number: o.number, status });
@@ -122,10 +131,11 @@ export const setOrderStatus = act(async (id: number, status: OrderStatus) => {
   return "Статусът на поръчката е сменен.";
 });
 
-export const createShipmentForRemaining = act(async (id: number) => {
-  const ctx = await requireContext("write");
+/** Пратка за неизпълненото (без вече резервираното в чакащи пратки). */
+async function shipmentForRemaining(ctx: Awaited<ReturnType<typeof requireContext>>, id: number) {
   const o = await own(ctx.db, id);
   if (o.status !== "confirmed" && o.status !== "partial") throw new UserError("Потвърдете поръчката, преди да създадете пратка.");
+  assertLocationAccess(ctx.user, o.locationId);
   const openShipments = await ctx.db.query.shipments.findMany({ where: eq(shipments.orderId, id), with: { lines: true } });
   const reserved = new Map<number, number>();
   for (const s of openShipments) if (!s.isReturn && (s.status === "pending" || s.status === "in_transit")) for (const l of s.lines) reserved.set(l.itemId, addQty(reserved.get(l.itemId) ?? 0, l.quantity));
@@ -152,9 +162,65 @@ export const createShipmentForRemaining = act(async (id: number) => {
   });
   await audit(ctx, "create", "shipment", shipmentId, { fromOrder: o.number });
   emit(ctx.db, "shipment.created", { id: shipmentId, orderId: o.id, lines: remaining });
+  return { shipmentId, order: o };
+}
+
+export const createShipmentForRemaining = act(async (id: number) => {
+  const ctx = await requireContext("write");
+  const { shipmentId } = await shipmentForRemaining(ctx, id);
   revalidate(id);
   revalidatePath("/shipments");
   return redirectWith(`/shipments/${shipmentId}/edit`, "Пратката за остатъка е създадена.");
+});
+
+/**
+ * „Изпълни сега“: пратка за остатъка и доставката ѝ в една стъпка (продажба от склада / приемане на
+ * доставката). Артикули с партиди изискват партида на реда — тогава пратката остава за попълване.
+ */
+export const fulfilNow = act(async (id: number) => {
+  const ctx = await requireContext("write");
+  const { shipmentId, order } = await shipmentForRemaining(ctx, id);
+  const tracked = order.lines.some((l) => l.item.tracking !== "none");
+  if (tracked) {
+    revalidate(id);
+    return redirectWith(`/shipments/${shipmentId}/edit`, "Артикулите с партиди изискват партида — попълнете пратката и я маркирайте като доставена.");
+  }
+  await changeShipmentStatus(ctx.db, ctx.user, shipmentId, "delivered");
+  await audit(ctx, "status", "shipment", shipmentId, { status: "delivered", fromOrder: order.number });
+  revalidate(id);
+  revalidatePath("/shipments");
+  revalidatePath("/items");
+  return order.type === "sales" ? "Изпълнено: стоката е изписана от склада." : "Приета: стоката е заприходена.";
+});
+
+/** Копие на поръчката (нова чернова/оферта със същите редове и цени). */
+export const duplicateOrder = act(async (id: number) => {
+  const ctx = await requireContext("write");
+  const o = await own(ctx.db, id);
+  const newId = await ctx.db.transaction(async (tx) => {
+    const number = await nextNumber(tx, o.type);
+    const [row] = await tx
+      .insert(orders)
+      .values({
+        type: o.type,
+        number,
+        partnerId: o.partnerId,
+        locationId: o.locationId,
+        status: o.status === "quote" ? "quote" : "draft",
+        orderDate: new Date().toISOString().slice(0, 10),
+        notes: o.notes,
+        pricesIncludeVat: o.pricesIncludeVat,
+        currency: o.currency,
+        exchangeRate: o.exchangeRate,
+        createdBy: ctx.user.id,
+      })
+      .$returningId();
+    await tx.insert(orderLines).values(o.lines.map((l) => ({ orderId: row.id, itemId: l.itemId, quantity: l.quantity, unitPrice: l.unitPrice, vatRateId: l.vatRateId, vatRate: l.vatRate })));
+    return row.id;
+  });
+  await audit(ctx, "create", "order", newId, { copyOf: o.number });
+  revalidate(newId);
+  return redirectWith(`/orders/${newId}`, `Копие на ${o.number}.`);
 });
 
 export const deleteOrder = act(async (id: number) => {

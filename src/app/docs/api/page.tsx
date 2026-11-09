@@ -136,7 +136,7 @@ export default async function ApiDocsPage() {
               <p key={i} dangerouslySetInnerHTML={{ __html: md(p) }} />
             ))}
           </div>
-          <div className="rounded-xl border border-line bg-surface p-4 text-sm">
+          <div className="rounded-lg border border-line bg-surface p-4 text-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted">Базов адрес</div>
             <code className="font-mono">{server}/api/v1</code>
             <p className="mt-2 text-muted">
@@ -163,7 +163,7 @@ export default async function ApiDocsPage() {
 
         <section id="errors" className="scroll-mt-24 space-y-3">
           <h2 className="text-xl font-semibold">Грешки и формати</h2>
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="overflow-x-auto rounded-lg border border-line">
             <table className="table">
               <thead>
                 <tr>
@@ -207,7 +207,7 @@ export default async function ApiDocsPage() {
             {byTag.get(t.name)!.map(({ method, path, op }) => {
               const req = media(op.requestBody?.content);
               return (
-                <div key={method + path} id={op.operationId} className="scroll-mt-24 rounded-2xl border border-line bg-surface shadow-sm">
+                <div key={method + path} id={op.operationId} className="scroll-mt-24 rounded-lg border border-line bg-surface">
                   <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4">
                     <Badge tone={METHOD_TONE[method] ?? "neutral"}>{method.toUpperCase()}</Badge>
                     <code className="font-mono text-sm">{path}</code>
@@ -233,7 +233,7 @@ export default async function ApiDocsPage() {
                       {op.parameters && op.parameters.length > 0 && (
                         <div>
                           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Параметри</h4>
-                          <div className="overflow-x-auto rounded-xl border border-line">
+                          <div className="overflow-x-auto rounded-lg border border-line">
                             <table className="table">
                               <tbody>
                                 {op.parameters.map((p) => (
@@ -357,7 +357,7 @@ $payload = json_decode($body, true);`}</Code>
             <h3 className="mb-3 text-sm font-semibold">Събития и примерни данни</h3>
             <div className="grid gap-4 lg:grid-cols-2">
               {WEBHOOK_EVENTS.map((e) => (
-                <div key={e} className="rounded-2xl border border-line bg-surface p-4">
+                <div key={e} className="rounded-lg border border-line bg-surface p-4">
                   <div className="mb-2 flex items-center gap-2">
                     <code className="font-mono text-sm">{e}</code>
                     <span className="text-xs text-muted">{WEBHOOK_EVENT_LABELS[e]}</span>

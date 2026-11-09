@@ -8,7 +8,15 @@ import { addQty, assertQuantity, itemDecimals, subQty } from "./quantity";
 import { costMovement, recordLayer } from "./valuation";
 
 export type LotInput = { lotId: number } | { lotNumber: string; expiryDate?: string | null; serialNumber?: string | null } | null | undefined;
-export type Actor = { id: number; name: string } | null;
+/** Кой прави движението; locations — локациите, до които има достъп (null/липса = всички). */
+export type Actor = { id: number; name: string; locations?: number[] | null } | null;
+
+/** Проверка на достъпа до локация (служител, ограничен до свой обект). */
+export function assertLocationAccess(actor: Actor | { locations?: number[] | null } | undefined, locationId: number | null | undefined) {
+  const allowed = actor?.locations;
+  if (!allowed || !locationId) return;
+  if (!allowed.includes(locationId)) throw new UserError("Нямате достъп до тази локация.");
+}
 
 export type MovementInput = {
   actor: Actor;
@@ -32,6 +40,7 @@ export type MovementInput = {
  */
 export async function applyMovement(tx: Db, input: MovementInput) {
   // редът на артикула се заключва: паралелни движения не губят обща наличност или средна цена
+  assertLocationAccess(input.actor, input.locationId);
   const [item] = await tx.select().from(items).where(eq(items.id, input.itemId)).for("update");
   if (!item) throw new UserError("Артикулът не е намерен.");
   // цели бройки или до quantity_decimals знака (кг, л…); серийните номера — винаги цели
@@ -41,9 +50,9 @@ export async function applyMovement(tx: Db, input: MovementInput) {
   const before = level?.quantity ?? 0;
 
   let delta: number;
-  if (input.type === "in" || input.type === "transfer_in") delta = input.quantity;
-  else if (input.type === "out" || input.type === "transfer_out" || input.type === "write_off") delta = -input.quantity;
-  else delta = subQty(input.quantity, before);
+  if (input.type === "in" || input.type === "transfer_in" || input.type === "produce_in") delta = input.quantity;
+  else if (input.type === "out" || input.type === "transfer_out" || input.type === "write_off" || input.type === "produce_out") delta = -input.quantity;
+  else delta = subQty(input.quantity, before); // adjust: новото абсолютно количество
 
   if (delta === 0) return { delta: 0, after: item.quantity, unitCost: item.unitCost, value: 0 };
   const after = addQty(before, delta);

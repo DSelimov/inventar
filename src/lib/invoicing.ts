@@ -6,6 +6,8 @@ import { localTodayIso } from "./dates";
 import { UserError } from "./errors";
 import { sumMoney } from "./money";
 import { nextInvoiceNumber } from "./numbering";
+import { recordCashEntry } from "./cash";
+import { toBase } from "./fx";
 import { addQty, subQty } from "./quantity";
 import { getCompanyDetails, getSettings } from "./settings";
 import { lineAmounts, vatSummary } from "./vat";
@@ -126,7 +128,8 @@ export async function draftFromOrder(db: TenantDb, orderId: number, currency: st
         description: l.item.variantLabel ? `${l.item.name} · ${l.item.variantLabel}` : l.item.name,
         quantity: Math.max(0, subQty(base, invoiced.get(l.id) ?? 0)),
         unit: l.item.unit,
-        unitPrice: l.unitPrice,
+        // фактурата е в основната валута (ЗДДС): цените от поръчка в чужда валута — по курса ѝ
+        unitPrice: toBase(l.unitPrice, order),
         vatRateId: l.vatRateId,
       };
     })
@@ -251,13 +254,35 @@ async function refreshPaymentStatus(tx: Db, invoiceId: number) {
   return { status, due, paid: inv.paidAmount };
 }
 
-export async function addPayment(db: TenantDb, invoiceId: number, p: { paidOn: string; amount: number; method?: string | null; note?: string | null }, createdBy: string) {
+/**
+ * Плащане по фактура: ред в invoice_payments, нова сума и статус, и запис в касовата книга
+ * (касата/сметката е избраната, иначе по метода — превод/карта → банка, иначе касата).
+ */
+export async function addPayment(
+  db: Db,
+  invoiceId: number,
+  p: { paidOn: string; amount: number; method?: string | null; note?: string | null; accountId?: number | null },
+  createdBy: string,
+  actor: { id: number; name: string } | null = null,
+) {
   if (!(p.amount > 0)) throw new UserError("Сумата на плащането трябва да е положителна.");
   return db.transaction(async (tx) => {
     const [inv] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId)).for("update");
     if (!inv || inv.status !== "issued" || (inv.kind !== "invoice" && inv.kind !== "debit_note")) throw new UserError("Плащане се отбелязва по издадена фактура.");
     const before = inv.paymentStatus;
-    await tx.insert(invoicePayments).values({ invoiceId, paidOn: p.paidOn, amount: p.amount, method: p.method ?? null, note: p.note ?? null, createdBy });
+    const [payment] = await tx.insert(invoicePayments).values({ invoiceId, paidOn: p.paidOn, amount: p.amount, method: p.method ?? null, note: p.note ?? null, createdBy }).$returningId();
+    await recordCashEntry(tx, actor, {
+      direction: "in",
+      entryDate: p.paidOn,
+      accountId: p.accountId,
+      method: p.method,
+      amount: p.amount,
+      partnerId: inv.partnerId,
+      invoiceId,
+      invoicePaymentId: payment.id,
+      category: "Плащане от клиент",
+      note: p.note ?? `Фактура № ${inv.number}`,
+    });
     await tx.update(invoices).set({ paidAmount: sumMoney([inv.paidAmount, p.amount]) }).where(eq(invoices.id, invoiceId));
     const after = await refreshPaymentStatus(tx, invoiceId);
     return { ...after, becamePaid: before !== "paid" && after.status === "paid", number: inv.number };

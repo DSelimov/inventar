@@ -5,18 +5,20 @@ import { PageHeader } from "@/components/ui/page-header";
 import { createPartner } from "@/lib/actions/partners";
 import { requireContext } from "@/lib/auth";
 import { Form } from "@/components/ui/form";
+import { listPriceGroups } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Нов партньор" };
 
 export default async function NewPartnerPage() {
-  await requireContext("write");
+  const ctx = await requireContext("write");
+  const priceGroups = await listPriceGroups(ctx.db);
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Нов партньор" back={{ href: "/partners", label: "Партньори" }} />
+      <PageHeader help="partners" title="Нов партньор" back={{ href: "/partners", label: "Партньори" }} />
       <Card>
         <CardBody>
           <Form action={createPartner}>
-            <PartnerFields submitLabel="Създай партньор" />
+            <PartnerFields submitLabel="Създай партньор" priceGroups={priceGroups} />
           </Form>
         </CardBody>
       </Card>

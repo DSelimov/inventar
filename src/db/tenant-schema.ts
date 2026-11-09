@@ -12,7 +12,7 @@ export const ITEM_STATUSES = ["active", "archived"] as const;
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
 export const TRACKING_MODES = ["none", "lot", "serial"] as const;
 export type TrackingMode = (typeof TRACKING_MODES)[number];
-export const MOVEMENT_TYPES = ["in", "out", "adjust", "transfer_in", "transfer_out", "write_off"] as const;
+export const MOVEMENT_TYPES = ["in", "out", "adjust", "transfer_in", "transfer_out", "write_off", "produce_in", "produce_out"] as const;
 export type MovementType = (typeof MOVEMENT_TYPES)[number];
 export const SHIPMENT_DIRECTIONS = ["inbound", "outbound"] as const;
 export type ShipmentDirection = (typeof SHIPMENT_DIRECTIONS)[number];
@@ -22,7 +22,8 @@ export const PARTNER_TYPES = ["supplier", "customer", "both"] as const;
 export type PartnerType = (typeof PARTNER_TYPES)[number];
 export const ORDER_TYPES = ["purchase", "sales"] as const;
 export type OrderType = (typeof ORDER_TYPES)[number];
-export const ORDER_STATUSES = ["draft", "confirmed", "partial", "completed", "cancelled"] as const;
+/** quote = оферта (клиентска, още не е поръчка); превръща се в поръчка с един бутон. */
+export const ORDER_STATUSES = ["quote", "draft", "confirmed", "partial", "completed", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export const EVENT_TYPES = ["event", "reminder", "deadline"] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -51,6 +52,34 @@ const qty = (name: string) => decimal(name, { precision: 14, scale: 3, mode: "nu
 const createdAt = () => datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`);
 const ts = (name: string) => datetime(name, { fsp: 3 });
 
+// ---------------------------------------------------------------- currencies
+/** Чуждестранни валути и текущият им курс към основната валута на организацията (ръчно или от ЕЦБ). */
+export const currencies = mysqlTable("currencies", {
+  code: varchar("code", { length: 3 }).primaryKey(),
+  name: varchar("name", { length: 64 }).notNull(),
+  /** Колко единици основна валута е 1 единица от тази валута. */
+  rate: decimal("rate", { precision: 18, scale: 8, mode: "number" }).notNull(),
+  source: varchar("source", { length: 16 }).notNull().default("manual"),
+  updatedAt: ts("updated_at").notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+});
+
+// ---------------------------------------------------------------- price groups
+/**
+ * Ценови групи (Едро, Дилър, Ценова група 1…). Цената „на дребно“ е items.unit_price; група без
+ * цена за даден артикул връща към нея. Групата идва от партньора, после от локацията на продажбата.
+ */
+export const priceGroups = mysqlTable(
+  "price_groups",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("price_groups_name").on(t.name)],
+);
+
 // ------------------------------------------------------------------- locations
 export const locations = mysqlTable("locations", {
   id: int("id").autoincrement().primaryKey(),
@@ -59,6 +88,10 @@ export const locations = mysqlTable("locations", {
   address: varchar("address", { length: 500 }),
   isDefault: boolean("is_default").notNull().default(false),
   active: boolean("active").notNull().default(true),
+  /** Ценова група за продажби от този обект (магазин на едро); партньорът с група има предимство. */
+  priceGroupId: int("price_group_id").references(() => priceGroups.id, { onDelete: "set null" }),
+  /** Консигнационна локация: стоката е при този партньор, но е наша (вж. consignments). */
+  partnerId: int("partner_id"),
   createdAt: createdAt(),
 });
 
@@ -104,6 +137,8 @@ export const items = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     sku: varchar("sku", { length: 64 }).notNull(),
     barcode: varchar("barcode", { length: 64 }),
+    /** PLU код за везна (етикет 2x PPPPP VVVVV C): по него се разпознава теглото/цената от баркода. */
+    plu: varchar("plu", { length: 8 }),
     name: varchar("name", { length: 300 }).notNull(),
     description: text("description"),
     categoryId: int("category_id").references(() => categories.id, { onDelete: "set null" }),
@@ -120,11 +155,13 @@ export const items = mysqlTable(
     quantityDecimals: tinyint("quantity_decimals").notNull().default(0),
     unitCost: money("unit_cost").notNull().default(0),
     unitPrice: money("unit_price").notNull().default(0),
+    /** Минимална продажна цена (същата основа като unitPrice); под нея продава само администратор. */
+    minPrice: money("min_price"),
     status: mysqlEnum("status", ITEM_STATUSES).notNull().default("active"),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
-  (t) => [uniqueIndex("items_sku").on(t.sku), index("items_barcode").on(t.barcode), index("items_parent").on(t.parentId)],
+  (t) => [uniqueIndex("items_sku").on(t.sku), index("items_barcode").on(t.barcode), index("items_parent").on(t.parentId), uniqueIndex("items_plu").on(t.plu)],
 );
 
 /** Снимки на артикул. Файловете са в хранилището (src/lib/storage.ts) под storageKey + "-full.webp" / "-thumb.webp". */
@@ -224,9 +261,46 @@ export const partners = mysqlTable("partners", {
   /** Държава по ISO 3166-1 alpha-2; ЕС/извън ЕС определя 0 % и обратното начисляване. */
   country: varchar("country", { length: 2 }).notNull().default("BG"),
   leadTimeDays: int("lead_time_days"),
+  /** Ценова група на клиента; празно = групата на локацията или цената на дребно. */
+  priceGroupId: int("price_group_id").references(() => priceGroups.id, { onDelete: "set null" }),
+  /** Постоянна отстъпка в % върху цената от групата (клиентски поръчки). */
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2, mode: "number" }).notNull().default(0),
   notes: text("notes"),
   createdAt: createdAt(),
 });
+
+/** Цена на артикул в ценова група (без ред = цената на дребно на артикула). */
+export const itemPrices = mysqlTable(
+  "item_prices",
+  {
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    priceGroupId: int("price_group_id").notNull().references(() => priceGroups.id, { onDelete: "cascade" }),
+    price: money("price").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.itemId, t.priceGroupId] })],
+);
+
+export const PRICE_TARGETS = ["retail", "cost", "group"] as const;
+export type PriceTarget = (typeof PRICE_TARGETS)[number];
+
+/** История на цените: всяка промяна на цена на дребно, доставна цена или цена в група. */
+export const priceChanges = mysqlTable(
+  "price_changes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    target: mysqlEnum("target", PRICE_TARGETS).notNull(),
+    priceGroupId: int("price_group_id").references(() => priceGroups.id, { onDelete: "cascade" }),
+    oldPrice: money("old_price"),
+    newPrice: money("new_price"),
+    /** „Смяна на цени“, „Редакция на артикул“, импорт… */
+    source: varchar("source", { length: 64 }).notNull(),
+    userId: int("user_id"),
+    userName: varchar("user_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("price_changes_item").on(t.itemId, t.createdAt)],
+);
 
 /** Опаковки на артикул (кашон = 12 бр., палет = 48 кашона в бр.): фактор в основната мерна единица и баркод. */
 export const itemUnits = mysqlTable(
@@ -274,6 +348,10 @@ export const orders = mysqlTable(
   pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
   /** Валутата, в която е издадена поръчката, ако е превалутирана (напр. BGN → EUR от 1.1.2026). */
   originalCurrency: varchar("original_currency", { length: 3 }),
+  /** Чуждестранна валута на поръчката (цените на редовете са в нея); null = основната валута. */
+  currency: varchar("currency", { length: 3 }),
+  /** Курс при създаването: колко единици основна валута е 1 единица от currency. */
+  exchangeRate: decimal("exchange_rate", { precision: 18, scale: 8, mode: "number" }),
   /** Поръчка от онлайн магазин: източник (woocommerce, shopify) и id там — пази от двоен внос. */
   externalSource: varchar("external_source", { length: 32 }),
   externalId: varchar("external_id", { length: 64 }),
@@ -575,6 +653,187 @@ export const invoicePayments = mysqlTable("invoice_payments", {
   createdAt: createdAt(),
 });
 
+// ---------------------------------------------------------------- production
+/**
+ * Рецепта (стокова разписка за производство): от кои артикули и колко се прави outputQuantity от
+ * itemId. Същата рецепта служи и за разглобяване (обратно: артикулът → съставките).
+ */
+export const recipes = mysqlTable(
+  "recipes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    outputQuantity: qty("output_quantity").notNull().default(1),
+    notes: text("notes"),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index("recipes_item").on(t.itemId)],
+);
+
+export const recipeLines = mysqlTable("recipe_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  recipeId: int("recipe_id").notNull().references(() => recipes.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  quantity: qty("quantity").notNull(),
+});
+
+export const PRODUCTION_KINDS = ["assembly", "disassembly"] as const;
+export type ProductionKind = (typeof PRODUCTION_KINDS)[number];
+
+/** Протокол за производство (сглобяване) или разглобяване; прилага се веднага, номерът е ПРД-ГГГГ-NNN. */
+export const productions = mysqlTable(
+  "productions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }).notNull(),
+    kind: mysqlEnum("kind", PRODUCTION_KINDS).notNull().default("assembly"),
+    recipeId: int("recipe_id").references(() => recipes.id, { onDelete: "set null" }),
+    itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+    quantity: qty("quantity").notNull(),
+    locationId: int("location_id").notNull().references(() => locations.id),
+    /** Себестойност на произведеното (сума на вложеното) или на разглобеното. */
+    totalCost: amount("total_cost").notNull().default(0),
+    notes: text("notes"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("productions_number").on(t.number)],
+);
+
+export const productionLines = mysqlTable("production_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  productionId: int("production_id").notNull().references(() => productions.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  /** in = произведено/получено, out = вложено/разглобено. */
+  direction: mysqlEnum("direction", ["in", "out"]).notNull(),
+  quantity: qty("quantity").notNull(),
+  unitCost: money("unit_cost").notNull().default(0),
+  value: amount("value").notNull().default(0),
+});
+
+// ---------------------------------------------------------------- consignment
+export const CONSIGNMENT_KINDS = ["give", "report", "return"] as const;
+export type ConsignmentKind = (typeof CONSIGNMENT_KINDS)[number];
+
+/**
+ * Консигнация: give — стоката отива в консигнационната локация на партньора (трансфер, остава наша);
+ * report — отчет за продаденото (продажба от тази локация, вземане към партньора); return — обратно в склада.
+ * Номер КСГ-ГГГГ-NNN.
+ */
+export const consignments = mysqlTable(
+  "consignments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }).notNull(),
+    kind: mysqlEnum("kind", CONSIGNMENT_KINDS).notNull(),
+    partnerId: int("partner_id").notNull().references(() => partners.id, { onDelete: "restrict" }),
+    /** Консигнационната локация на партньора. */
+    locationId: int("location_id").notNull().references(() => locations.id),
+    /** Складът, от който се дава / в който се връща. */
+    warehouseId: int("warehouse_id").references(() => locations.id),
+    /** При отчет: създадената продажба. */
+    orderId: int("order_id").references(() => orders.id, { onDelete: "set null" }),
+    notes: text("notes"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("consignments_number").on(t.number), index("consignments_partner").on(t.partnerId)],
+);
+
+export const consignmentLines = mysqlTable("consignment_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  consignmentId: int("consignment_id").notNull().references(() => consignments.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  quantity: qty("quantity").notNull(),
+  /** Продажна цена при отчет (без/с ДДС според поръчката). */
+  unitPrice: money("unit_price"),
+});
+
+// ------------------------------------------------------------------ transfers
+/** Трансфер между обекти (ТР-ГГГГ-NNN): чернова, после „Изпълни“ мести всички редове в една транзакция. */
+export const TRANSFER_STATUSES = ["draft", "completed"] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+export const transfers = mysqlTable(
+  "transfers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }).notNull(),
+    status: mysqlEnum("status", TRANSFER_STATUSES).notNull().default("draft"),
+    fromLocationId: int("from_location_id").notNull().references(() => locations.id),
+    toLocationId: int("to_location_id").notNull().references(() => locations.id),
+    notes: text("notes"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    completedAt: ts("completed_at"),
+    completedByName: varchar("completed_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("transfers_number").on(t.number), index("transfers_status").on(t.status, t.createdAt)],
+);
+
+export const transferLines = mysqlTable("transfer_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  transferId: int("transfer_id").notNull().references(() => transfers.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  quantity: qty("quantity").notNull(),
+  /** Конкретна партида / сериен номер; празно при артикул с партиди = по най-близък срок (FEFO) при изпълнение. */
+  lotId: int("lot_id").references(() => lots.id, { onDelete: "set null" }),
+});
+
+// ---------------------------------------------------------------- cash book
+export const CASH_ACCOUNT_KINDS = ["cash", "bank"] as const;
+export type CashAccountKind = (typeof CASH_ACCOUNT_KINDS)[number];
+
+/** Каси и банкови сметки на организацията. */
+export const cashAccounts = mysqlTable("cash_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  kind: mysqlEnum("kind", CASH_ACCOUNT_KINDS).notNull().default("cash"),
+  iban: varchar("iban", { length: 34 }),
+  isDefault: boolean("is_default").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+});
+
+export const CASH_DIRECTIONS = ["in", "out"] as const;
+export type CashDirection = (typeof CASH_DIRECTIONS)[number];
+
+/**
+ * Касова книга: всяко постъпление и плащане (каса или банка). Плащане по фактура има invoiceId (и ред в
+ * invoice_payments); по поръчка без фактура — orderId; без документ — аванс или друг приход/разход.
+ * Касовите записи имат пореден номер ПКО/РКО; банковите — без номер.
+ */
+export const cashEntries = mysqlTable(
+  "cash_entries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }),
+    direction: mysqlEnum("direction", CASH_DIRECTIONS).notNull(),
+    entryDate: date("entry_date", { mode: "string" }).notNull(),
+    accountId: int("account_id").notNull().references(() => cashAccounts.id),
+    amount: amount("amount").notNull(),
+    partnerId: int("partner_id").references(() => partners.id, { onDelete: "set null" }),
+    invoiceId: int("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+    orderId: int("order_id").references(() => orders.id, { onDelete: "set null" }),
+    invoicePaymentId: int("invoice_payment_id").references(() => invoicePayments.id, { onDelete: "set null" }),
+    /** Плащане от клиент, към доставчик, аванс, разход… — свободен текст с предложения. */
+    category: varchar("category", { length: 64 }),
+    note: varchar("note", { length: 255 }),
+    /** Сторно: обратният запис сочи оригинала; и двата не участват в салдата (в касата се неутрализират). */
+    reversalOfId: int("reversal_of_id"),
+    reversedAt: ts("reversed_at"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("cash_entries_date").on(t.entryDate), index("cash_entries_partner").on(t.partnerId), index("cash_entries_order").on(t.orderId)],
+);
+
 // ---------------------------------------------------------------- integrations
 /** Връзки към външни услуги (куриери, онлайн магазини): данните за достъп са криптирани с APP_SECRET. */
 export const integrations = mysqlTable("integrations", {
@@ -690,7 +949,19 @@ export const auditLog = mysqlTable(
 );
 
 // ------------------------------------------------------------------- relations
-export const locationsRelations = relations(locations, ({ many }) => ({ stockLevels: many(stockLevels) }));
+export const locationsRelations = relations(locations, ({ one, many }) => ({
+  stockLevels: many(stockLevels),
+  priceGroup: one(priceGroups, { fields: [locations.priceGroupId], references: [priceGroups.id] }),
+}));
+export const priceGroupsRelations = relations(priceGroups, ({ many }) => ({ prices: many(itemPrices) }));
+export const itemPricesRelations = relations(itemPrices, ({ one }) => ({
+  item: one(items, { fields: [itemPrices.itemId], references: [items.id] }),
+  priceGroup: one(priceGroups, { fields: [itemPrices.priceGroupId], references: [priceGroups.id] }),
+}));
+export const priceChangesRelations = relations(priceChanges, ({ one }) => ({
+  item: one(items, { fields: [priceChanges.itemId], references: [items.id] }),
+  priceGroup: one(priceGroups, { fields: [priceChanges.priceGroupId], references: [priceGroups.id] }),
+}));
 export const vatRatesRelations = relations(vatRates, ({ many }) => ({ items: many(items), categories: many(categories) }));
 export const categoriesRelations = relations(categories, ({ one, many }) => ({
   fields: many(fieldDefinitions),
@@ -716,6 +987,8 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   orderLines: many(orderLines),
   suppliers: many(itemSuppliers),
   packUnits: many(itemUnits),
+  recipes: many(recipes),
+  groupPrices: many(itemPrices),
 }));
 export const itemImagesRelations = relations(itemImages, ({ one }) => ({
   item: one(items, { fields: [itemImages.itemId], references: [items.id] }),
@@ -740,6 +1013,42 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   partner: one(partners, { fields: [invoices.partnerId], references: [partners.id] }),
   related: one(invoices, { fields: [invoices.relatedInvoiceId], references: [invoices.id], relationName: "notes" }),
   notesFor: many(invoices, { relationName: "notes" }),
+}));
+export const recipesRelations = relations(recipes, ({ one, many }) => ({
+  item: one(items, { fields: [recipes.itemId], references: [items.id] }),
+  lines: many(recipeLines),
+}));
+export const recipeLinesRelations = relations(recipeLines, ({ one }) => ({
+  recipe: one(recipes, { fields: [recipeLines.recipeId], references: [recipes.id] }),
+  item: one(items, { fields: [recipeLines.itemId], references: [items.id] }),
+}));
+export const productionsRelations = relations(productions, ({ one, many }) => ({
+  item: one(items, { fields: [productions.itemId], references: [items.id] }),
+  recipe: one(recipes, { fields: [productions.recipeId], references: [recipes.id] }),
+  location: one(locations, { fields: [productions.locationId], references: [locations.id] }),
+  lines: many(productionLines),
+}));
+export const productionLinesRelations = relations(productionLines, ({ one }) => ({
+  production: one(productions, { fields: [productionLines.productionId], references: [productions.id] }),
+  item: one(items, { fields: [productionLines.itemId], references: [items.id] }),
+}));
+export const consignmentsRelations = relations(consignments, ({ one, many }) => ({
+  partner: one(partners, { fields: [consignments.partnerId], references: [partners.id] }),
+  location: one(locations, { fields: [consignments.locationId], references: [locations.id] }),
+  warehouse: one(locations, { fields: [consignments.warehouseId], references: [locations.id], relationName: "consignmentWarehouse" }),
+  order: one(orders, { fields: [consignments.orderId], references: [orders.id] }),
+  lines: many(consignmentLines),
+}));
+export const consignmentLinesRelations = relations(consignmentLines, ({ one }) => ({
+  consignment: one(consignments, { fields: [consignmentLines.consignmentId], references: [consignments.id] }),
+  item: one(items, { fields: [consignmentLines.itemId], references: [items.id] }),
+}));
+export const cashAccountsRelations = relations(cashAccounts, ({ many }) => ({ entries: many(cashEntries) }));
+export const cashEntriesRelations = relations(cashEntries, ({ one }) => ({
+  account: one(cashAccounts, { fields: [cashEntries.accountId], references: [cashAccounts.id] }),
+  partner: one(partners, { fields: [cashEntries.partnerId], references: [partners.id] }),
+  invoice: one(invoices, { fields: [cashEntries.invoiceId], references: [invoices.id] }),
+  order: one(orders, { fields: [cashEntries.orderId], references: [orders.id] }),
 }));
 export const invoiceLinesRelations = relations(invoiceLines, ({ one }) => ({
   invoice: one(invoices, { fields: [invoiceLines.invoiceId], references: [invoices.id] }),
@@ -777,7 +1086,11 @@ export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
   lot: one(lots, { fields: [stockMovements.lotId], references: [lots.id] }),
   shipment: one(shipments, { fields: [stockMovements.shipmentId], references: [shipments.id] }),
 }));
-export const partnersRelations = relations(partners, ({ many }) => ({ orders: many(orders), shipments: many(shipments) }));
+export const partnersRelations = relations(partners, ({ one, many }) => ({
+  orders: many(orders),
+  shipments: many(shipments),
+  priceGroup: one(priceGroups, { fields: [partners.priceGroupId], references: [priceGroups.id] }),
+}));
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   partner: one(partners, { fields: [orders.partnerId], references: [partners.id] }),
   location: one(locations, { fields: [orders.locationId], references: [locations.id] }),
@@ -812,6 +1125,16 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
 }));
 
 // Row types
+export type PriceGroup = typeof priceGroups.$inferSelect;
+export type Currency = typeof currencies.$inferSelect;
+export type CashAccount = typeof cashAccounts.$inferSelect;
+export type Recipe = typeof recipes.$inferSelect;
+export type Consignment = typeof consignments.$inferSelect;
+export type Transfer = typeof transfers.$inferSelect;
+export type TransferLine = typeof transferLines.$inferSelect;
+export type Production = typeof productions.$inferSelect;
+export type CashEntry = typeof cashEntries.$inferSelect;
+export type PriceChange = typeof priceChanges.$inferSelect;
 export type Location = typeof locations.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type FieldDefinition = typeof fieldDefinitions.$inferSelect;

@@ -12,14 +12,14 @@ import { Table } from "@/components/ui/table";
 import { startStockCount } from "@/lib/actions/counts";
 import { requireContext } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { listCategories, listLocations, listStockCounts } from "@/lib/queries";
+import { listCategories, listLocationsFor, listStockCounts } from "@/lib/queries";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Инвентаризация" };
 
 export default async function CountsPage() {
   const ctx = await requireContext();
-  const [counts, locations, categories] = await Promise.all([listStockCounts(ctx.db), listLocations(ctx.db), listCategories(ctx.db)]);
+  const [counts, locations, categories] = await Promise.all([listStockCounts(ctx.db), listLocationsFor(ctx), listCategories(ctx.db)]);
   const writable = can(ctx.role, "write");
 
   return (
