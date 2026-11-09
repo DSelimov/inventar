@@ -19,6 +19,7 @@ export default async function ProductionPage() {
   return (
     <>
       <PageHeader
+        help="production"
         title="Производство"
         description="Протоколи за производство по рецепта и за разглобяване. Вложеното се изписва по себестойност, произведеното влиза с нея."
         actions={

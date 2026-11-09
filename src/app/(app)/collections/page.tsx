@@ -21,7 +21,7 @@ export default async function CollectionsPage() {
   const writable = can(ctx.role, "write");
   return (
     <>
-      <PageHeader title="Колекции" description="Свободни групи от артикули: комплект, витрина, сезон, клиентски проект." />
+      <PageHeader help="collections" title="Колекции" description="Свободни групи от артикули: комплект, витрина, сезон, клиентски проект." />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {collections.length === 0 ? (

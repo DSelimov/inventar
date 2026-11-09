@@ -28,7 +28,7 @@ export default async function CodPage({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <PageHeader title="Наложени платежи" description={`Товарителници с наложен платеж от ${formatDate(from)}: заявено ${money(expected)} · събрано ${money(collected)} · изплатено от куриера ${money(paid)}.`} back={{ href: "/reports", label: "Отчети" }} />
+      <PageHeader help="reports" title="Наложени платежи" description={`Товарителници с наложен платеж от ${formatDate(from)}: заявено ${money(expected)} · събрано ${money(collected)} · изплатено от куриера ${money(paid)}.`} back={{ href: "/reports", label: "Отчети" }} />
       <FilterBar action="/reports/cod">
         <label className="text-xs text-muted">
           От дата

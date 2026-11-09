@@ -29,7 +29,7 @@ export function SettingsTabs({ manage }: { manage: boolean }) {
           href={t.href}
           className={cn(
             "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-            (t.href === "/settings" ? pathname === "/settings" : pathname.startsWith(t.href)) ? "bg-accent-soft text-accent" : "text-muted hover:text-text",
+            (t.href === "/settings" ? pathname === "/settings" : pathname.startsWith(t.href)) ? "bg-accent text-white" : "text-accent hover:bg-surface-2",
           )}
         >
           {t.label}

@@ -46,6 +46,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader
+        help="calendar"
         title="Календар"
         description="Очаквани пратки, напомняния и крайни срокове на едно място."
         actions={

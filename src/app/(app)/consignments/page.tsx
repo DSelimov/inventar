@@ -28,6 +28,7 @@ export default async function ConsignmentsPage() {
   return (
     <>
       <PageHeader
+        help="consignment"
         title="Консигнация"
         description="Стока при клиенти на отговорно пазене: остава ваша, докато не отчетат продаденото. Отчетът създава продажба и вземане."
         actions={

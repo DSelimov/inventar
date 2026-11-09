@@ -34,6 +34,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader
+        help="partners"
         title="Партньори"
         description="Доставчици и клиенти с история на поръчките и срокове на доставка."
         actions={
@@ -50,7 +51,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
           ["supplier", "Доставчици"],
           ["customer", "Клиенти"],
         ].map(([v, l]) => (
-          <Link key={v} href={tabHref(v)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", type === v ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}>
+          <Link key={v} href={tabHref(v)} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium", type === v ? "bg-accent text-white" : "text-accent hover:bg-surface-2")}>
             {l}
           </Link>
         ))}

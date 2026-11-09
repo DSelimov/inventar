@@ -1,24 +1,30 @@
 @import "tailwindcss";
 
 :root {
-  /* Спокойна неутрална палитра: сив фон, бели повърхности, тъмен акцент. */
-  --bg: #fafafa;
+  /* Класически бизнес вид: бяло съдържание, светлосиво меню, синя горна лента и син акцент. */
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --line: #e4e4e7;
-  --text: #18181b;
-  --muted: #71717a;
-  --accent: #18181b;
-  --accent-hover: #3f3f46;
-  --accent-soft: #f4f4f5;
-  --success: #15803d;
-  --success-soft: #f0fdf4;
-  --warning: #a16207;
-  --warning-soft: #fefce8;
-  --danger: #b91c1c;
-  --danger-soft: #fef2f2;
-  --info: #1d4ed8;
-  --info-soft: #eff6ff;
+  --surface-2: #f5f5f5;
+  --line: #dddddd;
+  --text: #333333;
+  --muted: #666666;
+  --accent: #337ab7;
+  --accent-hover: #286090;
+  --accent-soft: #e8f1f9;
+  --topbar: #2f6fab;
+  --topbar-hover: #285f93;
+  --success: #3c763d;
+  --success-soft: #dff0d8;
+  --success-solid: #5cb85c;
+  --warning: #8a6d3b;
+  --warning-soft: #fcf8e3;
+  --warning-solid: #f0ad4e;
+  --danger: #a94442;
+  --danger-soft: #f2dede;
+  --danger-solid: #d9534f;
+  --info: #31708f;
+  --info-soft: #d9edf7;
+  --info-solid: #5bc0de;
 }
 
 @theme inline {
@@ -39,7 +45,20 @@
   --color-danger-soft: var(--danger-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --color-topbar: var(--topbar);
+  --color-topbar-hover: var(--topbar-hover);
+  --color-success-solid: var(--success-solid);
+  --color-warning-solid: var(--warning-solid);
+  --color-danger-solid: var(--danger-solid);
+  --color-info-solid: var(--info-solid);
+  /* Малки, почти квадратни ъгли навсякъде. */
+  --radius-sm: 2px;
+  --radius: 3px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
@@ -59,9 +78,23 @@ body {
 @layer components {
 /* Form controls share one look */
 .control {
-  @apply w-full rounded-md border border-line bg-surface px-3 py-[7px] text-sm text-text
-    placeholder:text-muted/70 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200
-    disabled:bg-surface-2 disabled:text-muted;
+  @apply w-full rounded border border-[#cccccc] bg-surface px-3 py-[0.44rem] text-sm text-text transition-colors
+    placeholder:text-[#999999] focus:border-[#66afe9] focus:outline-none focus:ring-3 focus:ring-[#66afe9]/25
+    disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-80;
+}
+input.control:read-only {
+  @apply bg-surface-2;
+}
+
+/* Selects: own chevron instead of the browser's, same padding as inputs */
+select.control:not([multiple]) {
+  @apply appearance-none bg-no-repeat pr-9;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 0.6rem center;
+  background-size: 1rem;
+}
+textarea.control {
+  @apply leading-relaxed;
 }
 
 /* Table defaults */
@@ -69,15 +102,15 @@ body {
   @apply w-full border-collapse text-sm;
 }
 .table th {
-  @apply border-b border-line px-4 py-2 text-left text-xs font-medium text-muted;
+  @apply border-b-2 border-line px-3 py-2 text-left text-sm font-bold text-text;
 }
 .table td {
-  @apply border-t border-line px-4 py-2.5 align-middle;
+  @apply border-t border-line px-3 py-2 align-middle;
 }
 .table tbody tr:first-child td {
   @apply border-t-0;
 }
 .table tbody tr:hover td {
-  @apply bg-surface-2/50;
+  @apply bg-surface-2;
 }
 }

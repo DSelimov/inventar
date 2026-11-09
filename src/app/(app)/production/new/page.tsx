@@ -52,7 +52,7 @@ export default async function NewProductionPage({ searchParams }: { searchParams
   if (recipes.length === 0) {
     return (
       <div className="mx-auto max-w-3xl">
-        <PageHeader title="Ново производство" back={{ href: "/production", label: "Производство" }} />
+        <PageHeader help="production" title="Ново производство" back={{ href: "/production", label: "Производство" }} />
         <Card>
           <CardBody className="text-sm text-muted">
             Първо създайте{" "}

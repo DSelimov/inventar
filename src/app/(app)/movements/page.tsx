@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { History } from "lucide-react";
+import { ArrowLeftRight, History } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Select } from "@/components/ui/fields";
@@ -37,7 +38,16 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader title="Движения" description="Цялата складова история: приходи, разходи, корекции и трансфери, от всички артикули и локации." />
+      <PageHeader
+        help="movements"
+        title="Движения"
+        description="Цялата складова история: приходи, разходи, корекции и трансфери, от всички артикули и локации."
+        actions={
+          <ButtonLink href="/reports/movements" variant="secondary">
+            <ArrowLeftRight className="h-4 w-4" /> Справка приход / разход
+          </ButtonLink>
+        }
+      />
 
       <FilterBar action="/movements" resetHref={filtered ? "/movements" : undefined}>
         {filters.itemId && <input type="hidden" name="item" value={filters.itemId} />}

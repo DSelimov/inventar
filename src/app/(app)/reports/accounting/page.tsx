@@ -38,7 +38,8 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader help="valuation"
+      <PageHeader
+        help="valuation"
         title="За счетоводителя"
         description={`Документи за ${formatDate(from, "LLLL yyyy")}: издадени фактури и известия с основа и ДДС по ставка, и получените доставки. Файловете са CSV за Excel.`}
         back={{ href: "/reports", label: "Отчети" }}

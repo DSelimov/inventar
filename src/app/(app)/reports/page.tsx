@@ -8,7 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Coins, PackageMinus, RefreshCw, TrendingUp } from "lucide-react";
+import { ArrowLeftRight, Coins, PackageMinus, RefreshCw, TrendingUp } from "lucide-react";
 import { requireContext, requireCostAccess } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { buildReports } from "@/lib/reports";
@@ -32,10 +32,14 @@ export default async function ReportsPage() {
   return (
     <>
       <PageHeader
+        help="reports"
         title="Отчети"
         description={`Анализ за последните ${settings.windowDays} дни (от ${formatDate(r.windowStart)}). Залежала стока: без разход ${settings.deadStockDays} дни. Покритие при поръчка: ${r.coverDays} дни (доставка ${r.avgLead} + буфер ${settings.safetyDays}).`}
         actions={
           <>
+            <ButtonLink href="/reports/movements" variant="secondary">
+              <ArrowLeftRight className="h-4 w-4" /> Приход и разход
+            </ButtonLink>
             <ButtonLink href="/reports/valuation" variant="secondary">
               <Coins className="h-4 w-4" /> Себестойност и марж
             </ButtonLink>

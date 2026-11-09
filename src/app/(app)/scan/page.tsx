@@ -108,7 +108,8 @@ export default async function ScanPage({ searchParams }: { searchParams: Promise
                       ))}
                   </ul>
                   <div className="mt-3 text-sm text-muted">
-                    Продажна цена {formatMoney(item.unitPrice, ctx.org.currency)} · Доставна {formatMoney(item.unitCost, ctx.org.currency)}
+                    Продажна цена {formatMoney(item.unitPrice, ctx.org.currency)}
+                    {!ctx.hideCosts && <> · Доставна {formatMoney(item.unitCost, ctx.org.currency)}</>}
                   </div>
                 </div>
                 {writable && item.tracking === "none" && (

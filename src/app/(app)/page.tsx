@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { format } from "date-fns";
 import {
   ArrowDownToLine,
+  ArrowLeftRight,
   ArrowRight,
   ArrowUpFromLine,
   BarChart3,
@@ -24,7 +25,6 @@ import {
   Package,
   PackagePlus,
   ScanLine,
-  Search,
   Settings,
   Scale,
   ShoppingCart,
@@ -36,6 +36,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { HomeSearch } from "@/components/home/home-search";
 import { Tile, type TileTone } from "@/components/home/tile";
 import { alertCounts } from "@/lib/alerts";
 import { requireContext } from "@/lib/auth";
@@ -58,6 +59,37 @@ type TileDef = {
   badge?: number;
   badgeTone?: TileTone;
   badgeLabel?: string;
+  /** Синоними за търсенето. */
+  keywords?: string;
+};
+
+/** Синоними за търсенето на функция (по адреса на плочката). */
+const KEYWORDS: Record<string, string> = {
+  "/orders/new?type=sales": "клиент продажби поръчка от клиент оферта",
+  "/shipments/new?direction=inbound": "доставка получаване стока заприхождаване стокова разписка",
+  "/shipments/new?direction=outbound": "изписване изпращане куриер товарителница експедиция",
+  "/orders/new?type=purchase": "доставчик покупка поръчка към доставчик заявка",
+  "/scan": "баркод скенер камера бързо",
+  "/counts": "броене ревизия наличност изравняване",
+  "/write-offs/new": "бракуване отписване повредена изтекла липса",
+  "/items/new": "нов продукт стока номенклатура добавяне",
+  "/invoices": "фактура кредитно дебитно известие проформа ддс",
+  "/cash": "плащане каса банка приход разход пари",
+  "/reports/balances": "дължи вземания задължения салдо партньор",
+  "/transfers": "трансфер преместване зареждане аптека обект склад между локации",
+  "/movements": "история движения приход разход",
+  "/orders/suggestions": "предложение поръчка минимум зареждане",
+  "/partners": "клиент доставчик контрагент фирма еик",
+  "/categories": "група полета",
+  "/settings/locations": "склад обект магазин локация",
+  "/reports": "справка отчет оборот марж",
+  "/reports/accounting": "счетоводител експорт микроинвест ajur плюс минус",
+  "/calendar": "срок събитие напомняне",
+  "/m": "телефон мобилно",
+  "/settings/import": "импорт csv excel microinvest",
+  "/settings": "фирма потребители настройки ддс",
+  "/help": "помощ ръководство как",
+  "/dashboard": "табло показатели",
 };
 
 function greeting(hour: number) {
@@ -122,6 +154,7 @@ export default async function HomePage() {
         },
         { href: "/cash", label: "Каса и банка", hint: "Плащания, приходи и разходи", icon: Wallet, tone: "success" },
         { href: "/reports/balances", label: "Салда", hint: "Кой колко дължи", icon: Scale, tone: "danger" },
+        { href: "/transfers", label: "Трансфери", hint: "Между склад и обекти", icon: ArrowLeftRight, tone: "info" },
         { href: "/movements", label: "Движения", hint: "История на наличностите", icon: History, tone: "neutral" },
         { href: "/orders/suggestions", label: "Предложения", hint: "Какво да се поръча", icon: Lightbulb, tone: "warning" },
         { href: "/consignments", label: "Консигнация", hint: "Стока при клиенти", icon: Handshake, tone: "info" },
@@ -184,21 +217,21 @@ export default async function HomePage() {
       <section>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs text-muted first-letter:uppercase">{format(now, "EEEE, d MMMM yyyy", { locale: LOCALE })}</p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight">
+            <p className="text-sm text-text/70 first-letter:uppercase">{format(now, "EEEE, d MMMM yyyy", { locale: LOCALE })}</p>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight">
               {greeting(now.getHours())}, {ctx.user.name.split(" ")[0]}
+              <Link href="/help/home" target="_blank" className="text-muted hover:text-accent" aria-label="Помощ за тази страница" title="Помощ">
+                <CircleHelp className="h-5 w-5" />
+              </Link>
             </h1>
           </div>
-          <form action="/items" role="search" className="relative w-full md:w-80">
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" />
-            <input type="search" name="q" aria-label="Търсене на артикул" placeholder="Търсене на артикул…" className="control pl-9" />
-          </form>
+          <HomeSearch containerId="home-groups" />
         </div>
         <dl className="mt-5 grid grid-cols-2 divide-line overflow-hidden rounded-lg border border-line bg-surface lg:grid-cols-4 lg:divide-x">
           {kpis.map((k) => (
             <Link key={k.label} href={k.href} className="group px-4 py-3 transition-colors hover:bg-surface-2/50">
-              <dt className="text-xs text-muted">{k.label}</dt>
-              <dd className="mt-1 flex items-center justify-between gap-2 text-lg font-semibold tabular-nums tracking-tight">
+              <dt className="text-sm text-text/70">{k.label}</dt>
+              <dd className="mt-1 flex items-center justify-between gap-2 text-xl font-semibold tabular-nums tracking-tight">
                 <span className="truncate">{k.value}</span>
                 <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition group-hover:opacity-100" />
               </dd>
@@ -207,9 +240,10 @@ export default async function HomePage() {
         </dl>
       </section>
 
+      <div id="home-groups" className="space-y-8">
       {visible.map((g) => (
-        <section key={g.title} aria-labelledby={`home-${g.title}`}>
-          <h2 id={`home-${g.title}`} className="mb-2 text-xs font-medium text-muted">
+        <section key={g.title} aria-labelledby={`home-${g.title}`} data-home-group>
+          <h2 id={`home-${g.title}`} className="mb-2.5 text-sm font-semibold text-text">
             {g.title}
           </h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -224,11 +258,16 @@ export default async function HomePage() {
                 badge={t.badge}
                 badgeTone={t.badgeTone}
                 badgeLabel={t.badgeLabel}
+                search={[t.label, t.hint, g.title, t.keywords ?? KEYWORDS[t.href]].filter(Boolean).join(" ")}
               />
             ))}
           </div>
         </section>
       ))}
+        <p data-home-empty hidden className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+          Няма функция с такова име. Опитайте с друга дума или потърсете в менюто вляво.
+        </p>
+      </div>
     </div>
   );
 }

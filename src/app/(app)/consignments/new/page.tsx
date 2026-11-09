@@ -57,7 +57,7 @@ export default async function NewConsignmentPage({ searchParams }: { searchParam
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader title={partner ? `${CONSIGNMENT_LABELS[kind]} — ${partner.name}` : "Консигнация"} back={{ href: "/consignments", label: "Консигнация" }} />
+      <PageHeader help="consignment" title={partner ? `${CONSIGNMENT_LABELS[kind]} — ${partner.name}` : "Консигнация"} back={{ href: "/consignments", label: "Консигнация" }} />
       <Card>
         <CardBody>
           <form action="/consignments/new" className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">

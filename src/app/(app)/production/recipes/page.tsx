@@ -20,6 +20,7 @@ export default async function RecipesPage() {
   return (
     <>
       <PageHeader
+        help="production"
         back={{ href: "/production", label: "Производство" }}
         title="Рецепти"
         description="От какво и колко се прави един артикул (торта, комплект, смес). Една рецепта служи и за разглобяване."

@@ -112,7 +112,7 @@ export default async function CountPage({ params, searchParams }: { params: Prom
               actions={
                 <div className="flex gap-1">
                   {(Object.keys(SHOW) as Array<keyof typeof SHOW>).map((k) => (
-                    <Link key={k} href={k === "all" ? `/counts/${id}` : `/counts/${id}?show=${k}`} className={cn("rounded-lg px-2.5 py-1 text-xs font-medium", show === k ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}>
+                    <Link key={k} href={k === "all" ? `/counts/${id}` : `/counts/${id}?show=${k}`} className={cn("rounded-lg px-2.5 py-1 text-xs font-medium", show === k ? "bg-accent text-white" : "text-accent hover:bg-surface-2")}>
                       {SHOW[k]}
                     </Link>
                   ))}

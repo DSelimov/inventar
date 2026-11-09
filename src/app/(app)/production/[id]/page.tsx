@@ -59,6 +59,7 @@ export default async function ProductionDetailPage({ params }: { params: Promise
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
+        help="production"
         back={{ href: "/production", label: "Производство" }}
         eyebrow={p.number}
         title={`${label(p.kind)}: ${formatNumber(p.quantity)} ${p.item.unit} ${p.item.name}`}

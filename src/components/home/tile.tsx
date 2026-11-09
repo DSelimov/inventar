@@ -5,12 +5,12 @@ import { cn } from "@/lib/utils";
 export type TileTone = "accent" | "success" | "warning" | "danger" | "info" | "neutral";
 
 const BADGE: Record<TileTone, string> = {
-  accent: "border-line bg-surface-2 text-text",
-  success: "border-green-200 bg-success-soft text-success",
-  warning: "border-yellow-200 bg-warning-soft text-warning",
-  danger: "border-red-200 bg-danger-soft text-danger",
-  info: "border-blue-200 bg-info-soft text-info",
-  neutral: "border-line bg-surface-2 text-muted",
+  accent: "border-transparent bg-accent text-white",
+  success: "border-transparent bg-success-solid text-white",
+  warning: "border-transparent bg-warning-solid text-white",
+  danger: "border-transparent bg-danger-solid text-white",
+  info: "border-transparent bg-info-solid text-white",
+  neutral: "border-transparent bg-[#777777] text-white",
 };
 
 export type TileProps = {
@@ -24,26 +24,30 @@ export type TileProps = {
   badgeTone?: TileTone;
   /** Пояснение към значката, напр. „3 неплатени“. */
   badgeLabel?: string;
+  /** Текст за търсенето на началния екран (заглавие, описание, група, синоними). */
+  search?: string;
 };
 
 /**
  * Плочка на началния екран: компактен бял ред с монохромна икона, заглавие, описание и брояч.
  * Цветът се използва само за брояча, когато нещо изисква внимание.
  */
-export function Tile({ href, label, hint, icon: Icon, badge, badgeTone = "danger", badgeLabel }: TileProps) {
+export function Tile({ href, label, hint, icon: Icon, badge, badgeTone = "danger", badgeLabel, search }: TileProps) {
   return (
     <Link
       href={href}
       aria-label={badge ? `${label} — ${badgeLabel ?? badge}` : label}
-      className="group flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-zinc-300 hover:bg-surface-2/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      data-home-tile
+      data-search={search ?? [label, hint].filter(Boolean).join(" ")}
+      className="group flex items-start gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-accent/50 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
-      <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-muted group-hover:text-text" />
+      <Icon aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-accent" strokeWidth={1.75} />
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium leading-5">{label}</div>
-        {hint && <p className="mt-0.5 truncate text-xs text-muted">{hint}</p>}
+        <div className="text-base font-semibold leading-6">{label}</div>
+        {hint && <p className="mt-0.5 line-clamp-2 text-sm text-text/70">{hint}</p>}
       </div>
       {!!badge && (
-        <span title={badgeLabel} className={cn("shrink-0 rounded-md border px-1.5 py-px text-xs font-medium tabular-nums", BADGE[badgeTone])}>
+        <span title={badgeLabel} className={cn("shrink-0 rounded-md border px-2 py-0.5 text-sm font-semibold tabular-nums", BADGE[badgeTone])}>
           {badge > 99 ? "99+" : badge}
         </span>
       )}

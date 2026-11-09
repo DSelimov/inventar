@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "db:studio": "drizzle-kit studio --config drizzle.tenant.config.ts",
     "db:seed": "tsx --env-file=.env src/db/seed.ts",
+    "db:seed:medical": "tsx --conditions=react-server --env-file=.env src/db/seed-medical.ts",
     "db:reset": "pnpm db:migrate && pnpm db:seed",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts && drizzle-kit generate --config drizzle.tenant.config.ts",
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts",

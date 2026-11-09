@@ -176,6 +176,13 @@
       "when": 1793968261621,
       "tag": "0024_quotes_min_price",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1793969881224,
+      "tag": "0025_transfers",
+      "breakpoints": true
     }
   ]
 }

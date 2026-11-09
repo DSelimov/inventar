@@ -49,6 +49,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
   return (
     <>
       <PageHeader
+        help="partners"
         back={{ href: "/partners", label: "Партньори" }}
         title={partner.name}
         description={

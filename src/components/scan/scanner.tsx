@@ -71,6 +71,8 @@ export function Scanner({ initialCode, onCode, continuous = false, hideInput = f
         onSubmit={(e) => {
           e.preventDefault();
           go(code);
+          // с onCode страницата остава — полето се чисти за следващия код от скенера
+          if (onCode) setCode("");
         }}
         className="flex gap-2"
       >

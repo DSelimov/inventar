@@ -40,7 +40,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader title="Каса и банка" description="Всички постъпления и плащания: по фактури, по поръчки, аванси и други приходи и разходи. Касовите записи са с пореден ПКО/РКО." />
+      <PageHeader help="cash" title="Каса и банка" description="Всички постъпления и плащания: по фактури, по поръчки, аванси и други приходи и разходи. Касовите записи са с пореден ПКО/РКО." />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {active.map((a) => (

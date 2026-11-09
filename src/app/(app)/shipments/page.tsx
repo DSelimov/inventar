@@ -56,7 +56,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
           <Link
             key={t.value}
             href={tabHref(t.value)}
-            className={cn("rounded-lg px-3 py-1.5 text-sm font-medium transition-colors", status === t.value ? "bg-accent-soft text-accent" : "text-muted hover:text-text")}
+            className={cn("rounded-lg px-3 py-1.5 text-sm font-medium transition-colors", status === t.value ? "bg-accent text-white" : "text-accent hover:bg-surface-2")}
           >
             {t.label}
           </Link>

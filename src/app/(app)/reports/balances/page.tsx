@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FilterBar } from "@/components/ui/search-form";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableWrap } from "@/components/ui/table";
-import { requireContext } from "@/lib/auth";
+import { requireContext, requireCostAccess } from "@/lib/auth";
 import { partnerBalances } from "@/lib/cash";
 import { sumMoney } from "@/lib/money";
 import { param, type SearchParams } from "@/lib/paging";
@@ -19,6 +19,7 @@ export const metadata: Metadata = { title: "Салда по партньори" 
 
 export default async function BalancesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireContext();
+  requireCostAccess(ctx);
   const sp = await searchParams;
   const showAll = param(sp, "all") === "1";
   const [partners, balances] = await Promise.all([listPartners(ctx.db), partnerBalances(ctx.db)]);
@@ -33,6 +34,7 @@ export default async function BalancesPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader
+        help="partners"
         title="Салда по партньори"
         back={{ href: "/reports", label: "Отчети" }}
         description="Вземания от клиенти (фактури и продажби без фактура минус платеното) и задължения към доставчици (получена стока минус платеното). Отрицателно = аванс."

@@ -20,7 +20,7 @@ export default async function CategoriesPage() {
   const writable = can(ctx.role, "write");
   return (
     <>
-      <PageHeader title="Категории" description="Групирайте артикулите и дефинирайте допълнителните полета, които всеки тип артикул изисква." />
+      <PageHeader help="categories" title="Категории" description="Групирайте артикулите и дефинирайте допълнителните полета, които всеки тип артикул изисква." />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {categories.length === 0 ? (

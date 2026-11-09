@@ -753,6 +753,38 @@ export const consignmentLines = mysqlTable("consignment_lines", {
   unitPrice: money("unit_price"),
 });
 
+// ------------------------------------------------------------------ transfers
+/** Трансфер между обекти (ТР-ГГГГ-NNN): чернова, после „Изпълни“ мести всички редове в една транзакция. */
+export const TRANSFER_STATUSES = ["draft", "completed"] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+export const transfers = mysqlTable(
+  "transfers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    number: varchar("number", { length: 32 }).notNull(),
+    status: mysqlEnum("status", TRANSFER_STATUSES).notNull().default("draft"),
+    fromLocationId: int("from_location_id").notNull().references(() => locations.id),
+    toLocationId: int("to_location_id").notNull().references(() => locations.id),
+    notes: text("notes"),
+    createdBy: int("created_by"),
+    createdByName: varchar("created_by_name", { length: 200 }),
+    completedAt: ts("completed_at"),
+    completedByName: varchar("completed_by_name", { length: 200 }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("transfers_number").on(t.number), index("transfers_status").on(t.status, t.createdAt)],
+);
+
+export const transferLines = mysqlTable("transfer_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  transferId: int("transfer_id").notNull().references(() => transfers.id, { onDelete: "cascade" }),
+  itemId: int("item_id").notNull().references(() => items.id, { onDelete: "restrict" }),
+  quantity: qty("quantity").notNull(),
+  /** Конкретна партида / сериен номер; празно при артикул с партиди = по най-близък срок (FEFO) при изпълнение. */
+  lotId: int("lot_id").references(() => lots.id, { onDelete: "set null" }),
+});
+
 // ---------------------------------------------------------------- cash book
 export const CASH_ACCOUNT_KINDS = ["cash", "bank"] as const;
 export type CashAccountKind = (typeof CASH_ACCOUNT_KINDS)[number];
@@ -1098,6 +1130,8 @@ export type Currency = typeof currencies.$inferSelect;
 export type CashAccount = typeof cashAccounts.$inferSelect;
 export type Recipe = typeof recipes.$inferSelect;
 export type Consignment = typeof consignments.$inferSelect;
+export type Transfer = typeof transfers.$inferSelect;
+export type TransferLine = typeof transferLines.$inferSelect;
 export type Production = typeof productions.$inferSelect;
 export type CashEntry = typeof cashEntries.$inferSelect;
 export type PriceChange = typeof priceChanges.$inferSelect;

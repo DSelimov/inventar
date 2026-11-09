@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { addDays, format } from "date-fns";
-import { AlertTriangle, ArrowRight, Boxes, CalendarDays, ClipboardList, Coins, MapPin, Package, Timer, Truck } from "lucide-react";
+import { AlertTriangle, ArrowRight, Boxes, CalendarDays, CircleHelp, ClipboardList, Coins, MapPin, Package, Timer, Truck } from "lucide-react";
 import { Badge, ColorBadge, statusTone } from "@/components/ui/badge";
 import { OnboardingChecklist } from "@/components/onboarding/checklist";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -33,7 +33,12 @@ export default async function DashboardPage() {
     <>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Табло</h1>
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+            Табло
+            <Link href="/help/dashboard" target="_blank" className="text-muted hover:text-accent" aria-label="Помощ за тази страница" title="Помощ">
+              <CircleHelp className="h-4 w-4" />
+            </Link>
+          </h1>
           <p className="mt-1 text-sm text-muted first-letter:uppercase">{format(new Date(), "EEEE, d MMMM yyyy", { locale: LOCALE })}</p>
         </div>
         {writable && (

@@ -14,7 +14,7 @@ export default async function NewPartnerPage() {
   const priceGroups = await listPriceGroups(ctx.db);
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Нов партньор" back={{ href: "/partners", label: "Партньори" }} />
+      <PageHeader help="partners" title="Нов партньор" back={{ href: "/partners", label: "Партньори" }} />
       <Card>
         <CardBody>
           <Form action={createPartner}>

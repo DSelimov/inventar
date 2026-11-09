@@ -29,7 +29,7 @@ export function PageHeader({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {eyebrow && <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">{eyebrow}</div>}
-          <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-tight">
+          <h1 className="flex items-center gap-2 truncate text-2xl font-normal">
             {title}
             {help && (
               <Link href={`/help/${help}`} target="_blank" className="text-muted/70 hover:text-text" aria-label="Помощ за тази страница" title="Помощ">
