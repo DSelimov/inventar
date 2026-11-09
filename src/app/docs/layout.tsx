@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Boxes, Braces, TerminalSquare } from "lucide-react";
+import { Braces, TerminalSquare } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { API_VERSION } from "@/lib/openapi";
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
@@ -8,10 +9,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       <header className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 md:px-8">
           <Link href="/docs/api" className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">
-              <Boxes className="h-4 w-4" />
-            </span>
-            <span className="text-sm font-semibold">Складио API</span>
+            <Logo size="sm" suffix="API" />
             <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">v{API_VERSION}</span>
           </Link>
           <nav className="ml-auto flex items-center gap-1 text-sm">

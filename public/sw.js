@@ -2,7 +2,7 @@
  * Service worker на мобилния режим. Мрежата е първа; без връзка — кешираната страница /m и статичните
  * файлове на Next. API заявките не се кешират (синхронизацията сама опитва отново).
  */
-const CACHE = "inventar-m-v1";
+const CACHE = "inventar-m-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/m"])).then(() => self.skipWaiting()));

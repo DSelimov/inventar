@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Bell, Boxes, ChevronDown, CircleUser, House, LogOut, ScanLine, Search, Settings, UserRound } from "lucide-react";
 import type { Role } from "@/db/schema";
+import { LogoMark } from "@/components/brand/logo";
 import { logout } from "@/lib/actions/auth";
 import { ROLE_LABELS } from "@/lib/permissions";
 
@@ -27,10 +28,8 @@ export function Topbar({
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center gap-3 bg-topbar px-3 text-white md:px-4">
       <Link href="/" className="flex shrink-0 items-center gap-2 rounded px-1 py-1 hover:bg-topbar-hover" title="Начало">
-        <span className="flex h-7 w-7 items-center justify-center rounded border border-white/40 bg-white/10">
-          <Boxes className="h-4 w-4" />
-        </span>
-        <span className="hidden text-base sm:inline">Складио</span>
+        <LogoMark tone="white" className="h-7 w-7" />
+        <span className="hidden font-brand text-lg font-extrabold tracking-tight sm:inline">Складио</span>
       </Link>
 
       <div className="min-w-0 max-w-56 truncate text-sm text-white/85">

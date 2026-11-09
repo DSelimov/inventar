@@ -1,15 +1,10 @@
 import Link from "next/link";
-import { Boxes } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-white">
-          <Boxes className="h-5 w-5" />
-        </div>
-        <div className="text-lg font-semibold">Складио</div>
-      </div>
+      <Logo className="mb-6 text-text" />
       <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6">{children}</div>
       <nav className="mt-6 flex flex-wrap justify-center gap-4 text-xs text-muted">
         <Link href="/terms" className="hover:text-accent">
