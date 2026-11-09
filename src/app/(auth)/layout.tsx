@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-white">
           <Boxes className="h-5 w-5" />
         </div>
-        <div className="text-lg font-semibold">Инвентар</div>
+        <div className="text-lg font-semibold">Складио</div>
       </div>
       <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6">{children}</div>
       <nav className="mt-6 flex flex-wrap justify-center gap-4 text-xs text-muted">

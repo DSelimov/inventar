@@ -1,4 +1,4 @@
-# Инвентар — notes for Claude Code
+# Складио — notes for Claude Code
 
 Universal inventory SaaS. **UI, demo data, README and commit messages are in Bulgarian**; code identifiers and
 comments may be English. Reply to the user in the language they write in.

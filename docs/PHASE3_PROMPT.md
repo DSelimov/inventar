@@ -1,11 +1,11 @@
-# Prompt for Claude Code — Инвентар, phase 3 (production readiness)
+# Prompt for Claude Code — Складио, phase 3 (production readiness)
 
 Paste this file's content as the first message in a new Claude Code session opened in the project root
 (`~/projects/inventory` or wherever the repo is cloned). Read `CLAUDE.md` and `README.md` first.
 
 ---
 
-You are continuing work on **Инвентар**, a universal inventory SaaS (Next.js 16, Drizzle ORM, MySQL 8,
+You are continuing work on **Складио**, a universal inventory SaaS (Next.js 16, Drizzle ORM, MySQL 8,
 Tailwind 4) with **one MySQL database and one subdomain per tenant**. Phases 1 and 2 are done and committed:
 categories with custom fields, items with variants / lots / serial numbers, multiple locations with transfers,
 partners, purchase and sales orders with partial fulfilment, shipments, collections, calendar, barcode scanning,

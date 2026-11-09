@@ -30,7 +30,7 @@ export function Topbar({
         <span className="flex h-7 w-7 items-center justify-center rounded border border-white/40 bg-white/10">
           <Boxes className="h-4 w-4" />
         </span>
-        <span className="hidden text-base sm:inline">Инвентар</span>
+        <span className="hidden text-base sm:inline">Складио</span>
       </Link>
 
       <div className="min-w-0 max-w-56 truncate text-sm text-white/85">

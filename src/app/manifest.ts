@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 /** PWA: мобилният режим /m се инсталира на телефона като приложение. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Инвентар — склад",
-    short_name: "Инвентар",
+    name: "Складио",
+    short_name: "Складио",
     description: "Приход, разход и инвентаризация със скенер, и без връзка.",
     start_url: "/m",
     scope: "/",

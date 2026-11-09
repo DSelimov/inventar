@@ -40,7 +40,7 @@ export const testIntegrationAction = act(async (id: string) => {
     const r = await linkProducts(ctx.db, p);
     await audit(ctx, "update", "settings", null, { integration: p, linked: r.linked });
     revalidatePath("/settings/integrations");
-    const tail = r.unknown.length ? ` Без съвпадение в Инвентар: ${r.unknown.slice(0, 10).join(", ")}${r.unknown.length > 10 ? ` и още ${r.unknown.length - 10}` : ""}.` : "";
+    const tail = r.unknown.length ? ` Без съвпадение в Складио: ${r.unknown.slice(0, 10).join(", ")}${r.unknown.length > 10 ? ` и още ${r.unknown.length - 10}` : ""}.` : "";
     return `${PROVIDERS[p].name}: свързани ${r.linked} артикула по SKU.${tail}`;
   }
   if (!isCourier(p)) throw new UserError("Непозната интеграция.");

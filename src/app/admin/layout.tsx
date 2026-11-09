@@ -11,7 +11,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">
               <Boxes className="h-4 w-4" />
             </span>
-            Инвентар · Платформа
+            Складио · Платформа
           </Link>
           <nav className="flex gap-4 text-sm">
             <Link href="/admin" className="text-muted hover:text-text">

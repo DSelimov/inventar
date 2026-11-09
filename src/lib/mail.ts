@@ -56,12 +56,12 @@ ${o.lines.map((l) => `<p style="margin:0 0 12px;line-height:1.5">${escape(l)}</p
   return { to: o.to, subject: o.subject, text, html };
 }
 
-const brandOf = (orgName?: string) => (orgName ? `${orgName} · Инвентар` : "Инвентар");
+const brandOf = (orgName?: string) => (orgName ? `${orgName} · Складио` : "Складио");
 
 export function passwordResetMail(o: { to: string; name: string; url: string; orgName?: string }) {
   return layout({
     to: o.to,
-    subject: "Нова парола за Инвентар",
+    subject: "Нова парола за Складио",
     brand: brandOf(o.orgName),
     lines: [`Здравейте, ${o.name}!`, "Получихме заявка за нова парола за вашия акаунт. Линкът е валиден 1 час и може да се използва веднъж."],
     button: "Задайте нова парола",
@@ -73,7 +73,7 @@ export function passwordResetMail(o: { to: string; name: string; url: string; or
 export function invitationMail(o: { to: string; name: string; url: string; orgName: string; invitedBy: string }) {
   return layout({
     to: o.to,
-    subject: `Покана за ${o.orgName} в Инвентар`,
+    subject: `Покана за ${o.orgName} в Складио`,
     brand: brandOf(o.orgName),
     lines: [`Здравейте, ${o.name}!`, `${o.invitedBy} ви покани в организация „${o.orgName}“. Задайте парола, за да влезете. Линкът е валиден 7 дни.`],
     button: "Приемете поканата",
@@ -85,7 +85,7 @@ export function invitationMail(o: { to: string; name: string; url: string; orgNa
 export function accessGrantedMail(o: { to: string; name: string; url: string; orgName: string; invitedBy: string }) {
   return layout({
     to: o.to,
-    subject: `Достъп до ${o.orgName} в Инвентар`,
+    subject: `Достъп до ${o.orgName} в Складио`,
     brand: brandOf(o.orgName),
     lines: [`Здравейте, ${o.name}!`, `${o.invitedBy} ви даде достъп до организация „${o.orgName}“. Влезте със съществуващия си имейл и парола.`],
     button: "Вход",

@@ -12,7 +12,7 @@ const fonts = () => (fontCache ??= { regular: readFileSync(path.join(FONTS, "Dej
 export const mm = (v: number) => (v * 72) / 25.4;
 
 export function createDoc(opts: { title: string; margin?: number; layout?: "portrait" | "landscape" }) {
-  const doc = new PDFDocument({ size: "A4", layout: opts.layout ?? "portrait", margin: opts.margin ?? mm(15), info: { Title: opts.title, Producer: "Инвентар", Creator: "Инвентар" }, bufferPages: true });
+  const doc = new PDFDocument({ size: "A4", layout: opts.layout ?? "portrait", margin: opts.margin ?? mm(15), info: { Title: opts.title, Producer: "Складио", Creator: "Складио" }, bufferPages: true });
   doc.registerFont("regular", fonts().regular);
   doc.registerFont("bold", fonts().bold);
   doc.font("regular");

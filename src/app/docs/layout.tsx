@@ -11,7 +11,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">
               <Boxes className="h-4 w-4" />
             </span>
-            <span className="text-sm font-semibold">Инвентар API</span>
+            <span className="text-sm font-semibold">Складио API</span>
             <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">v{API_VERSION}</span>
           </Link>
           <nav className="ml-auto flex items-center gap-1 text-sm">

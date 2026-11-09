@@ -39,7 +39,7 @@ export const deleteWebhook = act(async (id: number) => {
 
 export const sendTestWebhook = act(async () => {
   const ctx = await requireContext("manage");
-  emit(ctx.db, "item.updated", { test: true, message: "Тестово събитие от Инвентар", organization: ctx.org.name });
+  emit(ctx.db, "item.updated", { test: true, message: "Тестово събитие от Складио", organization: ctx.org.name });
   revalidatePath("/settings/webhooks");
   return "Тестовото събитие е изпратено.";
 });

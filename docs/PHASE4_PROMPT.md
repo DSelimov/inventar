@@ -1,11 +1,11 @@
-# Prompt for Claude Code — Инвентар, phase 4 (Bulgarian market)
+# Prompt for Claude Code — Складио, phase 4 (Bulgarian market)
 
 Paste this file's content as the first message in a new Claude Code session opened in the project root.
 Read `CLAUDE.md`, `README.md` and `docs/PHASE3_PROMPT.md` first.
 
 ---
 
-You are continuing work on **Инвентар**, a multi-tenant inventory SaaS (Next.js 16, Drizzle ORM, MySQL 8,
+You are continuing work on **Складио**, a multi-tenant inventory SaaS (Next.js 16, Drizzle ORM, MySQL 8,
 Tailwind 4, one database and one subdomain per tenant). Phase 3 (email, tests, paging, feedback, security,
 operations, `/admin`) and most of "expected soon after" (photos, PDF printing, stock counts, returns,
 notifications, onboarding, profile + TOTP) are done. Phase 4 makes the product sellable to Bulgarian
@@ -257,7 +257,7 @@ plan (C1).
 ### E2. Online stores and marketplaces
 - WooCommerce and Shopify: two-way sync — products/variants mapped by SKU, stock pushed on every movement
   (debounced), orders imported as sales orders. eMAG Marketplace: stock and order import.
-- Conflict rule: Инвентар is the source of truth for stock; the store is the source for orders.
+- Conflict rule: Складио is the source of truth for stock; the store is the source for orders.
 - **Done (WooCommerce, Shopify; eMAG not yet).** `src/lib/integrations/shops/` (one `Shop` interface:
   products, pushStock, orders) and `shops/sync.ts`:
   - linking by SKU (case-insensitive, simple products and variations) into `shop_products`; unmatched shop
@@ -271,7 +271,7 @@ plan (C1).
     `external_source` + `external_id` (unique), customer found by email/name or created, VAT assigned;
     lines with unknown SKUs go into the notes, orders with none are reported. Orders are imported before
     the stock push, so the imported quantity is reserved at once.
-  - Not covered: order cancellations/edits in the shop after import, product creation from Инвентар.
+  - Not covered: order cancellations/edits in the shop after import, product creation from Складио.
   Mocked tests `tests/db/shops.test.ts`; UI verified against a local WooCommerce mock (no public demo API
   for Woo or Shopify — verify with a real store before the first client).
 

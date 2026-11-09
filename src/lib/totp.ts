@@ -67,7 +67,7 @@ export function verifyTotp(secretBase32: string, code: string, lastStep: number 
   return null;
 }
 
-export function otpauthUrl(secretBase32: string, account: string, issuer = "Инвентар") {
+export function otpauthUrl(secretBase32: string, account: string, issuer = "Складио") {
   const label = encodeURIComponent(`${issuer}:${account}`);
   return `otpauth://totp/${label}?secret=${secretBase32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=${STEP_SECONDS}`;
 }

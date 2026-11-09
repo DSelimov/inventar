@@ -14,7 +14,7 @@ import { isShop, SHOPS, type ShopId } from ".";
 import type { ShopOrder } from "./types";
 
 /**
- * Синхронизация с онлайн магазините. Инвентар е източникът за наличността, магазинът — за поръчките:
+ * Синхронизация с онлайн магазините. Складио е източникът за наличността, магазинът — за поръчките:
  *  - свързване по SKU (shop_products), еднократно и при нови продукти;
  *  - наличност = на склад (в избраната локация или общо) − неизпълненото по потвърдени продажби;
  *    изпраща се само където се различава от последно изпратената (неуспешните се опитват пак);
@@ -125,7 +125,7 @@ export async function importOrders(db: TenantDb, provider: ShopId, actor: Actor,
     const notes = [
       `${name} поръчка ${o.number}.`,
       o.customer.address && `Адрес: ${o.customer.address}`,
-      missing.length && `Невнесени редове (няма SKU в Инвентар): ${missing.map((l) => `${l.sku || "без SKU"} ${l.name} × ${l.quantity}`).join("; ")}`,
+      missing.length && `Невнесени редове (няма SKU в Складио): ${missing.map((l) => `${l.sku || "без SKU"} ${l.name} × ${l.quantity}`).join("; ")}`,
       currency && o.currency && o.currency !== currency && `Цените са в ${o.currency} (валутата на магазина).`,
     ].filter(Boolean);
     try {

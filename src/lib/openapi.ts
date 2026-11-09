@@ -470,7 +470,7 @@ export function buildOpenApi(serverUrl: string) {
   return {
     openapi: "3.1.0",
     info: {
-      title: "Инвентар API",
+      title: "Складио API",
       version: API_VERSION,
       description: [
         "REST API на системата за инвентар. Всички заявки и отговори са JSON (UTF-8).",

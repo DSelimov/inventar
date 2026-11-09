@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin",
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: { default: "Инвентар", template: "%s · Инвентар" },
+  title: { default: "Складио", template: "%s · Складио" },
   description: "Универсална система за инвентар",
 };
 
